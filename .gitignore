@@ -1,0 +1,13 @@
+# Windows metadata
+*:Zone.Identifier
+$RECYCLE.BIN/
+Thumbs.db
+desktop.ini
+
+# IDEs y Editores
+.vscode/
+.idea/
+*.swp
+
+# Archivos de sistema
+.DS_Store
