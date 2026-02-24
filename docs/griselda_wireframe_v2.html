@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Griselda POS — Wireframe v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F5F7;--surface:#FFFFFF;--s2:#F2F2F7;--s3:#E8E8ED;
+  --border:#D1D1D6;--bl:#E5E5EA;
+  --text:#1C1C1E;--t2:#3A3A3C;--t3:#636366;--t4:#AEAEB2;
+  --blue:#2563EB;--blue-bg:#EFF6FF;
+  --green:#16A34A;--green-bg:#F0FDF4;
+  --amber:#D97706;--amber-bg:#FFFBEB;
+  --red:#DC2626;--red-bg:#FEF2F2;
+  --purple:#7C3AED;--purple-bg:#F5F3FF;
+  --cyan:#0891B2;
+  --r:8px;--rl:12px;--rxl:16px;
+  --sh:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+
+/* proto nav */
+.pnav{position:fixed;top:0;left:0;right:0;z-index:999;background:rgba(28,28,30,.95);backdrop-filter:blur(12px);display:flex;align-items:center;gap:3px;padding:8px 12px;overflow-x:auto;border-bottom:1px solid rgba(255,255,255,.06);}
+.pnav::-webkit-scrollbar{display:none;}
+.pnl{font-size:10px;color:rgba(255,255,255,.3);white-space:nowrap;padding-right:10px;border-right:1px solid rgba(255,255,255,.1);margin-right:4px;flex-shrink:0;}
+.pb{padding:5px 13px;border-radius:20px;font-size:11px;font-weight:500;border:none;background:rgba(255,255,255,.1);color:rgba(255,255,255,.5);cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .15s;flex-shrink:0;}
+.pb:hover{background:rgba(255,255,255,.18);color:#fff;}
+.pb.on{background:#2563EB;color:#fff;}
+
+/* screens */
+.scr{display:none;flex-direction:column;min-height:100vh;padding-top:44px;}
+.scr.on{display:flex;}
+
+/* status bar */
+.sb{background:var(--surface);padding:8px 18px 4px;display:flex;justify-content:space-between;}
+.sb-t{font-size:15px;font-weight:700;}
+.sb-r{font-size:12px;color:var(--t3);}
+
+/* header */
+.hdr{background:var(--surface);padding:0 16px;height:52px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--bl);flex-shrink:0;}
+.ht{font-size:17px;font-weight:600;flex:1;}
+.hs{font-size:12px;color:var(--t3);}
+.back{color:var(--blue);font-size:15px;background:none;border:none;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:2px;padding:4px 0;}
+.bhdr{padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;}
+.bp{background:var(--blue);color:#fff;}
+.bg{background:var(--s2);color:var(--t3);}
+
+/* bottom nav */
+.bnav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--bl);display:flex;padding:8px 0 calc(env(safe-area-inset-bottom,0px) + 8px);z-index:100;}
+.bn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;color:var(--t4);}
+.bn.on{color:var(--blue);}
+.bni{font-size:23px;position:relative;}
+.bnl{font-size:10px;font-weight:500;}
+.bndot{position:absolute;top:-2px;right:-6px;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;}
+
+/* scroll area */
+.sa{flex:1;overflow-y:auto;padding-bottom:90px;}
+.sh{padding:16px 16px 8px;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;}
+
+/* mesas */
+.llevar-btn{margin:0 12px 12px;background:var(--blue);color:#fff;border-radius:var(--rl);padding:16px 18px;display:flex;align-items:center;gap:12px;cursor:pointer;box-shadow:0 4px 14px rgba(37,99,235,.28);}
+.llevar-btn:active{transform:scale(.98);}
+.mg{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 12px;}
+.mc{background:var(--surface);border-radius:var(--rl);padding:14px;cursor:pointer;border:1.5px solid var(--bl);box-shadow:var(--sh);transition:transform .1s;}
+.mc:active{transform:scale(.97);}
+.mc.ocu{border-color:#FDE68A;background:#FFFDF0;}
+.mc-n{font-size:20px;font-weight:700;}
+.mc-c{font-size:12px;color:var(--t4);}
+.mc-s{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;margin-top:8px;}
+.sl{background:var(--green-bg);color:var(--green);}
+.so{background:var(--amber-bg);color:var(--amber);}
+.mc-i{font-size:11px;color:var(--t3);margin-top:4px;}
+.mc-t{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--amber);}
+
+/* products */
+.catrow{display:flex;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--bl);}
+.catrow::-webkit-scrollbar{display:none;}
+.cti{padding:12px 16px;font-size:13px;font-weight:500;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
+.cti.on{color:var(--blue);border-bottom-color:var(--blue);}
+.prod{background:var(--surface);border-radius:var(--rl);padding:14px;margin:0 12px 8px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid var(--bl);box-shadow:var(--sh);transition:transform .1s;}
+.prod:active{transform:scale(.98);}
+.pi{width:46px;height:46px;border-radius:var(--r);background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+.pn{font-size:14px;font-weight:500;}
+.pd{font-size:12px;color:var(--t3);}
+.pp{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;color:var(--green);}
+.padd{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;border:none;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(37,99,235,.28);}
+.pagot{display:inline-flex;padding:2px 8px;background:var(--red-bg);color:var(--red);border-radius:20px;font-size:10px;font-weight:600;margin-top:4px;}
+
+/* comanda */
+.ctabs{display:flex;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--bl);}
+.ctabs::-webkit-scrollbar{display:none;}
+.cti2{padding:10px 16px;font-size:13px;font-weight:500;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
+.cti2.on{color:var(--blue);border-bottom-color:var(--blue);}
+.ctp{padding:10px 14px;color:var(--blue);font-size:18px;cursor:pointer;}
+.citem{background:var(--surface);border-radius:var(--rl);padding:12px 14px;margin:0 12px 8px;box-shadow:var(--sh);}
+.citem-acc{border:1.5px solid rgba(37,99,235,.25);background:var(--blue-bg);}
+.cir{display:flex;align-items:flex-start;gap:10px;}
+.ciq{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;color:var(--blue);width:20px;flex-shrink:0;padding-top:1px;}
+.cin{font-size:13px;font-weight:500;}
+.cio{font-size:12px;color:var(--t3);margin-top:2px;}
+.cip{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--green);flex-shrink:0;}
+.ctag{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;margin-top:5px;}
+.tp{background:var(--blue-bg);color:var(--blue);}
+.te{background:var(--green-bg);color:var(--green);}
+.tc{background:var(--red-bg);color:var(--red);}
+.cfot{background:var(--surface);padding:14px 16px;border-top:1px solid var(--bl);}
+.ctot{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.ctotl{font-size:13px;color:var(--t3);}
+.ctotv{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--green);}
+.cbtns{display:flex;gap:8px;}
+.cbtn{flex:1;padding:13px;border-radius:var(--rl);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;border:none;transition:transform .1s;}
+.cbtn:active{transform:scale(.97);}
+.cb-s{background:var(--blue);color:#fff;box-shadow:0 3px 10px rgba(37,99,235,.28);}
+.cb-p{background:var(--green);color:#fff;box-shadow:0 3px 10px rgba(22,163,74,.28);}
+.cb-g{background:var(--s2);color:var(--t3);}
+
+/* bottom sheet */
+.shbg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:500;align-items:flex-end;}
+.shbg.on{display:flex;}
+.sheet{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-height:88vh;overflow-y:auto;padding-bottom:28px;}
+.shhnd{width:40px;height:4px;background:var(--s3);border-radius:2px;margin:12px auto 0;}
+.shhdr{padding:16px 20px 12px;border-bottom:1px solid var(--bl);}
+.sht{font-size:17px;font-weight:700;}
+.shs{font-size:13px;color:var(--t3);margin-top:2px;}
+.shbd{padding:16px 20px;}
+.shft{padding:12px 20px 0;border-top:1px solid var(--bl);display:flex;gap:10px;padding-bottom:calc(env(safe-area-inset-bottom,0px)+14px);}
+
+/* modificadores */
+.mgrp{margin-bottom:20px;}
+.mgh{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.mgn{font-size:15px;font-weight:600;}
+.mbadge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;}
+.mbreq{background:var(--blue-bg);color:var(--blue);}
+.mbopt{background:var(--s2);color:var(--t3);}
+.mbcond{background:var(--purple-bg);color:var(--purple);}
+.mopt{display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:var(--rl);border:1.5px solid var(--bl);background:var(--surface);cursor:pointer;margin-bottom:8px;transition:all .1s;}
+.mopt:active{transform:scale(.98);}
+.mopt.sel{border-color:var(--blue);background:var(--blue-bg);}
+.mchk{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;color:#fff;transition:all .15s;}
+.mopt.sel .mchk{border-color:var(--blue);background:var(--blue);}
+.moptnam{flex:1;font-size:14px;font-weight:500;}
+.moptpr{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--amber);}
+.condbox{background:var(--purple-bg);border:1px solid rgba(124,58,237,.15);border-radius:var(--rl);padding:14px;margin-top:4px;}
+.condlbl{font-size:11px;font-weight:600;color:var(--purple);margin-bottom:10px;}
+
+/* rapido */
+.ritem{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--rl);border:1px solid var(--bl);background:var(--surface);margin:0 0 8px;}
+.rinf{flex:1;}
+.rnam{font-size:14px;font-weight:500;}
+.rpr{font-size:12px;color:var(--t3);font-family:'JetBrains Mono',monospace;}
+.ctr{display:flex;align-items:center;}
+.ctrb{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);color:var(--t2);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:transform .1s;}
+.ctrb:active{transform:scale(.9);}
+.ctrv{width:36px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--blue);}
+
+/* cobro */
+.scgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.scbtn{background:var(--surface);border:1.5px solid var(--bl);border-radius:var(--rl);padding:14px;text-align:center;cursor:pointer;box-shadow:var(--sh);transition:all .1s;}
+.scbtn:active{transform:scale(.97);}
+.scbtn.on{border-color:var(--blue);background:var(--blue-bg);}
+.scico{font-size:24px;margin-bottom:6px;}
+.scnam{font-size:12px;font-weight:600;color:var(--t2);}
+.cocard{background:var(--surface);border-radius:var(--rl);padding:16px;margin-bottom:12px;box-shadow:var(--sh);}
+.coctit{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--t3);margin-bottom:12px;}
+.corow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bl);}
+.corow:last-child{border-bottom:none;}
+.col{font-size:14px;color:var(--t2);}
+.cov{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;}
+.mets{display:flex;gap:8px;margin-bottom:14px;}
+.met{flex:1;padding:11px 4px;border-radius:var(--rl);border:1.5px solid var(--bl);background:var(--s2);cursor:pointer;text-align:center;font-size:12px;font-weight:600;color:var(--t3);transition:all .12s;}
+.met.on{border-color:var(--blue);background:var(--blue-bg);color:var(--blue);}
+.numinput{background:var(--s2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:20px;padding:14px;width:100%;outline:none;text-align:right;}
+.numinput:focus{border-color:var(--blue);}
+.vuelto{background:var(--green-bg);border:1.5px solid rgba(22,163,74,.2);border-radius:var(--rl);padding:14px 16px;display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
+.vl{font-size:13px;color:var(--green);font-weight:500;}
+.vv{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--green);}
+
+/* dashboard */
+.kgrid{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.kc{background:var(--surface);border-radius:var(--rl);padding:14px;box-shadow:var(--sh);}
+.kl{font-size:11px;color:var(--t3);margin-bottom:4px;font-weight:500;}
+.kv{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;line-height:1;}
+.ks{font-size:11px;color:var(--t4);margin-top:4px;}
+.chart{background:var(--surface);border-radius:var(--rl);padding:16px;margin:0 12px 10px;box-shadow:var(--sh);}
+.chartt{font-size:14px;font-weight:600;margin-bottom:14px;}
+.barchart{display:flex;align-items:flex-end;gap:6px;height:80px;}
+.barw{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.bar{width:100%;border-radius:4px 4px 0 0;min-height:4px;}
+.barl{font-size:9px;color:var(--t4);}
+.hbars{display:flex;flex-direction:column;gap:8px;}
+.hbar{display:flex;align-items:center;gap:8px;}
+.hbn{font-size:12px;color:var(--t2);width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hbt{flex:1;background:var(--s2);border-radius:3px;height:7px;}
+.hbf{height:7px;border-radius:3px;}
+.hbv{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--t3);width:28px;text-align:right;flex-shrink:0;}
+.dnrow{display:flex;align-items:center;gap:14px;}
+.dnsvg{width:72px;height:72px;flex-shrink:0;}
+.dnitems{flex:1;}
+.dnitem{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12px;}
+.dndot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.dnpct{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t3);}
+
+/* turno */
+.tcard{background:var(--surface);border-radius:var(--rl);padding:16px;margin:0 12px 10px;box-shadow:var(--sh);}
+.ttit{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--t3);margin-bottom:10px;}
+.trow{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--bl);font-size:14px;}
+.trow:last-child{border-bottom:none;}
+.tl{color:var(--t2);}
+.tv{font-family:'JetBrains Mono',monospace;font-weight:500;}
+.tpos{color:var(--green);}
+.tneg{color:var(--red);}
+
+/* impresoras */
+.icard{background:var(--surface);border-radius:var(--rl);padding:16px;margin:0 12px 10px;box-shadow:var(--sh);}
+.ihead{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+.iico{width:44px;height:44px;border-radius:var(--rl);background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:22px;border:1px solid var(--bl);}
+.iname{font-size:15px;font-weight:600;}
+.iip{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t3);}
+.togrow{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--bl);}
+.togrow:last-child{border-bottom:none;}
+.tognam{font-size:14px;font-weight:500;}
+.togdes{font-size:11px;color:var(--t3);margin-top:2px;}
+.tog{width:44px;height:26px;border-radius:13px;background:var(--s3);position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;margin-left:12px;}
+.tog.on{background:var(--green);}
+.tog::after{content:'';position:absolute;width:20px;height:20px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.25);}
+.tog.on::after{left:21px;}
+.gchip{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:var(--s2);font-size:12px;font-weight:500;margin-right:8px;margin-bottom:6px;}
+.gdot{width:8px;height:8px;border-radius:50%;}
+
+/* misc */
+.badge{font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;}
+.bg2{background:var(--green-bg);color:var(--green);}
+.bb{background:var(--blue-bg);color:var(--blue);}
+.br{background:var(--red-bg);color:var(--red);}
+.bigbtn{width:100%;background:var(--blue);color:#fff;border:none;border-radius:var(--rl);padding:18px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(37,99,235,.28);transition:transform .1s;}
+.bigbtn.grn{background:var(--green);box-shadow:0 4px 14px rgba(22,163,74,.28);}
+.bigbtn:active{transform:scale(.98);}
+.bigbtn.gho{background:var(--s2);color:var(--t3);box-shadow:none;}
+.sep{height:1px;background:var(--bl);margin:14px 0;}
+.fi{background:var(--s2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-family:inherit;font-size:14px;padding:12px 14px;outline:none;width:100%;}
+.fi:focus{border-color:var(--blue);}
+.lbl{font-size:12px;font-weight:600;color:var(--t3);margin-bottom:6px;}
+.infobox{background:var(--blue-bg);border:1px solid rgba(37,99,235,.15);border-radius:var(--rl);padding:12px 14px;font-size:12px;color:var(--t2);line-height:1.5;}
+.infobox strong{color:var(--blue);}
+.hidden{display:none!important;}
+::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<div class="pnav">
+  <span class="pnl">📱 Griselda POS — Prototipo mobile-first</span>
+  <button class="pb on" onclick="go('mesas')">1 · Mesas</button>
+  <button class="pb" onclick="go('pos')">2 · POS</button>
+  <button class="pb" onclick="go('mod')">3 · Modificadores</button>
+  <button class="pb" onclick="go('rap')">4 · Captura rápida</button>
+  <button class="pb" onclick="go('cobro')">5 · Cobro</button>
+  <button class="pb" onclick="go('dash')">6 · Dashboard</button>
+  <button class="pb" onclick="go('cierre')">7 · Cierre turno</button>
+  <button class="pb" onclick="go('imp')">8 · Impresoras</button>
+</div>
+
+<!-- 1 MESAS -->
+<div id="s-mesas" class="scr on">
+  <div class="sb"><span class="sb-t">10:47</span><span class="sb-r">📶 🔋</span></div>
+  <div class="hdr"><div class="ht">Griselda POS</div><span class="badge bg2">● Turno #38</span><span style="font-size:22px;margin-left:6px;cursor:pointer;">👤</span></div>
+  <div class="sa">
+    <div class="sh">Para llevar</div>
+    <div class="llevar-btn" onclick="openSh('llevar')">
+      <span style="font-size:28px;">📦</span>
+      <div style="flex:1;"><div style="font-size:15px;font-weight:600;">Nuevo pedido para llevar</div><div style="font-size:12px;opacity:.8;margin-top:2px;">Sin mesa · Datos opcionales</div></div>
+      <span style="font-size:20px;opacity:.7;">›</span>
+    </div>
+    <div class="sh">Mesas — Interior</div>
+    <div class="mg">
+      <div class="mc ocu" onclick="go('pos')"><div class="mc-n">Mesa 1</div><div class="mc-c">4 personas</div><div class="mc-s so">● Ocupada</div><div class="mc-i">Maria · 3 com.</div><div class="mc-t">00:47</div></div>
+      <div class="mc" onclick="go('pos')"><div class="mc-n">Mesa 2</div><div class="mc-c">2 personas</div><div class="mc-s sl">○ Libre</div></div>
+      <div class="mc ocu" onclick="go('pos')"><div class="mc-n">Mesa 3</div><div class="mc-c">4 personas</div><div class="mc-s so">● Ocupada</div><div class="mc-i">Juan · 4 com.</div><div class="mc-t">00:23</div></div>
+      <div class="mc" onclick="go('pos')"><div class="mc-n">Mesa 4</div><div class="mc-c">6 personas</div><div class="mc-s sl">○ Libre</div></div>
+      <div class="mc" onclick="go('pos')"><div class="mc-n">Mesa 5</div><div class="mc-c">4 personas</div><div class="mc-s sl">○ Libre</div></div>
+      <div class="mc ocu" onclick="go('pos')"><div class="mc-n">Mesa 6</div><div class="mc-c">2 personas</div><div class="mc-s so">● Ocupada</div><div class="mc-i">Maria · 2 com.</div><div class="mc-t">01:12</div></div>
+      <div class="mc" onclick="go('pos')"><div class="mc-n">Mesa 7</div><div class="mc-c">4 personas</div><div class="mc-s sl">○ Libre</div></div>
+    </div>
+  </div>
+  <div class="bnav">
+    <div class="bn on"><div class="bni">🍽️</div><div class="bnl">Mesas</div></div>
+    <div class="bn" onclick="go('pos')"><div class="bni">📋<span class="bndot">3</span></div><div class="bnl">Pedidos</div></div>
+    <div class="bn"><div class="bni">🕐</div><div class="bnl">Historial</div></div>
+    <div class="bn" onclick="go('dash')"><div class="bni">📊</div><div class="bnl">Dashboard</div></div>
+    <div class="bn"><div class="bni">⚙️</div><div class="bnl">Más</div></div>
+  </div>
+</div>
+
+<!-- 2 POS — MENÚ -->
+<div id="s-pos" class="scr">
+  <div class="sb"><span class="sb-t">10:51</span><span class="sb-r">📶 🔋</span></div>
+  <div class="hdr" style="gap:8px;"><button class="back" onclick="go('mesas')">‹ Mesas</button><div style="flex:1;"><div class="ht">Mesa 1 — Menú</div><div class="hs">3 comensales · 00:47</div></div><button class="bhdr bg" onclick="go('comanda')">Ver comanda</button></div>
+  <div class="catrow">
+    <div class="cti on">Caldos</div><div class="cti">Tacos</div><div class="cti">Desayunos</div><div class="cti">Bebidas</div><div class="cti">Extras</div>
+  </div>
+  <div class="sa" style="padding-top:8px;">
+    <div class="prod" onclick="go('mod')"><div class="pi">🍲</div><div style="flex:1;"><div class="pn">Menudo Grande</div><div class="pd">Con panza, pata o mixto</div><div class="pp">$120.00</div></div><button class="padd" onclick="event.stopPropagation();go('mod')">＋</button></div>
+    <div class="prod" onclick="go('mod')"><div class="pi">🍲</div><div style="flex:1;"><div class="pn">Menudo Mediano</div><div class="pd">Con panza, pata o mixto</div><div class="pp">$100.00</div></div><button class="padd">＋</button></div>
+    <div class="prod" onclick="go('mod')"><div class="pi">🍲</div><div style="flex:1;"><div class="pn">Menudo Chico</div><div class="pp">$80.00</div></div><button class="padd">＋</button></div>
+    <div class="prod" style="opacity:.5;pointer-events:none;"><div class="pi">🍲</div><div style="flex:1;"><div class="pn">Para llevar</div><span class="pagot">Agotado</span></div><button class="padd" style="background:var(--s3);box-shadow:none;color:var(--t4);">✕</button></div>
+  </div>
+  <div style="padding:12px;border-top:1px solid var(--bl);background:var(--surface);position:sticky;bottom:0;">
+    <button class="bigbtn" onclick="go('comanda')">Ver comanda — $191.00 →</button>
+  </div>
+</div>
+
+<!-- 2b COMANDA -->
+<div id="s-comanda" class="scr">
+  <div class="sb"><span class="sb-t">10:51</span><span class="sb-r">📶 🔋</span></div>
+  <div class="hdr" style="gap:8px;"><button class="back" onclick="go('pos')">‹ Menú</button><div style="flex:1;"><div class="ht">Mesa 1 — Comanda</div><div class="hs">Comensal 1 de 3</div></div><button class="bhdr bp" onclick="go('cobro')">Cobrar</button></div>
+  <div class="ctabs">
+    <div class="cti2 on">Comensal 1</div><div class="cti2">Comensal 2</div><div class="cti2">Comensal 3</div><div class="ctp">＋</div>
+  </div>
+  <div class="sa" style="padding-top:8px;">
+    <div class="citem"><div class="cir"><div class="ciq">1</div><div style="flex:1;"><div class="cin">Menudo Grande</div><div class="cio">Con panza · Mediano</div><span class="ctag te">✓ Enviado</span></div><div class="cip">$120.00</div></div></div>
+    <div class="citem"><div class="cir"><div class="ciq">1</div><div style="flex:1;"><div class="cin">Refresco Coca Cola</div><span class="ctag te">✓ Enviado</span></div><div class="cip">$27.00</div></div></div>
+    <div class="citem" style="opacity:.55;"><div class="cir"><div class="ciq">1</div><div style="flex:1;"><div class="cin" style="text-decoration:line-through;">Café de olla</div><span class="ctag tc">✕ Cancelado</span></div><div class="cip" style="text-decoration:line-through;color:var(--t4);">$20.00</div></div></div>
+    <div class="citem citem-acc"><div class="cir"><div class="ciq">2</div><div style="flex:1;"><div class="cin">Tacos de guisado</div><div class="cio">Chicharrón x1 · Rajas x1</div><span class="ctag tp">⏳ Pendiente</span></div><div class="cip">$44.00</div></div></div>
+  </div>
+  <div class="cfot">
+    <div class="ctot"><span class="ctotl">Total comensal 1</span><span class="ctotv">$191.00</span></div>
+    <div class="cbtns">
+      <button class="cbtn cb-g" onclick="go('rap')">＋ Agregar</button>
+      <button class="cbtn cb-s">📮 Enviar</button>
+      <button class="cbtn cb-p" onclick="go('cobro')">💳 Cobrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- 3 MODIFICADORES -->
+<div id="s-mod" class="scr">
+  <div class="sb"><span class="sb-t">10:52</span><span class="sb-r">📶 🔋</span></div>
+  <div class="hdr"><button class="back" onclick="go('pos')">‹</button><div style="flex:1;"><div class="ht">Menudo Grande</div><div class="hs">Selecciona las opciones</div></div></div>
+  <div class="sa" style="padding:16px;padding-bottom:130px;">
+    <div class="infobox" style="margin-bottom:16px;"><strong>Requerido:</strong> hay que elegir antes de agregar. <strong>Opcional:</strong> se puede dejar vacío.</div>
+    <!-- Tamaño -->
+    <div class="mgrp">
+      <div class="mgh"><div class="mgn">Tamaño</div><span class="mbadge mbreq">Requerido — 1</span></div>
+      <div class="mopt" onclick="s1(this)"><div class="mchk"></div><span class="moptnam">Chico</span><span class="moptpr">$80.00</span></div>
+      <div class="mopt sel" onclick="s1(this)"><div class="mchk">✓</div><span class="moptnam">Mediano</span><span class="moptpr">$100.00</span></div>
+      <div class="mopt" onclick="s1(this)"><div class="mchk"></div><span class="moptnam">Grande</span><span class="moptpr">$120.00</span></div>
+      <div class="mopt" onclick="s1(this)"><div class="mchk"></div><span class="moptnam">Para llevar</span><span class="moptpr">$100.00</span></div>
+    </div>
+    <!-- Tipo de carne -->
+    <div class="mgrp">
+      <div class="mgh"><div class="mgn">Tipo de carne</div><span class="mbadge mbreq">Requerido — 1</span></div>
+      <div class="mopt sel" onclick="s1(this)"><div class="mchk">✓</div><span class="moptnam">Con panza</span><span class="moptpr"></span></div>
+      <div class="mopt" onclick="s1(this)"><div class="mchk"></div><span class="moptnam">Con pata</span><span class="moptpr"></span></div>
+      <div class="mopt" onclick="s1(this)"><div class="mchk"></div><span class="moptnam">Mixto</span><span class="moptpr"></span></div>
+    </div>
+    <!-- Extras opcionales -->
+    <div class="mgrp">
+      <div class="mgh"><div class="mgn">Extras</div><span class="mbadge mbopt">Opcional — varios</span></div>
+      <div class="mopt" onclick="sm(this)"><div class="mchk" style="border-radius:5px;"></div><span class="moptnam">Tostadas</span><span class="moptpr">+$10.00</span></div>
+      <div class="mopt" onclick="sm(this)"><div class="mchk" style="border-radius:5px;"></div><span class="moptnam">Limones extra</span><span class="moptpr">$0.00</span></div>
+    </div>
+    <!-- Condicional -->
+    <div class="mgrp">
+      <div class="mgh"><div class="mgn">Complemento</div><span class="mbadge mbcond">Condicional</span></div>
+      <div class="condbox">
+        <div class="condlbl">🔗 Visible porque elegiste "Mediano"</div>
+        <div class="mopt" onclick="sm(this)"><div class="mchk" style="border-radius:5px;"></div><span class="moptnam">Huevo revuelto</span><span class="moptpr">+$15.00</span></div>
+        <div class="mopt" onclick="sm(this)"><div class="mchk" style="border-radius:5px;"></div><span class="moptnam">Frijoles</span><span class="moptpr">+$10.00</span></div>
+      </div>
+    </div>
+  </div>
+  <div style="position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--bl);padding:14px 16px;padding-bottom:calc(env(safe-area-inset-bottom,0px)+14px);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-size:13px;color:var(--t2);">Menudo Grande · Con panza · Mediano</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--amber);">$100.00</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <div style="display:flex;border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;">
+        <button class="ctrb" style="border-radius:0;border:none;width:38px;height:38px;">−</button>
+        <div style="width:40px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;border-left:1.5px solid var(--border);border-right:1.5px solid var(--border);">1</div>
+        <button class="ctrb" style="border-radius:0;border:none;width:38px;height:38px;">＋</button>
+      </div>
+      <button class="bigbtn" onclick="go('comanda')" style="flex:1;padding:11px;">✓ Agregar a comanda</button>
+    </div>
+  </div>
+</div>
+
+<!-- 4 CAPTURA RÁPIDA -->
+<div id="s-rap" class="scr">
+  <div class="sb"><span class="sb-t">10:53</span><span class="sb-r">📶 🔋</span></div>
+  <div class="hdr"><button class="back" onclick="go('comanda')">‹</button><div style="flex:1;"><div class="ht">Tacos de guisado</div><div class="hs">Modo captura rápida</div></div></div>
+  <div class="sa" style="padding:16px;padding-bottom:140px;">
+    <div class="infobox" style="margin-bottom:14px;"><strong>Modo rápido:</strong> ajusta la cantidad con [+/−]. El sistema crea las entradas automáticamente.</div>
+    <div class="ritem"><div class="rinf"><div class="rnam">Chicharrón en salsa verde</div><div class="rpr">$22.00 c/u</div></div><div class="ctr"><button class="ctrb">−</button><div class="ctrv">2</div><button class="ctrb">＋</button></div></div>
+    <div class="ritem"><div class="rinf"><div class="rnam">Rajas con crema</div><div class="rpr">$22.00 c/u</div></div><div class="ctr"><button class="ctrb">−</button><div class="ctrv">1</div><button class="ctrb">＋</button></div></div>
+    <div class="ritem"><div class="rinf"><div class="rnam">Picadillo</div><div class="rpr">$22.00 c/u</div></div><div class="ctr"><button class="ctrb">−</button><div class="ctrv">0</div><button class="ctrb">＋</button></div></div>
+    <div class="ritem"><div class="rinf"><div class="rnam">Frijoles</div><div class="rpr">$22.00 c/u</div></div><div class="ctr"><button class="ctrb">−</button><div class="ctrv">0</div><button class="ctrb">＋</button></div></div>
+    <div class="ritem"><div class="rinf"><div class="rnam">Bistec</div><div class="rpr">$25.00 c/u</div></div><div class="ctr"><button class="ctrb">−</button><div class="ctrv">0</div><button class="ctrb">＋</button></div></div>
+    <div class="ritem" style="opacity:.4;pointer-events:none;"><div class="rinf"><div class="rnam" style="color:var(--t3);">Deshebrada</div><span class="badge br">Agotada</span></div><div class="ctr"><button class="ctrb">−</button><div class="ctrv" style="color:var(--t4);">0</div><button class="ctrb">＋</button></div></div>
+  </div>
+  <div style="position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--bl);padding:14px 16px;padding-bottom:calc(env(safe-area-inset-bottom,0px)+14px);">
+    <div style="background:var(--s2);border-radius:var(--rl);padding:12px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div><div style="font-size:13px;font-weight:500;color:var(--t2);">3 tacos · Chicharrón x2 · Rajas x1</div><div style="font-size:11px;color:var(--t3);margin-top:2px;">2 entradas se crean en la comanda</div></div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--amber);">$66.00</div>
+    </div>
+    <button class="bigbtn" onclick="go('comanda')">✓ Agregar 3 tacos a Comensal 1</button>
+  </div>
+</div>
+
+<!-- 5 COBRO -->
+<div id="s-cobro" class="scr">
+  <div class="sb"><span class="sb-t">11:04</span><span class="sb-r">📶 🔋</span></div>
+  <div class="hdr"><button class="back" onclick="go('comanda')">‹ Mesa 1</button><div class="ht" style="text-align:center;">Cobro</div><div style="width:60px;"></div></div>
+  <div class="sa" style="padding:12px;">
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--t3);margin-bottom:8px;">Escenario de cobro</div>
+    <div class="scgrid">
+      <div class="scbtn" onclick="sc(this)"><div class="scico">👤</div><div class="scnam">Individual</div></div>
+      <div class="scbtn on" onclick="sc(this)"><div class="scico">🍽️</div><div class="scnam">Cuenta general</div></div>
+      <div class="scbtn" onclick="sc(this)"><div class="scico">👥</div><div class="scnam">Uno paga varios</div></div>
+      <div class="scbtn" onclick="sc(this)"><div class="scico">➗</div><div class="scnam">Dividir cuenta</div></div>
+    </div>
+    <div class="cocard">
+      <div class="coctit">Resumen — Mesa completa</div>
+      <div class="corow"><span class="col">Comensal 1</span><span class="cov">$191.00</span></div>
+      <div class="corow"><span class="col">Comensal 2</span><span class="cov">$230.00</span></div>
+      <div class="corow"><span class="col">Comensal 3</span><span class="cov">$153.00</span></div>
+      <div class="corow"><span class="col" style="color:var(--amber);">Descuento 10%</span><span class="cov" style="color:var(--amber);">−$57.40</span></div>
+      <div class="corow" style="padding:12px 0 0;border:none;"><span class="col" style="font-size:16px;font-weight:700;">Total</span><span class="cov" style="font-size:22px;font-weight:700;color:var(--green);">$516.60</span></div>
+      <div style="font-size:11px;color:var(--t4);margin-top:6px;">Propina sugerida 10%: $568.26</div>
+    </div>
+    <div class="cocard">
+      <div class="coctit">Método de pago</div>
+      <div class="mets">
+        <div class="met on" onclick="mt(this)">💵 Efectivo</div>
+        <div class="met" onclick="mt(this)">💳 Tarjeta</div>
+        <div class="met" onclick="mt(this)">📱 Transfer</div>
+        <div class="met" onclick="tmx(this)">🔀 Mixto</div>
+      </div>
+      <div id="psimple">
+        <div style="margin-bottom:10px;"><div class="lbl">Efectivo recibido</div><input class="numinput" value="600.00" id="efin" oninput="cv()"></div>
+        <div class="vuelto"><span class="vl">💵 Cambio</span><span class="vv" id="vlt">$83.40</span></div>
+      </div>
+      <div id="pmixto" class="hidden">
+        <div style="font-size:12px;color:var(--t3);margin-bottom:10px;">Distribuye el total entre métodos:</div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;"><span style="width:80px;font-size:13px;color:var(--t3);">💵 Efectivo</span><input class="numinput" value="300.00" style="flex:1;font-size:16px;padding:10px;"></div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;"><span style="width:80px;font-size:13px;color:var(--t3);">💳 Tarjeta</span><input class="numinput" value="216.60" style="flex:1;font-size:16px;padding:10px;"></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;"><span style="color:var(--t3);">Suma</span><span style="color:var(--green);font-family:'JetBrains Mono',monospace;font-weight:600;">$516.60 ✓</span></div>
+        <div class="vuelto"><span class="vl">💵 Vuelto efectivo</span><span class="vv">$83.40</span></div>
+      </div>
+    </div>
+    <button class="bigbtn grn" onclick="alert('✓ Cobro confirmado\nMesa 1 cerrada\nTicket enviado a WiFi Printer')">✓ Confirmar cobro — $516.60</button>
+    <div style="height:20px;"></div>
+  </div>
+</div>
+
+<!-- 6 DASHBOARD -->
+<div id="s-dash" class="scr">
+  <div class="sb"><span class="sb-t">11:10</span><span class="sb-r">📶 🔋</span></div>
+  <div class="hdr"><div class="ht">Dashboard</div><button class="bhdr bg">📥 CSV</button></div>
+  <div class="sa" style="padding-bottom:90px;">
+    <div class="sh">Turno #38 · sábado 21 Feb</div>
+    <div class="kgrid">
+      <div class="kc" style="border-top:3px solid var(--green);"><div class="kl">Ventas del turno</div><div class="kv" style="color:var(--green);">$4,830</div><div class="ks">28 pedidos</div></div>
+      <div class="kc" style="border-top:3px solid var(--blue);"><div class="kl">Ticket promedio</div><div class="kv" style="color:var(--blue);">$172</div><div class="ks">+12% vs ayer</div></div>
+      <div class="kc" style="border-top:3px solid var(--amber);"><div class="kl">Descuentos</div><div class="kv" style="color:var(--amber);">$340</div><div class="ks">7% del total</div></div>
+      <div class="kc" style="border-top:3px solid var(--purple);"><div class="kl">Para llevar</div><div class="kv" style="color:var(--purple);">6</div><div class="ks">órdenes · $720</div></div>
+    </div>
+    <div class="chart">
+      <div class="chartt">Ventas por hora</div>
+      <div class="barchart">
+        <div class="barw"><div class="bar" style="height:16%;background:rgba(37,99,235,.15);"></div><div class="barl">8am</div></div>
+        <div class="barw"><div class="bar" style="height:55%;background:var(--blue);"></div><div class="barl">9am</div></div>
+        <div class="barw"><div class="bar" style="height:100%;background:var(--blue);"></div><div class="barl">10am</div></div>
+        <div class="barw"><div class="bar" style="height:82%;background:var(--blue);"></div><div class="barl">11am</div></div>
+        <div class="barw"><div class="bar" style="height:52%;background:rgba(37,99,235,.5);"></div><div class="barl">12pm</div></div>
+        <div class="barw"><div class="bar" style="height:30%;background:rgba(37,99,235,.15);"></div><div class="barl">1pm</div></div>
+      </div>
+    </div>
+    <div class="chart">
+      <div class="chartt">Top productos</div>
+      <div class="hbars">
+        <div class="hbar"><div class="hbn">Menudo Grande</div><div class="hbt"><div class="hbf" style="width:100%;background:var(--green);"></div></div><div class="hbv">x24</div></div>
+        <div class="hbar"><div class="hbn">Tacos guisado</div><div class="hbt"><div class="hbf" style="width:88%;background:var(--blue);"></div></div><div class="hbv">x38</div></div>
+        <div class="hbar"><div class="hbn">Coca Cola</div><div class="hbt"><div class="hbf" style="width:72%;background:var(--cyan);"></div></div><div class="hbv">x31</div></div>
+        <div class="hbar"><div class="hbn">Menudo Mediano</div><div class="hbt"><div class="hbf" style="width:58%;background:var(--green);"></div></div><div class="hbv">x18</div></div>
+        <div class="hbar"><div class="hbn">Chilaquiles</div><div class="hbt"><div class="hbf" style="width:46%;background:var(--amber);"></div></div><div class="hbv">x14</div></div>
+        <div class="hbar"><div class="hbn">Café de olla</div><div class="hbt"><div class="hbf" style="width:38%;background:var(--amber);"></div></div><div class="hbv">x12</div></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 12px;">
+      <div class="chart" style="margin:0;padding:14px;">
+        <div class="chartt" style="font-size:13px;">Métodos de pago</div>
+        <div class="dnrow">
+          <svg class="dnsvg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#E5E5EA" stroke-width="4"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="#16A34A" stroke-width="4" stroke-dasharray="62 38" stroke-dashoffset="25"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="#2563EB" stroke-width="4" stroke-dasharray="28 72" stroke-dashoffset="-37"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="#D97706" stroke-width="4" stroke-dasharray="10 90" stroke-dashoffset="-65"/></svg>
+          <div class="dnitems">
+            <div class="dnitem"><div class="dndot" style="background:var(--green);"></div>Efectivo<span class="dnpct">62%</span></div>
+            <div class="dnitem"><div class="dndot" style="background:var(--blue);"></div>Tarjeta<span class="dnpct">28%</span></div>
+            <div class="dnitem"><div class="dndot" style="background:var(--amber);"></div>Transfer<span class="dnpct">10%</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="chart" style="margin:0;padding:14px;">
+        <div class="chartt" style="font-size:13px;">Canal de venta</div>
+        <div class="dnrow">
+          <svg class="dnsvg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#E5E5EA" stroke-width="4"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="#0891B2" stroke-width="4" stroke-dasharray="85 15" stroke-dashoffset="25"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="#7C3AED" stroke-width="4" stroke-dasharray="15 85" stroke-dashoffset="-60"/></svg>
+          <div class="dnitems">
+            <div class="dnitem"><div class="dndot" style="background:var(--cyan);"></div>Mesa<span class="dnpct">85%</span></div>
+            <div class="dnitem"><div class="dndot" style="background:var(--purple);"></div>Llevar<span class="dnpct">15%</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="bnav">
+    <div class="bn" onclick="go('mesas')"><div class="bni">🍽️</div><div class="bnl">Mesas</div></div>
+    <div class="bn"><div class="bni">📋</div><div class="bnl">Pedidos</div></div>
+    <div class="bn"><div class="bni">🕐</div><div class="bnl">Historial</div></div>
+    <div class="bn on"><div class="bni">📊</div><div class="bnl">Dashboard</div></div>
+    <div class="bn"><div class="bni">⚙️</div><div class="bnl">Más</div></div>
+  </div>
+</div>
+
+<!-- 7 CIERRE -->
+<div id="s-cierre" class="scr">
+  <div class="sb"><span class="sb-t">14:00</span><span class="sb-r">📶 🔋</span></div>
+  <div class="hdr"><div class="ht">Cierre de turno</div><span class="badge br">Solo Admin</span></div>
+  <div class="sa">
+    <div class="sh">Turno #38 · Abierto 09:15 AM</div>
+    <div class="tcard">
+      <div class="ttit">Cajón de efectivo</div>
+      <div class="trow"><span class="tl">Fondo inicial</span><span class="tv">$500.00</span></div>
+      <div class="trow"><span class="tl">Cobros en efectivo</span><span class="tv tpos">+$2,996.00</span></div>
+      <div class="trow"><span class="tl">Pagos / Salidas</span><span class="tv tneg">−$200.00</span></div>
+      <div class="trow"><span class="tl">Cancelaciones</span><span class="tv tneg">−$40.00</span></div>
+      <div class="trow"><span class="tl" style="font-weight:700;font-size:15px;color:var(--text);">Efectivo teórico</span><span class="tv" style="font-size:18px;font-weight:700;">$3,256.00</span></div>
+    </div>
+    <div class="tcard">
+      <div class="ttit">Ventas del turno</div>
+      <div class="trow"><span class="tl">Ventas brutas</span><span class="tv tpos">$4,830.00</span></div>
+      <div class="trow"><span class="tl">Descuentos</span><span class="tv tneg">−$340.00</span></div>
+      <div class="trow"><span class="tl">Cancelaciones</span><span class="tv tneg">−$40.00</span></div>
+      <div class="trow"><span class="tl" style="font-weight:700;font-size:15px;color:var(--text);">Ventas netas</span><span class="tv tpos" style="font-size:18px;font-weight:700;">$4,450.00</span></div>
+    </div>
+    <div class="tcard">
+      <div class="ttit">Por método de pago</div>
+      <div class="trow"><span class="tl">💵 Efectivo</span><span class="tv">$2,996.00</span></div>
+      <div class="trow"><span class="tl">💳 Tarjeta</span><span class="tv">$1,074.00</span></div>
+      <div class="trow"><span class="tl">📱 Transferencia</span><span class="tv">$380.00</span></div>
+    </div>
+    <div class="tcard" style="border:2px solid rgba(37,99,235,.2);">
+      <div class="ttit" style="color:var(--blue);">Cuadre final</div>
+      <div class="trow"><span class="tl">Efectivo teórico</span><span class="tv">$3,256.00</span></div>
+      <div style="margin-bottom:12px;"><div class="lbl">Efectivo físico contado</div><input class="numinput" value="3220.00" id="ctd" oninput="ud()"></div>
+      <div class="trow"><span class="tl" style="font-weight:700;color:var(--text);">Diferencia</span><span class="tv tneg" id="dif" style="font-size:18px;font-weight:700;">−$36.00</span></div>
+    </div>
+    <div style="padding:0 12px;margin-bottom:12px;"><div class="lbl">Notas del cierre</div><input class="fi" placeholder="Observaciones, faltante explicado..."></div>
+    <div style="padding:0 12px;display:flex;flex-direction:column;gap:10px;">
+      <button class="bigbtn gho">🖨️ Imprimir resumen del turno</button>
+      <button class="bigbtn" onclick="alert('✓ Turno #38 cerrado\nDiferencia: −$36.00\nHasta mañana 🌮')">🔒 Cerrar turno #38</button>
+    </div>
+    <div style="height:20px;"></div>
+  </div>
+</div>
+
+<!-- 8 IMPRESORAS -->
+<div id="s-imp" class="scr">
+  <div class="sb"><span class="sb-t">11:15</span><span class="sb-r">📶 🔋</span></div>
+  <div class="hdr"><div class="ht">Impresoras</div><button class="bhdr bp">＋ Agregar</button></div>
+  <div class="sa" style="padding-bottom:90px;">
+    <div class="sh">Dispositivos</div>
+    <div class="infobox" style="margin:0 12px 12px;"><strong>Grupos lógicos:</strong> una impresora física puede cubrir Cocina y Barra como tickets separados. Al llegar la segunda, solo se reasigna el grupo "Barra".</div>
+    <div class="icard">
+      <div class="ihead">
+        <div class="iico">🖨️</div>
+        <div style="flex:1;"><div class="iname">WiFi Printer</div><div class="iip">192.168.1.50 · Puerto 9100 · 80mm</div></div>
+        <span class="badge bg2">● Activa</span>
+      </div>
+      <div class="togrow"><div><div class="tognam">Imprimir recibos y cuentas</div></div><div class="tog on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="togrow"><div><div class="tognam">Imprimir pedidos (cocina)</div></div><div class="tog on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="togrow"><div><div class="tognam">Imprimir automáticamente</div></div><div class="tog on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="togrow"><div><div class="tognam">Un artículo por ticket</div><div class="togdes">Imprime un ticket por cada producto</div></div><div class="tog" onclick="this.classList.toggle('on')"></div></div>
+      <div class="togrow"><div><div class="tognam">Agrupar ítems idénticos</div><div class="togdes">3x Coca Cola en lugar de tres líneas</div></div><div class="tog" onclick="this.classList.toggle('on')"></div></div>
+      <div style="padding-top:14px;border-top:1px solid var(--bl);margin-top:4px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--t3);margin-bottom:8px;">Grupos asignados</div>
+        <div><span class="gchip"><div class="gdot" style="background:var(--green);"></div>Cocina</span><span class="gchip"><div class="gdot" style="background:var(--cyan);"></div>Barra de bebidas</span></div>
+        <div style="font-size:11px;color:var(--t4);margin-top:6px;">Caldos, Desayunos → Cocina &nbsp;·&nbsp; Bebidas → Barra</div>
+        <button class="bhdr bg" style="margin-top:10px;width:100%;text-align:center;padding:10px;">Probar impresión ↗</button>
+      </div>
+    </div>
+    <div class="icard" style="border:1.5px dashed var(--border);background:var(--bg);text-align:center;padding:28px 16px;">
+      <div style="font-size:32px;margin-bottom:8px;">🖨️</div>
+      <div style="font-size:15px;font-weight:600;color:var(--t2);margin-bottom:6px;">Segunda impresora</div>
+      <div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Para la barra cuando esté disponible. Solo reasigna el grupo "Barra de bebidas".</div>
+      <button class="bhdr bg" style="width:100%;text-align:center;padding:10px;">＋ Configurar segunda impresora</button>
+    </div>
+    <div class="sh">Toggle global</div>
+    <div class="icard">
+      <div class="togrow" style="border:none;padding:0;">
+        <div style="flex:1;margin-right:14px;"><div class="tognam">Impresión activa</div><div class="togdes" style="margin-top:3px;">Apagar desactiva toda impresión automática del sistema.</div></div>
+        <div class="tog on" onclick="this.classList.toggle('on')" style="flex-shrink:0;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="bnav">
+    <div class="bn" onclick="go('mesas')"><div class="bni">🍽️</div><div class="bnl">Mesas</div></div>
+    <div class="bn"><div class="bni">📋</div><div class="bnl">Pedidos</div></div>
+    <div class="bn"><div class="bni">🕐</div><div class="bnl">Historial</div></div>
+    <div class="bn"><div class="bni">📊</div><div class="bnl">Dashboard</div></div>
+    <div class="bn on"><div class="bni">⚙️</div><div class="bnl">Config</div></div>
+  </div>
+</div>
+
+<!-- SHEET PARA LLEVAR -->
+<div class="shbg" id="sh-llevar" onclick="closeSh('llevar')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="shhnd"></div>
+    <div class="shhdr"><div class="sht">📦 Pedido para llevar</div><div class="shs">Datos del cliente — todos opcionales</div></div>
+    <div class="shbd">
+      <div style="margin-bottom:12px;"><div class="lbl">Nombre del cliente</div><input class="fi" placeholder="Ej: Don Carlos (opcional)"></div>
+      <div style="margin-bottom:12px;"><div class="lbl">Teléfono</div><input class="fi" type="tel" placeholder="(opcional)"></div>
+      <div style="margin-bottom:12px;"><div class="lbl">Hora de recogida</div><input class="fi" type="time" value="11:30"></div>
+      <div class="infobox"><strong>Sin datos:</strong> el pedido aparece como "Para llevar" en cocina. Funciona igual.</div>
+    </div>
+    <div class="shft">
+      <button class="bigbtn gho" onclick="closeSh('llevar')" style="flex:1;">Cancelar</button>
+      <button class="bigbtn" style="flex:2;" onclick="closeSh('llevar');go('pos')">✓ Crear pedido</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const screens=['mesas','pos','comanda','mod','rap','cobro','dash','cierre','imp'];
+const navmap=['mesas','pos','mod','rap','cobro','dash','cierre','imp'];
+
+function go(id){
+  screens.forEach(s=>{const el=document.getElementById('s-'+s);if(el)el.classList.remove('on');});
+  document.querySelectorAll('.pb').forEach(b=>b.classList.remove('on'));
+  const s=document.getElementById('s-'+id);
+  if(s){s.classList.add('on');s.scrollTop=0;}
+  const i=navmap.indexOf(id);
+  const btns=document.querySelectorAll('.pb');
+  if(i>=0&&btns[i])btns[i].classList.add('on');
+  window.scrollTo(0,0);
+}
+function openSh(id){document.getElementById('sh-'+id).classList.add('on');}
+function closeSh(id){document.getElementById('sh-'+id).classList.remove('on');}
+function sc(el){document.querySelectorAll('.scbtn').forEach(s=>s.classList.remove('on'));el.classList.add('on');}
+function mt(el){document.querySelectorAll('.met').forEach(m=>{if(m!==el)m.classList.remove('on')});el.classList.toggle('on');}
+let mx=false;
+function tmx(el){
+  mx=!mx;
+  document.getElementById('psimple').classList.toggle('hidden',mx);
+  document.getElementById('pmixto').classList.toggle('hidden',!mx);
+  el.classList.toggle('on',mx);
+}
+function cv(){
+  const e=parseFloat(document.getElementById('efin').value.replace(/,/g,''))||0;
+  const v=Math.max(0,e-516.60);
+  document.getElementById('vlt').textContent='$'+v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+}
+function ud(){document.getElementById('dif').textContent='−$36.00';}
+function s1(el){
+  el.closest('.mgrp').querySelectorAll('.mopt').forEach(o=>{o.classList.remove('sel');o.querySelector('.mchk').textContent='';});
+  el.classList.add('sel');el.querySelector('.mchk').textContent='✓';
+}
+function sm(el){
+  el.classList.toggle('sel');
+  el.querySelector('.mchk').textContent=el.classList.contains('sel')?'✓':'';
+}
+document.querySelectorAll('.ctrb').forEach(b=>{
+  b.addEventListener('click',function(){
+    const v=this.parentNode.querySelector('.ctrv');
+    if(!v)return;
+    let n=parseInt(v.textContent);
+    this.textContent==='＋'?n=Math.min(n+1,20):n=Math.max(n-1,0);
+    v.textContent=n;
+    v.style.color=n>0?'var(--blue)':'var(--t4)';
+  });
+});
+</script>
+</body>
+</html>
