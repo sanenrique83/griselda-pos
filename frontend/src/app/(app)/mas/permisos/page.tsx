@@ -1,0 +1,44 @@
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { PermisosShell } from '@/components/permisos/PermisosShell'
+import type { ConfigSistema } from '@/lib/types/database.types'
+
+export type ConfigPermisos = Pick<
+  ConfigSistema,
+  | 'cancelaciones_mesero'
+  | 'descuentos_mesero'
+  | 'cancelar_pedido_mesero'
+  | 'ver_dashboard_mesero'
+  | 'propina_sugerida_pct'
+  | 'transferencia_banco'
+  | 'transferencia_clabe'
+  | 'transferencia_titular'
+>
+
+export default async function PermisosPage() {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  // Solo admin
+  const { data: perfil } = await supabase
+    .from('perfiles')
+    .select('rol')
+    .eq('id', user.id)
+    .single()
+
+  if (perfil?.rol !== 'admin') redirect('/mesas')
+
+  const { data: config } = await supabase
+    .from('config_sistema')
+    .select(
+      'cancelaciones_mesero, descuentos_mesero, cancelar_pedido_mesero, ver_dashboard_mesero, propina_sugerida_pct, transferencia_banco, transferencia_clabe, transferencia_titular',
+    )
+    .eq('id', 1)
+    .single()
+
+  if (!config) redirect('/mas')
+
+  return <PermisosShell config={config as ConfigPermisos} />
+}
