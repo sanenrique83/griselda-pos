@@ -58,17 +58,35 @@ export async function cobrarPedido(data: {
   turnoId: number
   mesaId: number | null
   subpedidos: SubpedidoMonto[]
-  totalCobrado: number
-  pagos: PagoInput[]
+  totalCobrado: number   // monto del negocio SIN propina
+  propina: number        // propina (va a meseros, no entra al cuadre de caja)
+  pagos: PagoInput[]     // montos físicos por método (incluyen propina)
   efectivoRecibido: number | null
   cambio: number | null
+  descuentoPct?: number
+  descuentoMonto?: number
 }): Promise<{ error: string } | void> {
   const supabase = await createClient()
 
-  // Validar que la suma de pagos cubra el total
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Validar que los pagos cubran el total físico (negocio + propina)
+  const totalFisico = data.totalCobrado + data.propina
   const sumaPagos = data.pagos.reduce((s, p) => s + p.monto, 0)
-  if (sumaPagos < data.totalCobrado - 0.01) {
+  if (sumaPagos < totalFisico - 0.01) {
     return { error: 'El monto ingresado no cubre el total del pedido.' }
+  }
+
+  // ── 0. Registrar descuento si aplica ──────────────────────────────────────
+  if (data.descuentoPct && data.descuentoPct > 0 && data.descuentoMonto && user) {
+    await supabase.from('descuentos').insert({
+      pedido_id: data.pedidoId,
+      usuario_id: user.id,
+      tipo: 'porcentaje',
+      valor: data.descuentoPct,
+      monto_calculado: data.descuentoMonto,
+      motivo: 'Descuento en cobro',
+    })
   }
 
   // ── 1. Movimiento de caja ──────────────────────────────────────────────────
@@ -78,6 +96,7 @@ export async function cobrarPedido(data: {
       turno_id: data.turnoId,
       tipo: 'cobro',
       monto: data.totalCobrado,
+      propina: data.propina,
       efectivo_recibido: data.efectivoRecibido,
       cambio: data.cambio,
       notas: null,
@@ -85,7 +104,10 @@ export async function cobrarPedido(data: {
     .select('id')
     .single()
 
-  if (movErr || !mov) return { error: 'Error al registrar el movimiento de caja.' }
+  if (movErr || !mov) {
+    console.error('[cobrarPedido] error movimiento_caja:', movErr)
+    return { error: 'Error al registrar el movimiento de caja.' }
+  }
 
   // ── 2. Registrar pagos (uno por método) ────────────────────────────────────
   const { error: pagosErr } = await supabase

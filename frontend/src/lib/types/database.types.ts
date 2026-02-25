@@ -234,7 +234,8 @@ export interface MovimientoCaja {
   id: number
   turno_id: number
   tipo: TipoMovimientoCaja
-  monto: number
+  monto: number            // ingreso del negocio (sin propina)
+  propina: number          // propina del cobro (va a meseros, no a caja)
   efectivo_recibido: number | null
   cambio: number | null
   notas: string | null

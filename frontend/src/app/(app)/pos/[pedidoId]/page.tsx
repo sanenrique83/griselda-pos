@@ -97,6 +97,15 @@ export default async function PosPage({
     }))
   }
 
+  // ── Permiso de cancelación ────────────────────────────────────────────────
+  const { data: { user } } = await supabase.auth.getUser()
+  const [{ data: config }, { data: perfil }] = await Promise.all([
+    supabase.from('config_sistema').select('cancelaciones_mesero').eq('id', 1).single(),
+    user ? supabase.from('perfiles').select('rol').eq('id', user.id).single() : Promise.resolve({ data: null }),
+  ])
+  const puedesCancelar =
+    (perfil as any)?.rol === 'admin' || (config as any)?.cancelaciones_mesero === true
+
   // ── Catálogo: categorías + productos ──────────────────────────────────────
   const [{ data: rawCategorias }, { data: rawProductos }] = await Promise.all([
     supabase
@@ -181,6 +190,7 @@ export default async function PosPage({
       categorias={categorias}
       productos={productos}
       mesasOcupadas={mesasOcupadas}
+      puedesCancelar={puedesCancelar}
     />
   )
 }

@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Perfil } from '@/lib/types/database.types'
+import { DashboardCharts } from '@/components/dashboard/DashboardCharts'
+import type { VentaHora, TopProducto, MetodoPagoData, TipoPedidoData } from '@/components/dashboard/DashboardCharts'
 
 // ─── Helpers de formato ───────────────────────────────────────────────────────
 
@@ -52,24 +54,19 @@ export default async function DashboardPage() {
     .limit(1)
     .maybeSingle()
 
-  // ── Mesas activas (siempre, sin importar turno) ────────────────────────────
+  // ── Mesas activas ─────────────────────────────────────────────────────────
   const { count: mesasActivas } = await supabase
     .from('mesas')
     .select('*', { count: 'exact', head: true })
     .eq('estado', 'ocupada')
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Si no hay turno: renderizar estado vacío
-  // ─────────────────────────────────────────────────────────────────────────
   if (!turno) {
     return (
       <div>
         <Header titulo="Dashboard" subtitulo="Sin turno activo" ahora={ahora} />
         <div className="px-4 py-4 space-y-4">
           <div className="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-4">
-            <p className="text-sm font-semibold text-amber-800">
-              No hay turno abierto
-            </p>
+            <p className="text-sm font-semibold text-amber-800">No hay turno abierto</p>
             <p className="mt-1 text-xs text-amber-600">
               Ve a Más → Turno para iniciar el turno del día.
             </p>
@@ -86,14 +83,14 @@ export default async function DashboardPage() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Queries del turno activo (en paralelo donde sea posible)
+  // Queries del turno activo
   // ─────────────────────────────────────────────────────────────────────────
 
   const [movimientosRes, pedidosCerradosRes, pedidosActivosRes, pedidoIdsRes] =
     await Promise.all([
       supabase
         .from('movimientos_caja')
-        .select('id, tipo, monto')
+        .select('id, tipo, monto, created_at')
         .eq('turno_id', turno.id),
       supabase
         .from('pedidos')
@@ -105,13 +102,14 @@ export default async function DashboardPage() {
         .select('*', { count: 'exact', head: true })
         .eq('turno_id', turno.id)
         .eq('estado', 'abierto'),
-      supabase.from('pedidos').select('id').eq('turno_id', turno.id),
+      supabase.from('pedidos').select('id, tipo').eq('turno_id', turno.id),
     ])
 
   const movimientos = movimientosRes.data ?? []
   const pedidosCerrados = pedidosCerradosRes.count ?? 0
   const pedidosAbiertos = pedidosActivosRes.count ?? 0
-  const pedidoIds = (pedidoIdsRes.data ?? []).map((p: any) => p.id)
+  const pedidosData = pedidoIdsRes.data ?? []
+  const pedidoIds = pedidosData.map((p: any) => p.id)
 
   // Pagos del turno
   const cobroIds = movimientos.filter((m) => m.tipo === 'cobro').map((m) => m.id)
@@ -138,18 +136,10 @@ export default async function DashboardPage() {
     { efectivo: 0, tarjeta: 0, transferencia: 0 },
   )
 
-  const promedioTicket =
-    pedidosCerrados > 0 ? totalCobrado / pedidosCerrados : 0
+  const promedioTicket = pedidosCerrados > 0 ? totalCobrado / pedidosCerrados : 0
 
-  // ── Top productos ─────────────────────────────────────────────────────────
-  type TopProd = {
-    nombre: string
-    emoji: string | null
-    vendidos: number
-    total: number
-  }
-
-  let topProductos: TopProd[] = []
+  // ── Top 10 productos ──────────────────────────────────────────────────────
+  let topProductos: TopProducto[] = []
 
   if (pedidoIds.length > 0) {
     const { data: subs } = await supabase
@@ -168,7 +158,7 @@ export default async function DashboardPage() {
         .in('subpedido_id', subIds)
         .neq('estado', 'cancelado')
 
-      const topMap = new Map<number, TopProd>()
+      const topMap = new Map<number, TopProducto>()
       for (const pp of rawProds ?? []) {
         const prod = (pp as any).productos
         if (!prod) continue
@@ -192,17 +182,60 @@ export default async function DashboardPage() {
 
       topProductos = [...topMap.values()]
         .sort((a, b) => b.vendidos - a.vendidos)
-        .slice(0, 6)
+        .slice(0, 10)
     }
   }
 
-  // ── Label del turno ───────────────────────────────────────────────────────
-  const turnoLabel = `Turno #${turno.id} · desde ${fmtHora(turno.abierto_en)}`
-  const metodoTotal = porMetodo.efectivo + porMetodo.tarjeta + porMetodo.transferencia
+  // ── Ventas por franja horaria ─────────────────────────────────────────────
+  const cobrosConHora = movimientos.filter((m) => m.tipo === 'cobro')
+  const abiertaEn = new Date(turno.abierto_en)
+  const ahoraDate = new Date()
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────────────
+  // Generar todas las horas desde apertura hasta ahora
+  const horaInicio = abiertaEn.getHours()
+  const horaFin = ahoraDate.getHours()
+  const horasMap = new Map<number, number>()
+
+  for (let h = horaInicio; h <= horaFin; h++) {
+    horasMap.set(h, 0)
+  }
+
+  for (const cobro of cobrosConHora) {
+    const horaLocal = new Date(cobro.created_at).toLocaleString('en-US', {
+      hour: 'numeric',
+      hour12: false,
+      timeZone: 'America/Mexico_City',
+    })
+    const h = parseInt(horaLocal)
+    if (!isNaN(h)) {
+      horasMap.set(h, (horasMap.get(h) ?? 0) + cobro.monto)
+    }
+  }
+
+  const ventasPorHora: VentaHora[] = [...horasMap.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([h, total]) => ({
+      hora: `${String(h).padStart(2, '0')}h`,
+      total,
+    }))
+
+  // ── Mesa vs para llevar ───────────────────────────────────────────────────
+  const mesaCount = pedidosData.filter((p: any) => p.tipo === 'mesa').length
+  const llevarCount = pedidosData.filter((p: any) => p.tipo === 'llevar').length
+
+  // ── Datos para charts ─────────────────────────────────────────────────────
+  const metodosPago: MetodoPagoData[] = [
+    { nombre: '💵 Efectivo', monto: porMetodo.efectivo, color: '#10b981' },
+    { nombre: '💳 Tarjeta', monto: porMetodo.tarjeta, color: '#3b82f6' },
+    { nombre: '📱 Transf.', monto: porMetodo.transferencia, color: '#7c3aed' },
+  ]
+
+  const tiposPedido: TipoPedidoData[] = [
+    { nombre: 'Mesa', count: mesaCount, color: '#3b82f6' },
+    { nombre: 'Para llevar', count: llevarCount, color: '#f59e0b' },
+  ]
+
+  const turnoLabel = `Turno #${turno.id} · desde ${fmtHora(turno.abierto_en)}`
 
   return (
     <div>
@@ -220,7 +253,7 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        {/* ── Métricas principales ────────────────────────────────────────── */}
+        {/* ── Métricas principales ─────────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-3">
           <MetricCard
             label="Total cobrado"
@@ -247,66 +280,19 @@ export default async function DashboardPage() {
           />
         </div>
 
-        {/* ── Métodos de pago ─────────────────────────────────────────────── */}
-        {totalCobrado > 0 && (
-          <div className="rounded-2xl bg-white shadow-card overflow-hidden">
-            <SectionHeader title="Métodos de pago" />
-            <div className="px-4 py-3 space-y-3">
-              <PaymentBar
-                emoji="💵"
-                label="Efectivo"
-                amount={porMetodo.efectivo}
-                total={metodoTotal}
-                color="emerald"
-              />
-              <PaymentBar
-                emoji="💳"
-                label="Tarjeta"
-                amount={porMetodo.tarjeta}
-                total={metodoTotal}
-                color="blue"
-              />
-              <PaymentBar
-                emoji="📱"
-                label="Transf."
-                amount={porMetodo.transferencia}
-                total={metodoTotal}
-                color="violet"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ── Top productos ────────────────────────────────────────────────── */}
-        {topProductos.length > 0 && (
-          <div className="rounded-2xl bg-white shadow-card overflow-hidden">
-            <SectionHeader title="Más vendidos del turno" />
-            <div className="divide-y divide-[#F2F2F7]">
-              {topProductos.map((p, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3">
-                  <span className="text-[22px] w-8 text-center leading-none">
-                    {p.emoji ?? '🍽️'}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-medium">{p.nombre}</p>
-                    <p className="text-xs text-text-3">
-                      ×{p.vendidos} vendido{p.vendidos !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                  <span className="font-mono text-sm font-semibold text-green-600">
-                    ${fmtMoney(p.total)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {totalCobrado === 0 && (
+        {/* ── Gráficas Recharts ─────────────────────────────────────────────── */}
+        {totalCobrado > 0 ? (
+          <DashboardCharts
+            ventasPorHora={ventasPorHora}
+            topProductos={topProductos}
+            metodosPago={metodosPago}
+            tiposPedido={tiposPedido}
+          />
+        ) : (
           <div className="rounded-2xl border border-[#E5E5EA] bg-white px-4 py-8 text-center">
             <p className="text-2xl mb-2">📊</p>
             <p className="text-sm text-text-3">
-              Las métricas aparecerán cuando haya cobros en el turno.
+              Las gráficas aparecerán cuando haya cobros en el turno.
             </p>
           </div>
         )}
@@ -341,16 +327,6 @@ function Header({
   )
 }
 
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
-        {title}
-      </p>
-    </div>
-  )
-}
-
 function MetricCard({
   label,
   value,
@@ -365,74 +341,20 @@ function MetricCard({
   big?: boolean
 }) {
   const colorMap = {
-    green:  { bg: 'bg-green-50',  text: 'text-green-600',  dot: 'bg-green-400' },
-    blue:   { bg: 'bg-blue-50',   text: 'text-blue-600',   dot: 'bg-blue-400' },
-    amber:  { bg: 'bg-amber-50',  text: 'text-amber-600',  dot: 'bg-amber-400' },
-    violet: { bg: 'bg-violet-50', text: 'text-violet-600', dot: 'bg-violet-400' },
+    green:  { bg: 'bg-green-50',  text: 'text-green-600' },
+    blue:   { bg: 'bg-blue-50',   text: 'text-blue-600' },
+    amber:  { bg: 'bg-amber-50',  text: 'text-amber-600' },
+    violet: { bg: 'bg-violet-50', text: 'text-violet-600' },
   }
   const c = colorMap[color]
 
   return (
     <div className={`rounded-2xl ${c.bg} px-4 py-4`}>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
-        {label}
-      </p>
-      <p
-        className={`mt-1.5 font-mono font-bold leading-tight ${c.text} ${
-          big ? 'text-[22px]' : 'text-[20px]'
-        }`}
-      >
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">{label}</p>
+      <p className={`mt-1.5 font-mono font-bold leading-tight ${c.text} ${big ? 'text-[22px]' : 'text-[20px]'}`}>
         {value}
       </p>
-      {unit && (
-        <p className="mt-0.5 text-[11px] text-text-3">{unit}</p>
-      )}
-    </div>
-  )
-}
-
-function PaymentBar({
-  emoji,
-  label,
-  amount,
-  total,
-  color,
-}: {
-  emoji: string
-  label: string
-  amount: number
-  total: number
-  color: 'emerald' | 'blue' | 'violet'
-}) {
-  const pct = total > 0 ? Math.round((amount / total) * 100) : 0
-  const barColorMap = {
-    emerald: 'bg-emerald-500',
-    blue: 'bg-blue-500',
-    violet: 'bg-violet-500',
-  }
-
-  if (amount === 0) return null
-
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-[16px] leading-none">{emoji}</span>
-          <span className="text-sm font-medium">{label}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-sm font-semibold">
-            ${amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-          </span>
-          <span className="w-8 text-right text-xs text-text-3">{pct}%</span>
-        </div>
-      </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-s3">
-        <div
-          className={`h-full rounded-full ${barColorMap[color]} transition-all`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+      {unit && <p className="mt-0.5 text-[11px] text-text-3">{unit}</p>}
     </div>
   )
 }

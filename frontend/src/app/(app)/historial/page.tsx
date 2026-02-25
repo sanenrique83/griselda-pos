@@ -19,30 +19,16 @@ export type ReciboData = {
   pagos: PagoResumen[]
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+export type TurnoItem = {
+  id: number
+  abierto_en: string
+  cerrado_en: string | null
+  estado: 'abierto' | 'cerrado'
+}
 
-export default async function HistorialPage() {
-  const supabase = await createClient()
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  // Turno activo
-  const { data: turno } = await supabase
-    .from('turnos')
-    .select('id')
-    .eq('estado', 'abierto')
-    .order('abierto_en', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (!turno) {
-    return <HistorialShell recibos={[]} sinTurno />
-  }
-
-  // Cobros del turno con pagos y trazabilidad de mesa
+async function cargarRecibos(supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server').createClient>>, turnoId: number): Promise<ReciboData[]> {
   const { data: movimientos } = await supabase
     .from('movimientos_caja')
     .select(
@@ -57,12 +43,11 @@ export default async function HistorialPage() {
          )
        )`,
     )
-    .eq('turno_id', turno.id)
+    .eq('turno_id', turnoId)
     .eq('tipo', 'cobro')
     .order('created_at', { ascending: false })
 
-  const recibos: ReciboData[] = (movimientos ?? []).map((m: any) => {
-    // Obtener el primer pedido referenciado para la etiqueta de mesa
+  return (movimientos ?? []).map((m: any) => {
     const primerSubpedido = (m.cobro_subpedidos ?? [])[0]
     const pedido = primerSubpedido?.subpedidos?.pedidos
 
@@ -71,8 +56,6 @@ export default async function HistorialPage() {
       if (pedido.tipo === 'mesa' && pedido.mesas) {
         const mesa = pedido.mesas as { numero: number; nombre: string | null }
         mesaLabel = `Mesa ${mesa.nombre ?? mesa.numero}`
-      } else if (pedido.tipo === 'llevar') {
-        mesaLabel = 'Para llevar'
       }
     }
 
@@ -91,6 +74,76 @@ export default async function HistorialPage() {
       pagos,
     }
   })
+}
 
-  return <HistorialShell recibos={recibos} sinTurno={false} />
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default async function HistorialPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ turno?: string }>
+}) {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: perfil } = await supabase
+    .from('perfiles')
+    .select('rol')
+    .eq('id', user.id)
+    .single()
+
+  const isAdmin = (perfil as any)?.rol === 'admin'
+
+  // Turno activo
+  const { data: turnoActivo } = await supabase
+    .from('turnos')
+    .select('id, abierto_en, cerrado_en, estado')
+    .eq('estado', 'abierto')
+    .order('abierto_en', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  // Lista de turnos (solo para admin)
+  let turnos: TurnoItem[] = []
+  if (isAdmin) {
+    const { data: allTurnos } = await supabase
+      .from('turnos')
+      .select('id, abierto_en, cerrado_en, estado')
+      .order('abierto_en', { ascending: false })
+      .limit(30)
+    turnos = (allTurnos ?? []) as TurnoItem[]
+  }
+
+  // Determinar qué turno cargar
+  const params = await searchParams
+  const turnoIdParam = params.turno ? parseInt(params.turno) : null
+  const turnoIdFinal = isAdmin && turnoIdParam && !isNaN(turnoIdParam)
+    ? turnoIdParam
+    : turnoActivo?.id ?? null
+
+  if (!turnoIdFinal) {
+    return (
+      <HistorialShell
+        recibos={[]}
+        sinTurno
+        turnos={turnos}
+        turnoSeleccionadoId={null}
+        isAdmin={isAdmin}
+      />
+    )
+  }
+
+  const recibos = await cargarRecibos(supabase, turnoIdFinal)
+
+  return (
+    <HistorialShell
+      recibos={recibos}
+      sinTurno={false}
+      turnos={turnos}
+      turnoSeleccionadoId={turnoIdFinal}
+      isAdmin={isAdmin}
+    />
+  )
 }

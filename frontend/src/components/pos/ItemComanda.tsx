@@ -17,7 +17,13 @@ const TAG = {
   },
 }
 
-export function ItemComandaRow({ item }: { item: ItemComanda }) {
+export function ItemComandaRow({
+  item,
+  onCancelar,
+}: {
+  item: ItemComanda
+  onCancelar?: () => void
+}) {
   const cancelado = item.estado === 'cancelado'
   const pendiente = item.estado === 'pendiente'
   const tag = TAG[item.estado]
@@ -27,11 +33,20 @@ export function ItemComandaRow({ item }: { item: ItemComanda }) {
   return (
     <div
       className={`
-        rounded-xl p-3 shadow-card
+        relative rounded-xl p-3 shadow-card
         ${pendiente ? 'border-[1.5px] border-blue-200 bg-blue-50' : 'bg-white'}
         ${cancelado ? 'opacity-55' : ''}
       `}
     >
+      {onCancelar && item.estado === 'enviado' && (
+        <button
+          onClick={onCancelar}
+          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-[15px] font-bold text-red-600 active:scale-90"
+          aria-label="Cancelar ítem"
+        >
+          ×
+        </button>
+      )}
       <div className="flex items-start gap-2.5">
         {/* Cantidad */}
         <span className="w-5 flex-shrink-0 pt-px font-mono text-sm font-semibold text-blue-600">

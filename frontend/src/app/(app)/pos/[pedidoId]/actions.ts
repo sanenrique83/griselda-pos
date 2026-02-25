@@ -451,6 +451,79 @@ export async function compartirMesa(
   return { nuevoPedidoId: nuevoPedido.id }
 }
 
+// ─── Cancelar ítem enviado ────────────────────────────────────────────────────
+export async function cancelarItem(
+  pedidoProductoId: number,
+  motivo: string,
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Sin sesión.' }
+
+  // 1. Datos del item
+  const { data: pp } = await supabase
+    .from('pedido_productos')
+    .select('precio_unit, cantidad, subpedido_id')
+    .eq('id', pedidoProductoId)
+    .single()
+
+  if (!pp) return { error: 'Producto no encontrado.' }
+
+  // 2. Extras
+  const { data: opciones } = await supabase
+    .from('pedido_producto_opciones')
+    .select('precio_extra')
+    .eq('pedido_producto_id', pedidoProductoId)
+
+  const extrasTotal = (opciones ?? []).reduce((s: number, o: any) => s + o.precio_extra, 0)
+  const montoAfectado = (pp.precio_unit + extrasTotal) * pp.cantidad
+
+  // 3. Navegar subpedido → pedido → turno_id
+  const { data: sub } = await supabase
+    .from('subpedidos')
+    .select('pedido_id')
+    .eq('id', pp.subpedido_id)
+    .single()
+
+  if (!sub) return { error: 'Subpedido no encontrado.' }
+
+  const { data: pedido } = await supabase
+    .from('pedidos')
+    .select('turno_id')
+    .eq('id', sub.pedido_id)
+    .single()
+
+  if (!pedido) return { error: 'Pedido no encontrado.' }
+
+  // 4. Marcar cancelado
+  const { error: updErr } = await supabase
+    .from('pedido_productos')
+    .update({ estado: 'cancelado' })
+    .eq('id', pedidoProductoId)
+
+  if (updErr) return { error: 'Error al cancelar el ítem.' }
+
+  // 5. Registrar cancelación
+  await supabase.from('cancelaciones').insert({
+    pedido_producto_id: pedidoProductoId,
+    usuario_id: user.id,
+    motivo,
+    monto_afectado: montoAfectado,
+  })
+
+  // 6. Movimiento de caja negativo
+  await supabase.from('movimientos_caja').insert({
+    turno_id: pedido.turno_id,
+    tipo: 'cancelacion',
+    monto: -montoAfectado,
+    notas: motivo,
+    usuario_id: user.id,
+  })
+
+  return {}
+}
+
 // ─── Agregar comensal ──────────────────────────────────────────────────────────
 export async function agregarComensal(
   pedidoId: number,

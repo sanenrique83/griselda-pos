@@ -5,11 +5,20 @@ import { TurnoShell } from '@/components/turno/TurnoShell'
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
+export type MovimientoCajaItem = {
+  id: number
+  tipo: 'fondo' | 'retiro'
+  monto: number
+  notas: string | null
+  created_at: string
+}
+
 export type TurnoResumen = {
   id: number
   fondoInicial: number
   abierto_en: string
   totalCobrado: number
+  propinaTotal: number
   porMetodo: {
     efectivo: number
     tarjeta: number
@@ -21,6 +30,7 @@ export type TurnoResumen = {
   efectivoTeorico: number
   pedidosCerrados: number
   pedidosAbiertos: number
+  movimientos: MovimientoCajaItem[]
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -56,11 +66,11 @@ export default async function TurnoPage() {
   }
 
   // ── Métricas del turno activo ──────────────────────────────────────────────
-  const [movimientosRes, pedidosCerradosRes, pedidosAbiertosRes] =
+  const [movimientosRes, pedidosCerradosRes, pedidosAbiertosRes, movsFondoRetiroRes] =
     await Promise.all([
       supabase
         .from('movimientos_caja')
-        .select('id, tipo, monto')
+        .select('id, tipo, monto, propina')
         .eq('turno_id', turno.id),
       supabase
         .from('pedidos')
@@ -72,6 +82,12 @@ export default async function TurnoPage() {
         .select('*', { count: 'exact', head: true })
         .eq('turno_id', turno.id)
         .eq('estado', 'abierto'),
+      supabase
+        .from('movimientos_caja')
+        .select('id, tipo, monto, notas, created_at')
+        .eq('turno_id', turno.id)
+        .in('tipo', ['fondo', 'retiro'])
+        .order('created_at', { ascending: false }),
     ])
 
   const movimientos = movimientosRes.data ?? []
@@ -101,6 +117,10 @@ export default async function TurnoPage() {
     .filter((m) => m.tipo === 'cobro')
     .reduce((s, m) => s + m.monto, 0)
 
+  const propinaTotal = movimientos
+    .filter((m) => m.tipo === 'cobro')
+    .reduce((s, m) => s + ((m as { propina?: number }).propina ?? 0), 0)
+
   const fondosExtra = movimientos
     .filter((m) => m.tipo === 'fondo')
     .reduce((s, m) => s + m.monto, 0)
@@ -116,6 +136,7 @@ export default async function TurnoPage() {
     fondoInicial: turno.fondo_inicial,
     abierto_en: turno.abierto_en,
     totalCobrado,
+    propinaTotal,
     porMetodo,
     cobrosEfectivo: porMetodo.efectivo,
     fondosExtra,
@@ -123,6 +144,7 @@ export default async function TurnoPage() {
     efectivoTeorico,
     pedidosCerrados: pedidosCerradosRes.count ?? 0,
     pedidosAbiertos: pedidosAbiertosRes.count ?? 0,
+    movimientos: (movsFondoRetiroRes.data ?? []) as MovimientoCajaItem[],
   }
 
   return <TurnoShell turnoActivo={turnoResumen} />

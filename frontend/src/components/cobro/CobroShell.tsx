@@ -29,6 +29,8 @@ interface CobroShellProps {
   totalPedido: number
   propinaPct: number
   datosBancarios?: DatosBancarios
+  descuentoHabilitado?: boolean
+  descuentoMaxPct?: number
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -85,6 +87,8 @@ export function CobroShell({
   totalPedido,
   propinaPct,
   datosBancarios,
+  descuentoHabilitado = false,
+  descuentoMaxPct = 0,
 }: CobroShellProps) {
   const router = useRouter()
 
@@ -95,6 +99,9 @@ export function CobroShell({
   // Dividir: número de partes y cuántas pagar ahora
   const [nPartes, setNPartes] = useState('2')
   const [partesAPagar, setPartesAPagar] = useState('1')
+
+  // ── Descuento ─────────────────────────────────────────────────────────────
+  const [descuentoPct, setDescuentoPct] = useState('')
 
   // ── Método de pago ─────────────────────────────────────────────────────────
   const [metodo, setMetodo] = useState<Metodo>('efectivo')
@@ -137,8 +144,16 @@ export function CobroShell({
     return subpedidos.filter((sp) => subSeleccionados.has(sp.id))
   })()
 
-  const propinaAmt = conPropina ? round2(totalEscenario * propinaPct / 100) : 0
-  const total = round2(totalEscenario + propinaAmt)
+  const numDescuentoPct = parseFloat(descuentoPct) || 0
+  const descuentoInvalido =
+    descuentoHabilitado && numDescuentoPct > 0 && numDescuentoPct > descuentoMaxPct
+  const montoDescuento = descuentoHabilitado && !descuentoInvalido
+    ? round2(totalEscenario * numDescuentoPct / 100)
+    : 0
+  const totalConDescuento = round2(totalEscenario - montoDescuento)
+
+  const propinaAmt = conPropina ? round2(totalConDescuento * propinaPct / 100) : 0
+  const total = round2(totalConDescuento + propinaAmt)
 
   // Efectivo
   const numRecibido = parseFloat(efectivoRecibido) || 0
@@ -158,7 +173,7 @@ export function CobroShell({
   // Quick chips para efectivo
   const chipsRapidos = [
     { label: 'Exacto', valor: total },
-    ...BILLETES_MX.filter((b) => b >= total)
+    ...BILLETES_MX.filter((b) => b > total)
       .slice(0, 3)
       .map((b) => ({ label: `$${b.toLocaleString('es-MX')}`, valor: b })),
   ]
@@ -167,6 +182,7 @@ export function CobroShell({
   const hayMetodo = metodo !== undefined
   const esValido = (() => {
     if (!hayMetodo) return false
+    if (descuentoInvalido) return false
     if (total <= 0 && escenario !== 'dividir') return false
     switch (metodo) {
       case 'efectivo':      return numRecibido >= total
@@ -210,6 +226,7 @@ export function CobroShell({
     setMixtoTarjeta('')
     setMixtoTransfer('')
     setConPropina(false)
+    setDescuentoPct('')
     setError(null)
   }
 
@@ -261,10 +278,13 @@ export function CobroShell({
         turnoId,
         mesaId,
         subpedidos: subpedidosACobrar.map((sp) => ({ id: sp.id, monto: sp.total })),
-        totalCobrado: total,
+        totalCobrado: totalConDescuento,
+        propina: propinaAmt,
         pagos,
         efectivoRecibido: efectivoRec,
         cambio,
+        descuentoPct: numDescuentoPct > 0 ? numDescuentoPct : undefined,
+        descuentoMonto: montoDescuento > 0 ? montoDescuento : undefined,
       })
 
       if (result?.error) {
@@ -441,6 +461,52 @@ export function CobroShell({
           </div>
         </div>
 
+        {/* ── Descuento ──────────────────────────────────────────────────── */}
+        {descuentoHabilitado && totalEscenario > 0 && (
+          <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+            <div className="px-4 pt-4 pb-3 border-b border-[#E5E5EA]">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                Descuento
+              </p>
+            </div>
+            <div className="px-4 py-4 space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={descuentoPct}
+                    onChange={(e) => setDescuentoPct(e.target.value)}
+                    placeholder="0"
+                    className={`w-full rounded-xl border-[1.5px] bg-s2 px-3.5 py-3 text-center font-mono text-[22px] font-bold outline-none ${
+                      descuentoInvalido
+                        ? 'border-red-400 focus:border-red-500'
+                        : 'border-border focus:border-blue-500 focus:bg-white'
+                    }`}
+                  />
+                </div>
+                <span className="font-mono text-[22px] font-bold text-text-3">%</span>
+              </div>
+              {descuentoInvalido && (
+                <div className="flex items-center gap-1.5 rounded-xl bg-red-50 px-3 py-2">
+                  <span className="text-xs font-bold text-red-600">Máx {descuentoMaxPct}%</span>
+                </div>
+              )}
+              {numDescuentoPct > 0 && !descuentoInvalido && (
+                <div className="flex items-center justify-between rounded-xl bg-blue-50 px-4 py-2.5">
+                  <p className="text-xs text-blue-600">Descuento aplicado</p>
+                  <span className="font-mono text-sm font-bold text-blue-700">
+                    −${montoDescuento.toFixed(2)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Botón Anular mesa (solo cuando total=0) ────────────────────── */}
         {mostrarAnular && (
           <button
@@ -453,7 +519,7 @@ export function CobroShell({
         )}
 
         {/* ── Propina sugerida ───────────────────────────────────────────── */}
-        {propinaPct > 0 && totalEscenario > 0 && (
+        {propinaPct > 0 && totalConDescuento > 0 && (
           <button
             onClick={() => setConPropina((v) => !v)}
             className={`w-full flex items-center justify-between rounded-2xl border-[1.5px] px-4 py-3.5 transition-colors ${

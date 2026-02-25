@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { abrirTurno, cerrarTurno } from '@/app/(app)/mas/turno/actions'
-import type { TurnoResumen } from '@/app/(app)/mas/turno/page'
+import { abrirTurno, cerrarTurno, registrarMovimiento } from '@/app/(app)/mas/turno/actions'
+import type { TurnoResumen, MovimientoCajaItem } from '@/app/(app)/mas/turno/page'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -158,10 +158,43 @@ function AbrirTurnoForm() {
 // ─── Subcomponente: Turno activo + cierre ─────────────────────────────────────
 
 function TurnoActivo({ turno }: { turno: TurnoResumen }) {
+  const router = useRouter()
   const [efectivoContado, setEfectivoContado] = useState('')
   const [notas, setNotas] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  // Movimientos de caja
+  const [sheetMovimiento, setSheetMovimiento] = useState<'fondo' | 'retiro' | null>(null)
+  const [montoMov, setMontoMov] = useState('')
+  const [notasMov, setNotasMov] = useState('')
+  const [errorMov, setErrorMov] = useState<string | null>(null)
+  const [isPendingMov, startMov] = useTransition()
+
+  function handleRegistrarMovimiento() {
+    const monto = parseFloat(montoMov)
+    if (!sheetMovimiento || isNaN(monto) || monto <= 0) {
+      setErrorMov('Ingresa un monto válido.')
+      return
+    }
+    setErrorMov(null)
+    startMov(async () => {
+      const result = await registrarMovimiento({
+        turnoId: turno.id,
+        tipo: sheetMovimiento,
+        monto,
+        notas: notasMov.trim() || null,
+      })
+      if (result?.error) {
+        setErrorMov(result.error)
+      } else {
+        setSheetMovimiento(null)
+        setMontoMov('')
+        setNotasMov('')
+        router.refresh()
+      }
+    })
+  }
 
   const numContado = efectivoContado === '' ? 0 : parseFloat(efectivoContado)
   const diferencia =
@@ -214,6 +247,13 @@ function TurnoActivo({ turno }: { turno: TurnoResumen }) {
             bold
             green
           />
+          {turno.propinaTotal > 0 && (
+            <ResumenRow
+              label="Propinas a meseros"
+              value={`$${fmtMoney(turno.propinaTotal)}`}
+              indent
+            />
+          )}
           {turno.porMetodo.efectivo > 0 && (
             <ResumenRow
               label="💵 Efectivo"
@@ -368,6 +408,136 @@ function TurnoActivo({ turno }: { turno: TurnoResumen }) {
           </div>
         </div>
       </div>
+
+      {/* ── Movimientos de caja ────────────────────────────────────────────── */}
+      <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+        <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+            Movimientos de caja
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2.5 p-3">
+          <button
+            onClick={() => { setSheetMovimiento('fondo'); setMontoMov(''); setNotasMov(''); setErrorMov(null) }}
+            className="flex items-center justify-center gap-2 rounded-xl bg-blue-50 py-3.5 text-[14px] font-semibold text-blue-700 active:scale-[.97]"
+          >
+            💰 Depositar
+          </button>
+          <button
+            onClick={() => { setSheetMovimiento('retiro'); setMontoMov(''); setNotasMov(''); setErrorMov(null) }}
+            className="flex items-center justify-center gap-2 rounded-xl bg-amber-50 py-3.5 text-[14px] font-semibold text-amber-700 active:scale-[.97]"
+          >
+            🏦 Retirar
+          </button>
+        </div>
+
+        {turno.movimientos.length > 0 && (
+          <div className="divide-y divide-[#F2F2F7] border-t border-[#E5E5EA]">
+            {turno.movimientos.map((m) => (
+              <div key={m.id} className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <p className="text-[13px] font-medium">
+                    {m.tipo === 'fondo' ? '💰 Depósito' : '🏦 Retiro'}
+                    {m.notas ? ` · ${m.notas}` : ''}
+                  </p>
+                  <p className="text-[11px] text-text-3">
+                    {new Date(m.created_at).toLocaleTimeString('es-MX', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false,
+                      timeZone: 'America/Mexico_City',
+                    })}
+                  </p>
+                </div>
+                <span
+                  className={`font-mono text-[14px] font-semibold ${
+                    m.tipo === 'fondo' ? 'text-blue-600' : 'text-amber-600'
+                  }`}
+                >
+                  {m.tipo === 'fondo' ? '+' : '−'}${fmtMoney(m.monto)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {turno.movimientos.length === 0 && (
+          <p className="px-4 py-3 text-xs text-text-3">Sin movimientos en este turno.</p>
+        )}
+      </div>
+
+      {/* ── Sheet: Registrar movimiento ─────────────────────────────────────── */}
+      {sheetMovimiento && (
+        <>
+          <div
+            className="fixed inset-0 z-[65] bg-black/40"
+            onClick={() => setSheetMovimiento(null)}
+          />
+          <div className="fixed bottom-0 left-0 right-0 z-[70] rounded-t-2xl bg-white max-h-[85vh] flex flex-col">
+            <div className="flex-shrink-0 px-4 pt-5 pb-3 border-b border-[#E5E5EA]">
+              <p className="text-[16px] font-bold">
+                {sheetMovimiento === 'fondo' ? '💰 Depositar a caja' : '🏦 Retirar de caja'}
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-3">
+                  Monto
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-mono text-[22px] font-bold text-text-3">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0.01}
+                    step="0.01"
+                    value={montoMov}
+                    onChange={(e) => setMontoMov(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-10 pr-4 font-mono text-[22px] font-bold outline-none focus:border-blue-600 focus:bg-white"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-3">
+                  Nota (opcional)
+                </label>
+                <textarea
+                  value={notasMov}
+                  onChange={(e) => setNotasMov(e.target.value)}
+                  placeholder="Ej: cambio para el día, pago de proveedor…"
+                  rows={2}
+                  className="w-full resize-none rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-600"
+                />
+              </div>
+              {errorMov && (
+                <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{errorMov}</p>
+              )}
+            </div>
+            <div className="flex-shrink-0 px-4 py-4 border-t border-[#E5E5EA] space-y-2.5">
+              <button
+                onClick={handleRegistrarMovimiento}
+                disabled={isPendingMov}
+                className={`w-full rounded-xl py-[15px] text-[15px] font-bold text-white active:scale-[.98] disabled:opacity-40 ${
+                  sheetMovimiento === 'fondo'
+                    ? 'bg-blue-600 shadow-[0_4px_14px_rgba(37,99,235,.28)]'
+                    : 'bg-amber-500 shadow-[0_4px_14px_rgba(245,158,11,.28)]'
+                }`}
+              >
+                {isPendingMov ? 'Guardando…' : sheetMovimiento === 'fondo' ? 'Confirmar depósito' : 'Confirmar retiro'}
+              </button>
+              <button
+                onClick={() => setSheetMovimiento(null)}
+                className="w-full rounded-xl bg-s2 py-[15px] text-[15px] font-semibold text-text-2 active:scale-[.98]"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {error && (
         <div className="rounded-2xl bg-red-50 border border-red-100 px-4 py-3.5 text-sm text-red-600">

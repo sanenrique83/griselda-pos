@@ -48,11 +48,17 @@ export default async function CobroPage({
     .order('comensal_numero')
 
   // ── Config del sistema ──────────────────────────────────────────────────────
-  const { data: config } = await supabase
-    .from('config_sistema')
-    .select('propina_sugerida_pct, moneda, transferencia_banco, transferencia_clabe, transferencia_titular')
-    .eq('id', 1)
-    .single()
+  const { data: { user } } = await supabase.auth.getUser()
+  const [{ data: config }, { data: perfil }] = await Promise.all([
+    supabase
+      .from('config_sistema')
+      .select('propina_sugerida_pct, moneda, transferencia_banco, transferencia_clabe, transferencia_titular, descuentos_mesero, descuento_max_pct')
+      .eq('id', 1)
+      .single(),
+    user
+      ? supabase.from('perfiles').select('rol').eq('id', user.id).single()
+      : Promise.resolve({ data: null }),
+  ])
 
   // ── Transformar subpedidos ──────────────────────────────────────────────────
   const subpedidos: SubpedidoCobro[] = (rawSubs ?? []).map((sub: any) => {
@@ -81,6 +87,11 @@ export default async function CobroPage({
       ? (mesa?.nombre ?? `Mesa ${mesa?.numero ?? pedidoId}`)
       : 'Para llevar'
 
+  const esAdmin = (perfil as any)?.rol === 'admin'
+  const descuentoHabilitado =
+    esAdmin || ((config as any)?.descuentos_mesero === true)
+  const descuentoMaxPct = esAdmin ? 100 : ((config as any)?.descuento_max_pct ?? 0)
+
   return (
     <CobroShell
       pedidoId={pedidoId}
@@ -95,6 +106,8 @@ export default async function CobroPage({
         clabe: (config as any)?.transferencia_clabe ?? null,
         titular: (config as any)?.transferencia_titular ?? null,
       }}
+      descuentoHabilitado={descuentoHabilitado}
+      descuentoMaxPct={descuentoMaxPct}
     />
   )
 }

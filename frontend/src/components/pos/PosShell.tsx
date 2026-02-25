@@ -25,6 +25,7 @@ interface PosShellProps {
   categorias: CategoriaPOS[]
   productos: ProductoCatalogo[]
   mesasOcupadas?: MesaOcupada[]
+  puedesCancelar?: boolean
 }
 
 export function PosShell({
@@ -38,6 +39,7 @@ export function PosShell({
   categorias,
   productos,
   mesasOcupadas = [],
+  puedesCancelar = false,
 }: PosShellProps) {
   const router = useRouter()
   const [vista, setVista] = useState<'menu' | 'comanda'>('menu')
@@ -279,6 +281,7 @@ export function PosShell({
             subpedidoActivoId={subpedidoActivoId}
             onCambiarSubpedido={(id) => setSubpedidoActivoId(id)}
             onAgregar={() => setVista('menu')}
+            puedesCancelar={puedesCancelar}
           />
         )}
       </div>

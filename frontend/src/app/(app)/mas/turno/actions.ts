@@ -36,6 +36,31 @@ export async function abrirTurno(
   redirect('/mas/turno')
 }
 
+// ─── Registrar movimiento mid-turno ───────────────────────────────────────────
+
+export async function registrarMovimiento(data: {
+  turnoId: number
+  tipo: 'fondo' | 'retiro'
+  monto: number
+  notas: string | null
+}): Promise<{ error: string } | void> {
+  if (data.monto <= 0) return { error: 'El monto debe ser mayor a cero.' }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Sin sesión.' }
+
+  const { error } = await supabase.from('movimientos_caja').insert({
+    turno_id: data.turnoId,
+    tipo: data.tipo,
+    monto: data.monto,
+    notas: data.notas,
+    usuario_id: user.id,
+  })
+
+  if (error) return { error: 'Error al registrar el movimiento.' }
+}
+
 // ─── Cerrar turno ─────────────────────────────────────────────────────────────
 
 export async function cerrarTurno(data: {
