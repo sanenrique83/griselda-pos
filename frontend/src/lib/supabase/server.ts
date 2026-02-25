@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr' // Añade type CookieOptions
 import { cookies } from 'next/headers'
 
 // Cliente para uso en Server Components, Server Actions y Route Handlers.
@@ -14,16 +14,12 @@ export async function createClient() {
         getAll() {
           return cookieStore.getAll()
         },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
-            )
-          } catch {
-            // En Server Components el setter no funciona, pero no afecta la lectura.
-          }
-        },
-      },
-    },
-  )
+       setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+    try {
+        cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+        )
+    } catch {
+        // En Server Components el setter no funciona...
+    }
 }
