@@ -22,4 +22,8 @@ export async function createClient() {
     } catch {
         // En Server Components el setter no funciona...
     }
+        },
+      },
+    }
+  )
 }
