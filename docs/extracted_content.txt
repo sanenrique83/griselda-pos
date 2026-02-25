@@ -1,0 +1,634 @@
+=== PARAGRAPHS ===
+[4] Style: | GRISELDA POS
+[5] Style: | La Menuderia  --  El Arenal, Jalisco
+[6] Style: | Menudo y tacos de guisado
+[7] Style: | Version 4.0  --  Documento Tecnico Final  --  Listo para desarrollo
+[9] Style: | DOCUMENTO FINAL: todas las decisiones de diseno estan tomadas.
+[13] Style:Heading1 | Registro de cambios v3 a v4
+[14] Style: | Version que incorpora todos los flujos operativos restantes, tipos de servicio adicionales, impresion con grupos logicos, pago mixto, vuelto, datos del establecimiento y preparacion del schema para mapa visual en Fase 2.
+[17] Style:Heading1 | 1. Vision del Sistema
+[18] Style: | Griselda POS es el sistema operativo digital privado de La Menuderia, fonda boutique en El Arenal, Jalisco, especializada en menudo y tacos de guisado. Sistema de una sola operacion, no SaaS, construido para reemplazar completamente a Loyverse y Waiterio con un producto propio.
+[20] Style:Heading2 | Capacidades completas de Fase 1
+[21] Style:ListParagraph | Dos tipos de servicio: Mesa y Para llevar
+[22] Style:ListParagraph | Toma de orden con grupos de modificadores jerarquicos, condicionales y modo captura rapida
+[23] Style:ListParagraph | Combos fijos con precio independiente y modificadores por componente
+[24] Style:ListParagraph | Cuatro escenarios de cobro: individual, grupal, dividido, pago mixto
+[25] Style:ListParagraph | Calculo de vuelto en pantalla
+[26] Style:ListParagraph | Cancelaciones auditadas y descuentos/corterias con permisos configurables por Admin
+[27] Style:ListParagraph | Grupos de impresora: una fisica puede cubrir Cocina y Barra hasta agregar segunda
+[28] Style:ListParagraph | Cinco toggles de configuracion por impresora
+[29] Style:ListParagraph | Cuatro formatos de ticket de cliente segun escenario de cobro
+[30] Style:ListParagraph | Datos del establecimiento en todos los tickets
+[31] Style:ListParagraph | Dashboard analitico con seis graficas
+[32] Style:ListParagraph | 12 reportes exportables a CSV
+[33] Style:ListParagraph | Cierre de turno con cuadre exacto de caja
+[34] Style:ListParagraph | Gestion de tesoreria mid-turno: depositos y salidas
+[37] Style:Heading1 | 2. Stack Tecnologico
+[40] Style:Heading1 | 3. Arquitectura
+[43] Style:Heading1 | 4. Roles y Permisos
+[44] Style:Heading2 | Roles
+[46] Style:Heading2 | Permisos configurables en config_sistema
+[48] Style:Heading2 | Matriz de permisos
+[50] Style:Heading1 | 5. Modelo de Base de Datos
+[51] Style:Heading2 | 5.1 Diagrama de relaciones -- 18 tablas
+[53] Style:Heading2 | 5.2 Definicion de tablas
+[54] Style:Heading3 | config_sistema -- fila unica
+[56] Style:Heading3 | areas
+[58] Style:Heading3 | mesas
+[59] Style: | Campos de posicion visual incluidos con NULL. No requieren migracion cuando se implemente el mapa en Fase 2.
+[61] Style:Heading3 | impresoras
+[62] Style: | Cinco toggles identicos a Loyverse. Cada impresora tiene su configuracion independiente.
+[64] Style:Heading3 | grupos_impresora
+[65] Style: | Funcion logica desacoplada del dispositivo fisico. 'Cocina' y 'Barra' pueden apuntar a la misma impresora.
+[67] Style:Heading3 | categorias
+[69] Style:Heading3 | productos
+[72] Style:Heading3 | combo_productos
+[74] Style:Heading3 | grupos_modificadores
+[76] Style:Heading3 | opciones_modificador
+[78] Style:Heading3 | turnos
+[80] Style:Heading3 | pedidos
+[82] Style:Heading3 | subpedidos
+[84] Style:Heading3 | pedido_productos
+[86] Style:Heading3 | pedido_producto_opciones
+[88] Style:Heading3 | cancelaciones
+[90] Style:Heading3 | descuentos
+[92] Style:Heading3 | movimientos_caja
+[94] Style:Heading3 | pagos -- detalle para pago mixto
+[95] Style: | Un cobro de $300 pagado mitad efectivo mitad tarjeta genera un movimiento_caja de $300 y dos registros en pagos.
+[97] Style:Heading3 | cobro_subpedidos
+[100] Style:Heading1 | 6. Flujo Operativo Completo
+[101] Style:Heading2 | Inicio de dia
+[102] Style:ListParagraph | Login con credenciales
+[103] Style:ListParagraph | Verificar que no exista turno abierto
+[104] Style:ListParagraph | Registrar fondo inicial -- movimiento_caja tipo 'fondo'
+[105] Style:ListParagraph | turno.estado = 'abierto'
+[107] Style:Heading2 | Servicio en Mesa
+[108] Style:ListParagraph | Mesero toca mesa libre en el mapa
+[109] Style:ListParagraph | Pedido creado: tipo='mesa', mesa_id, mesero_id, turno_id
+[110] Style:ListParagraph | mesa.estado = 'ocupada'
+[111] Style:ListParagraph | Crea subpedidos por comensal -- su mesero_id queda en cada subpedido
+[112] Style:ListParagraph | Toma orden: flujo estandar de modificadores o modo rapido segun producto
+[113] Style:ListParagraph | Envia a cocina: ticket subdividido por comensal, agrupado por grupo_impresora
+[114] Style:ListParagraph | Puede agregar mas productos en cualquier momento: solo se envian los 'pendiente'
+[116] Style:Heading2 | Para Llevar
+[117] Style:ListParagraph | Mesero toca boton 'Para llevar' en lugar de una mesa
+[118] Style:ListParagraph | Pedido creado: tipo='llevar', mesa_id=NULL
+[119] Style:ListParagraph | Sistema pide opcionalmente: nombre del cliente, telefono, hora de recogida
+[120] Style:ListParagraph | Flujo de toma de orden identico a mesa
+[121] Style:ListParagraph | Ticket de cocina muestra 'PARA LLEVAR -- [nombre]' en lugar de numero de mesa
+[122] Style:ListParagraph | El cobro puede hacerse antes de que este listo el pedido
+[124] Style:Heading2 | Toma de orden -- flujo de modificadores
+[125] Style: | Modo estandar
+[127] Style: | Modo captura rapida -- tacos
+[130] Style:Heading2 | Cobro
+[131] Style: | Escenario A -- Individual
+[132] Style:ListParagraph | Un subpedido, un movimiento_caja
+[133] Style:ListParagraph | Si efectivo: mesero ingresa efectivo_recibido, pantalla muestra cambio instantaneamente
+[135] Style: | Escenario B -- Uno paga por varios
+[136] Style:ListParagraph | Mesero selecciona multiples subpedidos
+[137] Style:ListParagraph | Un movimiento_caja + N registros en cobro_subpedidos
+[139] Style: | Escenario C -- Dividir entre varios
+[140] Style:ListParagraph | Mesero selecciona subpedidos y numero de partes
+[141] Style:ListParagraph | N movimientos_caja con monto proporcional
+[143] Style: | Escenario D -- Pago mixto
+[144] Style:ListParagraph | Mesero indica que habra mas de un metodo
+[145] Style:ListParagraph | Ingresa monto por metodo hasta completar el total
+[146] Style:ListParagraph | Un movimiento_caja + N registros en pagos
+[147] Style:ListParagraph | Cambio se calcula solo sobre la parte pagada en efectivo
+[149] Style:Heading2 | Pre-cuenta
+[150] Style:ListParagraph | Disponible en cualquier momento del pedido activo
+[151] Style:ListParagraph | Imprime ticket con total actual sin registrar cobro ni cambiar estados
+[152] Style:ListParagraph | El comensal puede seguir pidiendo despues
+[154] Style:Heading2 | Cancelacion de producto enviado
+[155] Style:ListParagraph | Solo para productos en estado 'enviado'
+[156] Style:ListParagraph | Admin siempre / Mesero si cancelaciones_mesero=TRUE
+[157] Style:ListParagraph | Motivo obligatorio -- registro en cancelaciones
+[158] Style:ListParagraph | Producto -> 'cancelado', visible tachado
+[159] Style:ListParagraph | movimiento_caja tipo 'cancelacion' con monto negativo
+[160] Style:ListParagraph | Ticket de aviso impreso en cocina
+[162] Style:Heading2 | Menu del dia -- activacion masiva
+[163] Style:ListParagraph | Pantalla de Admin con toggle individual por producto
+[164] Style:ListParagraph | Boton 'Todos disponibles' para reset al inicio del dia
+[165] Style:ListParagraph | disponible_actualizado_en registra timestamp exacto para reporte de agotados
+[167] Style:Heading2 | Reapertura de mesa cerrada por error
+[168] Style:ListParagraph | Solo Admin, desde historial de pedidos del turno activo
+[169] Style:ListParagraph | pedido.estado='abierto', mesa.estado='ocupada'
+[170] Style:ListParagraph | Registro en auditoria con usuario y timestamp
+[172] Style:Heading2 | Reimpresion de tickets historicos
+[173] Style:ListParagraph | Disponible en historial de recibos
+[174] Style:ListParagraph | Reenvio al servidor de impresion sin cambiar estados
+[175] Style:ListParagraph | Ticket impreso muestra '[REIMPRESION]' en encabezado
+[177] Style:Heading2 | Gestion de tesoreria mid-turno
+[178] Style:ListParagraph | Depositar: ingreso adicional de efectivo -- movimiento tipo 'fondo'
+[179] Style:ListParagraph | Pagos/Salidas: retiro para gastos -- movimiento tipo 'retiro'
+[180] Style:ListParagraph | Ambos afectan el efectivo teorico en el cierre de turno
+[182] Style:Heading2 | Cierre de turno
+[183] Style:ListParagraph | Solo Admin
+[184] Style:ListParagraph | Pantalla: fondo inicial, ventas por metodo, descuentos, cancelaciones, efectivo teorico
+[185] Style:ListParagraph | Admin ingresa efectivo fisico contado
+[186] Style:ListParagraph | Sistema calcula diferencia
+[187] Style:ListParagraph | turno.estado='cerrado'
+[190] Style:Heading1 | 7. Modelo de Estados
+[192] Style:Heading1 | 8. Servidor de Impresion -- Raspberry Pi
+[193] Style:Heading2 | Estructura de archivos
+[195] Style:Heading2 | config.json
+[198] Style:Heading2 | Toggles de impresion -- tres niveles
+[200] Style:Heading2 | Comportamiento ante fallo
+[202] Style:Heading2 | Formato ticket de cocina
+[204] Style:Heading2 | Formato ticket de cliente -- encabezado fijo
+[206] Style:Heading2 | Cuatro formatos segun escenario
+[209] Style:Heading1 | 9. Reportes
+[210] Style: | Todos exportables a CSV. Admin ve todos. Mesero solo sus ventas del turno.
+[212] Style:Heading1 | 10. Dashboard Analitico
+[213] Style: | Recharts sobre queries existentes. Sin tablas adicionales. Solo Admin.
+[215] Style:Heading1 | 11. Combos Fijos
+[216] Style:ListParagraph | En catalogo como cualquier producto con es_combo=TRUE
+[217] Style:ListParagraph | Precio definido por el Admin, independiente de suma de componentes
+[218] Style:ListParagraph | Componentes visibles en pantalla al seleccionar
+[219] Style:ListParagraph | Modificadores de componentes aplican segun incluye_extras
+[220] Style:ListParagraph | Ticket de cocina imprime componentes con opciones elegidas
+[223] Style:Heading1 | 12. Interfaz y Modulos
+[225] Style:Heading1 | 13. Complejidad y Viabilidad
+[227] Style: | Proyecto viable para desarrollo individual. La mayor complejidad esta concentrada donde mas valor aporta: flujo de toma de orden y cobro flexible.
+[228] Style:Heading1 | 14. Fase 2+
+[230] Style:Heading1 | Conclusion -- Documento Final
+[231] Style: | Griselda POS v4.0 es el documento tecnico completo y definitivo para La Menuderia. No hay decisiones de diseno pendientes. Todo el sistema esta especificado para entrar a desarrollo directamente.
+[233] Style:ListParagraph | 18 tablas con schema completo, tipos, FK y decisiones de diseno documentadas
+[234] Style:ListParagraph | Dos tipos de servicio: Mesa y Para llevar con datos de cliente
+[235] Style:ListParagraph | Grupos de modificadores jerarquicos, condicionales y modo captura rapida para tacos
+[236] Style:ListParagraph | Combos fijos con precio independiente y modificadores por componente
+[237] Style:ListParagraph | Cuatro escenarios de cobro incluyendo pago mixto con calculo de vuelto
+[238] Style:ListParagraph | Cuatro formatos de ticket de cliente generados automaticamente segun escenario
+[239] Style:ListParagraph | Cancelaciones auditadas y descuentos con permisos configurables
+[240] Style:ListParagraph | Grupos de impresora estilo Loyverse: una fisica cubre Cocina y Barra
+[241] Style:ListParagraph | Cinco toggles de configuracion por impresora y tres niveles de control de impresion
+[242] Style:ListParagraph | Datos completos del establecimiento en todos los tickets
+[243] Style:ListParagraph | Dashboard analitico con seis graficas incluido en Fase 1
+[244] Style:ListParagraph | 12 reportes exportables a CSV
+[245] Style:ListParagraph | Campos del mapa visual en schema con NULL -- sin migracion en Fase 2
+[246] Style:ListParagraph | Todos los flujos operativos y casos de excepcion documentados
+[250] Style:Heading1 | Apendice UI -- Especificaciones de Interfaz
+[251] Style: | Este apendice complementa la Seccion 12 (Interfaz y Modulos) con las decisiones de diseno UI tomadas tras la validacion del wireframe interactivo. Claude Code debe usar griselda_wireframe_v2.html como referencia visual de todas las pantallas.
+[253] Style:Heading2 | A.1 Plataforma objetivo y prioridad
+[254] Style: | El sistema es una Progressive Web App (PWA) disenada mobile-first. El dispositivo primario es un smartphone con pantalla de 390px de ancho. La experiencia en tablet (768px+) es identica en estructura y navegacion, simplemente mas ancha -- no hay layouts alternativos para pantallas grandes.
+[255] Style: | Regla critica: no existe modo desktop ni layout split. En tablet, el POS muestra una pantalla a la vez igual que en celular.
+[257] Style:Heading2 | A.2 Tema visual
+[258] Style: | Tema claro estilo iOS / Loyverse. Variables CSS de referencia:
+[259] Style:ListParagraph | Fondo general: #F5F5F7 (gris suave iOS)
+[260] Style:ListParagraph | Cards y superficies: #FFFFFF con sombra sutil (0 1px 3px rgba 8%)
+[261] Style:ListParagraph | Acento principal: #2563EB (azul)
+[262] Style:ListParagraph | Positivo / confirmacion: #16A34A (verde)
+[263] Style:ListParagraph | Alerta / precios: #D97706 (ambar)
+[264] Style:ListParagraph | Error / cancelacion: #DC2626 (rojo)
+[265] Style:ListParagraph | Tipografia: Inter (sin serif) para UI, JetBrains Mono para precios y codigos
+[267] Style:Heading2 | A.3 Navegacion principal -- Bottom Navigation
+[268] Style: | Barra fija en la parte inferior de la pantalla (patron iOS). Reemplaza completamente al sidebar lateral que se describia en la Seccion 12. Cinco tabs permanentes:
+[269] Style:ListParagraph | Mesas -- pantalla principal del mapa
+[270] Style:ListParagraph | Pedidos -- lista de pedidos activos con badge de conteo
+[271] Style:ListParagraph | Historial -- recibos del turno con opcion de reimpresion
+[272] Style:ListParagraph | Dashboard -- graficas y KPIs (visible solo Admin)
+[273] Style:ListParagraph | Mas -- acceso a Config, Turno, Reportes, Cerrar sesion
+[275] Style:Heading2 | A.4 Pantalla POS -- dos vistas separadas
+[276] Style: | El POS se divide en dos pantallas con navegacion explicita entre ellas. No existe layout split menu+comanda en ningun tamano de pantalla.
+[277] Style:ListParagraph | Vista Menu: tabs de categorias en la parte superior, lista de productos abajo. Boton fijo al pie "Ver comanda" con total acumulado.
+[278] Style:ListParagraph | Vista Comanda: tabs de comensales, lista de items con estados (Enviado / Pendiente / Cancelado), pie con total y tres botones: Agregar, Enviar a cocina, Cobrar.
+[279] Style:ListParagraph | El header muestra siempre el numero de mesa, el tiempo transcurrido, y acceso directo a Cobrar.
+[281] Style:Heading2 | A.5 Patrones de interaccion movil
+[282] Style:ListParagraph | Bottom sheets: Para llevar (captura de datos del cliente), Pre-cuenta, y modificadores de productos se presentan como hojas que suben desde abajo, no como modales flotantes centrados.
+[283] Style:ListParagraph | Targets tactiles: minimo 44px de alto en todos los elementos interactivos. Botones de accion principal con padding de 18px.
+[284] Style:ListParagraph | Botones de accion principal: ancho completo, fijos al pie de pantalla con padding de safe area (env(safe-area-inset-bottom)) para compatibilidad con iPhone con notch.
+[285] Style:ListParagraph | Contadores de captura rapida: botones circulares [- valor +] de 34px, color del valor en azul cuando es mayor a 0, gris cuando es 0.
+[286] Style:ListParagraph | Opciones de modificador: radio (circulo) para grupos de seleccion unica, checkbox (cuadrado con radio 5px) para seleccion multiple. Seleccionado = borde azul + fondo azul claro + checkmark blanco.
+[288] Style:Heading2 | A.6 Referencia visual -- wireframe interactivo
+[289] Style: | El archivo griselda_wireframe_v2.html contiene 9 pantallas navegables con datos reales de La Menuderia. Es la referencia de diseno autorizada para Claude Code. Las pantallas cubiertas son:
+[290] Style:ListParagraph | 1. Mapa de mesas con boton Para llevar destacado
+[291] Style:ListParagraph | 2. POS Vista Menu -- categorias y productos
+[292] Style:ListParagraph | 2b. POS Vista Comanda -- items con estados y pie de pago
+[293] Style:ListParagraph | 3. Modificadores modo estandar (Menudo Grande con grupos y condicional)
+[294] Style:ListParagraph | 4. Captura rapida (Tacos de guisado con contadores por guisado)
+[295] Style:ListParagraph | 5. Cobro -- 4 escenarios, pago mixto, calculo de vuelto en tiempo real
+[296] Style:ListParagraph | 6. Dashboard -- KPIs, barras por hora, top productos, donuts de metodos y canal
+[297] Style:ListParagraph | 7. Cierre de turno -- cuadre completo, ingreso de efectivo fisico, diferencia
+[298] Style:ListParagraph | 8. Config impresoras -- 5 toggles por dispositivo, grupos logicos, toggle global
+[300] Style: | -- Version 4.0 -- Documento final -- La Menuderia, El Arenal Jalisco --
+
+=== TABLES ===
+
+--- TABLE 0 ---
+Seccion | Cambio | Detalle
+5 | Tabla nueva: pagos | Detalle de metodos en un cobro para pago mixto
+5 | Campos nuevos en pedidos | tipo ENUM(mesa/llevar), cliente_nombre, cliente_telefono, hora_recogida
+5 | Campos nuevos en movimientos_caja | efectivo_recibido y cambio para calculo de vuelto
+5 | mesero_id en subpedidos | Opcion C: trazabilidad de quien atendio cada comensal
+5 | Tabla nueva: grupos_impresora | Enrutamiento logico estilo Loyverse
+5 | Impresoras ampliada | 5 toggles de configuracion + ancho_papel
+5 | Campos de mapa en mesas | pos_x, pos_y, rotacion, forma, tamano -- nullable para Fase 2
+5 | Tabla nueva: areas | Zonas del restaurante: interior, terraza, etc.
+5 | config_sistema ampliado | Datos completos del establecimiento, IVA incluido, toggle global impresion
+6 | Flujo: Para llevar | Captura de datos del cliente, flujo identico a mesa
+6 | Flujo: Pago mixto | Multiples metodos en un mismo cobro
+6 | Flujo: Vuelto | Calculo automatico en pantalla al ingresar efectivo
+6 | Flujo: Pre-cuenta | Impresion sin registrar cobro
+6 | Flujo: Menu del dia | Activacion masiva de productos al inicio del turno
+6 | Flujo: Reapertura de mesa | Solo Admin, con registro de auditoria
+6 | Flujo: Reimpresion historica | Desde historial de recibos sin cambiar estados
+6 | Flujo: Tesoreria mid-turno | Depositar y Pagos/Salidas durante el turno
+8 | Impresion: grupos logicos | Una fisica puede ser Cocina y Barra simultaneamente
+8 | Tickets: datos del negocio | Encabezado completo en todos los tickets de cliente
+8 | Tickets: 4 formatos de cuenta | Automatico segun escenario de cobro
+9 | Reporte nuevo | Ventas mesa vs para llevar
+10 | Dashboard: grafica nueva | Mesa vs Para llevar en dona
+
+--- TABLE 1 ---
+Componente | Tecnologia
+Framework | Next.js
+UI | React
+Estilos | TailwindCSS
+Estado global | Zustand
+Graficas | Recharts -- dashboard analitico Fase 1
+PWA | Service Worker + Manifest -- instalable, requiere conexion activa
+Hosting | Vercel
+Base de datos | Supabase (PostgreSQL) con Row Level Security por rol
+Storage | Supabase Storage -- fotos de productos, logo del negocio
+Impresion | Raspberry Pi 4 + Node.js + PM2 + ESC/POS TCP 9100
+
+--- TABLE 2 ---
+ | Alcance offline:La PWA requiere conexion activa. Service Worker solo para instalacion y cache de assets. Sin sincronizacion offline en Fase 1.
+
+--- TABLE 3 ---
+Tablets / Celulares (PWA -- red WiFi local)        |        v  HTTPS  +--------------------------------+  |  Next.js + React + Recharts    |  <- Vercel  |  Zustand                       |  +----------------+---------------+                   |  HTTPS                   v  +--------------------------------+  |  Supabase                      |  <- Cloud  |  PostgreSQL + Auth + Storage   |  +----------------+---------------+                   |  +------------------------------------------------+  |  Red WiFi local -- La Menuderia                 |  |                                                 |  |  POST http://192.168.1.100:3001/print           |  |                    |                            |  |           Raspberry Pi  (Node + PM2)            |  |          /                    \                 |  |  Grupo 'Cocina'       Grupo 'Barra de bebidas'  |  |        |                       |                |  |   Impresora fisica        (misma impresora      |  |   192.168.1.50             hasta agregar 2a)    |  +------------------------------------------------+
+
+--- TABLE 4 ---
+ | Un dispositivo, varios grupos:Una impresora fisica puede pertenecer a los grupos 'Cocina' y 'Barra' a la vez. Al llegar la segunda impresora, el Admin cambia solo la IP del grupo 'Barra' en config. Sin tocar productos ni categorias.
+
+--- TABLE 5 ---
+Rol | Alcance
+admin | Acceso total. Configura sistema, productos, modificadores, combos, impresoras. Abre y cierra turnos. Ve todos los reportes y dashboard.
+mesero | Mesas, pedidos, para llevar, cobros. Cancelaciones y descuentos segun flags de config.
+cocina | Solo pantalla de pedidos pendientes. Fase 2.
+
+--- TABLE 6 ---
+Parametro | Tipo | Comportamiento
+cancelaciones_mesero | BOOLEAN DEFAULT FALSE | Mesero puede cancelar productos ya enviados
+descuentos_mesero | BOOLEAN DEFAULT FALSE | Mesero puede aplicar descuentos y corterias
+descuento_max_pct | NUMERIC DEFAULT 10 | Limite porcentual para meseros. Admin sin limite.
+corteria_requiere_nota | BOOLEAN DEFAULT TRUE | Toda corteria exige justificacion escrita
+propina_sugerida_pct | NUMERIC DEFAULT 10 | Solo visual en ticket. No se cobra ni registra.
+impresion_activa | BOOLEAN DEFAULT TRUE | Toggle global de impresion automatica
+
+--- TABLE 7 ---
+Modulo | Acceso
+Mesas, pedidos, para llevar | Admin + Mesero
+Toma de orden con modificadores | Admin + Mesero
+Modo captura rapida (tacos) | Admin + Mesero
+Enviar a cocina | Admin + Mesero
+Pre-cuenta (imprimir sin cobrar) | Admin + Mesero
+Cobrar (todos los escenarios) | Admin + Mesero
+Pago mixto | Admin + Mesero
+Reimprimir ticket historico | Admin + Mesero
+Cancelar producto enviado | Admin siempre | Mesero si cancelaciones_mesero=TRUE
+Aplicar descuento / corteria | Admin siempre | Mesero si descuentos_mesero=TRUE
+Reabrir mesa cerrada por error | Solo Admin
+Menu del dia (activacion masiva) | Solo Admin
+Abrir / cerrar turno | Solo Admin
+Gestion de tesoreria mid-turno | Solo Admin
+Dashboard y reportes completos | Solo Admin
+Configuracion del sistema | Solo Admin
+
+--- TABLE 8 ---
+config_sistema (fila unica -- comportamiento global del negocio)  areas    |-- mesas (area_id, pos_x, pos_y, rotacion...)          |-- pedidos (mesa_id, turno_id, mesero_id, tipo, datos llevar)                |-- descuentos (pedido_id)                |-- subpedidos (pedido_id, mesero_id)                      |-- descuentos (subpedido_id)                      |-- pedido_productos (subpedido_id)                      |     |-- pedido_producto_opciones                      |     |-- cancelaciones                      |-- cobro_subpedidos (subpedido_id, movimiento_id)                                |-- movimientos_caja                                      |-- pagos (movimiento_id)  turnos -> pedidos, movimientos_caja  usuarios -> pedidos, subpedidos, cancelaciones, descuentos  grupos_impresora (impresora_id)    |-- impresoras  categorias (grupo_impresora_id)    |-- productos (categoria_id, es_combo, modo_captura)          |-- combo_productos          |-- grupos_modificadores (producto_id, padre_opcion_id)                |-- opciones_modificador
+
+--- TABLE 9 ---
+Campo | Tipo y descripcion
+id | INTEGER DEFAULT 1, CHECK(id=1)
+negocio_nombre | TEXT -- 'La Menuderia'
+negocio_descripcion | TEXT -- 'Menudo y tacos de guisado'
+negocio_direccion | TEXT -- 'Lazaro Cardenas 283B'
+negocio_ciudad | TEXT -- 'El Arenal, Jalisco'
+negocio_telefono | TEXT
+negocio_rfc | TEXT -- opcional, para facturacion futura
+negocio_logo_url | TEXT -- Supabase Storage, aparece en ticket de cliente
+moneda | TEXT DEFAULT 'MXN'
+iva_incluido | BOOLEAN DEFAULT TRUE -- precio ya incluye IVA, no se desglosa en ticket
+cancelaciones_mesero | BOOLEAN DEFAULT FALSE
+descuentos_mesero | BOOLEAN DEFAULT FALSE
+descuento_max_pct | NUMERIC(5,2) DEFAULT 10.00
+corteria_requiere_nota | BOOLEAN DEFAULT TRUE
+propina_sugerida_pct | NUMERIC(5,2) DEFAULT 10.00
+impresion_activa | BOOLEAN DEFAULT TRUE
+
+--- TABLE 10 ---
+Campo | Tipo
+id | SERIAL PK
+nombre | TEXT NOT NULL -- 'Interior', 'Terraza', 'Barra'
+orden | INTEGER DEFAULT 0
+activa | BOOLEAN DEFAULT TRUE
+
+--- TABLE 11 ---
+Campo | Tipo y descripcion
+id | SERIAL PK
+area_id | INTEGER FK -> areas.id
+numero | INTEGER NOT NULL UNIQUE
+nombre | TEXT -- etiqueta opcional
+capacidad | INTEGER
+estado | ENUM('libre','ocupada') DEFAULT 'libre'
+activa | BOOLEAN DEFAULT TRUE
+pos_x | INTEGER -- posicion horizontal en mapa (Fase 2, nullable)
+pos_y | INTEGER -- posicion vertical en mapa (Fase 2, nullable)
+rotacion | INTEGER DEFAULT 0 -- grados (Fase 2)
+forma | ENUM('rectangulo','cuadrado','circulo') DEFAULT 'rectangulo' (Fase 2)
+tamano | ENUM('chico','medio','grande') DEFAULT 'medio' (Fase 2)
+
+--- TABLE 12 ---
+Campo | Tipo y descripcion
+id | SERIAL PK
+nombre | TEXT NOT NULL -- 'WiFi Printer'
+ip | TEXT NOT NULL -- '192.168.1.50'
+puerto | INTEGER DEFAULT 9100
+ancho_papel | ENUM('58mm','80mm') DEFAULT '80mm'
+activa | BOOLEAN DEFAULT TRUE
+imprimir_recibos_cuentas | BOOLEAN DEFAULT TRUE
+imprimir_pedidos | BOOLEAN DEFAULT TRUE
+imprimir_automaticamente | BOOLEAN DEFAULT TRUE
+un_articulo_por_ticket | BOOLEAN DEFAULT FALSE
+agrupar_identicos | BOOLEAN DEFAULT FALSE -- '3x Refresco' en lugar de tres lineas
+
+--- TABLE 13 ---
+Campo | Tipo
+id | SERIAL PK
+nombre | TEXT NOT NULL -- 'Cocina', 'Barra de bebidas'
+impresora_id | INTEGER FK -> impresoras.id
+activo | BOOLEAN DEFAULT TRUE
+
+--- TABLE 14 ---
+Campo | Tipo
+id | SERIAL PK
+nombre | TEXT NOT NULL -- libre, definida por el Admin
+grupo_impresora_id | INTEGER FK -> grupos_impresora.id
+orden | INTEGER DEFAULT 0
+activa | BOOLEAN DEFAULT TRUE
+
+--- TABLE 15 ---
+Campo | Tipo
+id | SERIAL PK
+categoria_id | INTEGER FK -> categorias.id
+nombre | TEXT NOT NULL
+descripcion | TEXT
+precio | NUMERIC(10,2) NOT NULL
+emoji | TEXT
+foto_url | TEXT -- Supabase Storage
+es_combo | BOOLEAN DEFAULT FALSE
+modo_captura | ENUM('estandar','rapido') DEFAULT 'estandar'
+disponible | BOOLEAN DEFAULT TRUE -- agotado del dia
+disponible_actualizado_en | TIMESTAMPTZ
+activo | BOOLEAN DEFAULT TRUE
+created_at | TIMESTAMPTZ DEFAULT NOW()
+
+--- TABLE 16 ---
+ | Snapshot de precio:precio_unit en pedido_productos es INMUTABLE. Cambios de precio no afectan pedidos ya abiertos. El cuadre de caja es siempre exacto.
+
+--- TABLE 17 ---
+Campo | Tipo
+id | SERIAL PK
+combo_id | INTEGER FK -> productos.id (es_combo=TRUE)
+producto_id | INTEGER FK -> productos.id -- componente
+cantidad | INTEGER DEFAULT 1
+incluye_extras | BOOLEAN DEFAULT FALSE -- si FALSE, opciones del componente sin costo extra en el combo
+
+--- TABLE 18 ---
+Campo | Tipo
+id | SERIAL PK
+producto_id | INTEGER FK -> productos.id
+nombre | TEXT NOT NULL -- 'Color', 'Complemento', 'Extras', 'Tamano'
+requerido | BOOLEAN DEFAULT FALSE -- TRUE bloquea el boton Confirmar si no se elige
+minimo | INTEGER DEFAULT 0
+maximo | INTEGER DEFAULT 1 -- 99 = elige varios
+orden | INTEGER DEFAULT 0
+padre_opcion_id | INTEGER FK -> opciones_modificador.id -- NULL=siempre visible, valor=condicional
+mostrar_en_rapido | BOOLEAN DEFAULT TRUE
+
+--- TABLE 19 ---
+Campo | Tipo
+id | SERIAL PK
+grupo_id | INTEGER FK -> grupos_modificadores.id NOT NULL
+nombre | TEXT NOT NULL -- 'Rojos', 'Huevo sencillo', 'Grande'
+precio_extra | NUMERIC(10,2) DEFAULT 0.00
+orden | INTEGER DEFAULT 0
+activa | BOOLEAN DEFAULT TRUE
+
+--- TABLE 20 ---
+Campo | Tipo
+id | SERIAL PK
+usuario_id | UUID FK -> usuarios.id
+fondo_inicial | NUMERIC(10,2) NOT NULL
+efectivo_contado | NUMERIC(10,2) -- ingresado al cierre
+diferencia | NUMERIC(10,2) -- efectivo_contado - total_esperado
+estado | ENUM('abierto','cerrado') DEFAULT 'abierto'
+abierto_en | TIMESTAMPTZ DEFAULT NOW()
+cerrado_en | TIMESTAMPTZ
+notas | TEXT
+
+--- TABLE 21 ---
+Campo | Tipo
+id | SERIAL PK
+turno_id | INTEGER FK -> turnos.id NOT NULL
+mesa_id | INTEGER FK -> mesas.id -- NULL si tipo='llevar'
+mesero_id | UUID FK -> usuarios.id NOT NULL
+tipo | ENUM('mesa','llevar') DEFAULT 'mesa'
+estado | ENUM('abierto','cerrado') DEFAULT 'abierto'
+num_comensales | INTEGER DEFAULT 1
+cliente_nombre | TEXT -- para tipo='llevar'
+cliente_telefono | TEXT -- para tipo='llevar'
+hora_recogida | TIME -- hora estimada de recogida
+notas | TEXT
+created_at | TIMESTAMPTZ DEFAULT NOW()
+cerrado_en | TIMESTAMPTZ
+
+--- TABLE 22 ---
+Campo | Tipo
+id | SERIAL PK
+pedido_id | INTEGER FK -> pedidos.id NOT NULL
+mesero_id | UUID FK -> usuarios.id NOT NULL -- quien tomo este subpedido
+comensal_numero | INTEGER NOT NULL
+nombre | TEXT -- nombre opcional del comensal
+estado | ENUM('activo','pagado') DEFAULT 'activo'
+created_at | TIMESTAMPTZ DEFAULT NOW()
+
+--- TABLE 23 ---
+Campo | Tipo
+id | SERIAL PK
+subpedido_id | INTEGER FK -> subpedidos.id NOT NULL
+producto_id | INTEGER FK -> productos.id NOT NULL
+cantidad | INTEGER DEFAULT 1
+precio_unit | NUMERIC(10,2) NOT NULL -- snapshot inmutable
+estado | ENUM('pendiente','enviado','cancelado') DEFAULT 'pendiente'
+notas | TEXT
+created_at | TIMESTAMPTZ DEFAULT NOW()
+
+--- TABLE 24 ---
+Campo | Tipo
+id | SERIAL PK
+pedido_producto_id | INTEGER FK -> pedido_productos.id NOT NULL
+opcion_id | INTEGER FK -> opciones_modificador.id NOT NULL
+precio_extra | NUMERIC(10,2) NOT NULL -- snapshot al momento del pedido
+
+--- TABLE 25 ---
+Campo | Tipo
+id | SERIAL PK
+pedido_producto_id | INTEGER FK -> pedido_productos.id NOT NULL
+usuario_id | UUID FK -> usuarios.id
+motivo | TEXT NOT NULL
+monto_afectado | NUMERIC(10,2) NOT NULL -- (precio_unit + opciones) x cantidad
+created_at | TIMESTAMPTZ DEFAULT NOW()
+
+--- TABLE 26 ---
+Campo | Tipo
+id | SERIAL PK
+pedido_id | INTEGER FK -> pedidos.id -- nullable, si aplica a la mesa completa
+subpedido_id | INTEGER FK -> subpedidos.id -- nullable, si aplica a un comensal
+usuario_id | UUID FK -> usuarios.id
+tipo | ENUM('porcentaje','monto_fijo','corteria') NOT NULL
+valor | NUMERIC(10,2) NOT NULL
+monto_calculado | NUMERIC(10,2) NOT NULL
+motivo | TEXT
+created_at | TIMESTAMPTZ DEFAULT NOW()
+
+--- TABLE 27 ---
+Campo | Tipo
+id | SERIAL PK
+turno_id | INTEGER FK -> turnos.id NOT NULL
+tipo | ENUM('cobro','fondo','retiro','ajuste','cancelacion') NOT NULL
+monto | NUMERIC(10,2) NOT NULL -- total del cobro, negativo para cancelaciones
+efectivo_recibido | NUMERIC(10,2) -- lo que dio el cliente en efectivo
+cambio | NUMERIC(10,2) -- vuelto: efectivo_recibido - parte_efectivo del cobro
+notas | TEXT
+usuario_id | UUID FK -> usuarios.id
+created_at | TIMESTAMPTZ DEFAULT NOW()
+
+--- TABLE 28 ---
+Campo | Tipo
+id | SERIAL PK
+movimiento_id | INTEGER FK -> movimientos_caja.id NOT NULL
+metodo_pago | ENUM('efectivo','tarjeta','transferencia') NOT NULL
+monto | NUMERIC(10,2) NOT NULL
+referencia | TEXT -- 4 digitos tarjeta, clave SPEI, etc.
+
+--- TABLE 29 ---
+Campo | Tipo
+id | SERIAL PK
+movimiento_id | INTEGER FK -> movimientos_caja.id NOT NULL
+subpedido_id | INTEGER FK -> subpedidos.id NOT NULL
+monto_aplicado | NUMERIC(10,2) NOT NULL
+
+--- TABLE 30 ---
+Ejemplo: Chilaquiles  1. Sistema carga grupos ORDER BY orden  2. GRUPO 'Color'        requerido=TRUE  padre=NULL     Mesero elige 'Rojos'  3. GRUPO 'Complemento'  requerido=FALSE padre=opcion(Rojos)  <- aparece     Comensal no quiere -> lo deja vacio (es opcional, puede avanzar)  4. GRUPO 'Extras'       requerido=FALSE padre=NULL     Comensal elige 'Queso'  5. Confirmar habilitado. Total = $95 + $0 = $95
+
+--- TABLE 31 ---
+Pantalla muestra todas las opciones con contadores:  Chicharron en salsa    [ - ] 2 [ + ]  Rajas con crema        [ - ] 1 [ + ]  Picadillo              [ - ] 0 [ + ]  Total: 3 tacos          [ CONFIRMAR ]  El sistema crea internamente dos pedido_productos.  El mesero hizo una sola interaccion.
+
+--- TABLE 32 ---
+ | Validacion:Grupos requeridos=TRUE bloquean el boton Confirmar hasta completarse. Grupos opcionales pueden dejarse vacios. La pantalla resalta en color los grupos requeridos sin completar.
+
+--- TABLE 33 ---
+Entidad | Ciclo de estados
+Producto en pedido | pendiente -> enviado -> cancelado
+Mesa | libre -> ocupada -> libre (al cerrar pedido)
+Pedido | abierto -> cerrado
+Subpedido | activo -> pagado
+Turno | abierto -> cerrado
+Producto catalogo | disponible / agotado (toggle diario) | activo / inactivo (permanente)
+
+--- TABLE 34 ---
+printer-server/  +-- server.js            <- Express HTTP POST /print  +-- router.js            <- Lee grupo_impresora, enruta al dispositivo  +-- printer.js           <- ESC/POS + TCP 9100  +-- templates/           <- Cuatro formatos de ticket de cliente  +-- config.json          <- IPs, grupos, toggles por impresora  +-- ecosystem.config.js  <- PM2 autostart y reinicio en fallo
+
+--- TABLE 35 ---
+{    "server_port": 3001,    "printers": [{      "id": 1, "nombre": "WiFi Printer", "ip": "192.168.1.50",      "port": 9100, "ancho_papel": "80mm", "activa": true,      "imprimir_recibos_cuentas": true,      "imprimir_pedidos": true,      "imprimir_automaticamente": true,      "un_articulo_por_ticket": false,      "agrupar_identicos": false    }],    "grupos": [      { "id": 1, "nombre": "Cocina",           "impresora_id": 1 },      { "id": 2, "nombre": "Barra de bebidas", "impresora_id": 1 }    ],    "cut_paper": true  }
+
+--- TABLE 36 ---
+ | Agregar segunda impresora:Cambiar impresora_id del grupo 'Barra de bebidas' a 2 y agregar su entrada en printers[]. El sistema empieza a imprimir dos tickets fisicamente separados sin tocar productos ni categorias.
+
+--- TABLE 37 ---
+Nivel | Comportamiento
+Global | config_sistema.impresion_activa=FALSE -> ningun ticket automatico en todo el sistema
+Por envio | Boton 'Enviar sin imprimir' en pantalla POS -> ese envio especifico no imprime pero productos cambian a 'enviado'
+Por impresora | imprimir_pedidos o imprimir_recibos_cuentas=FALSE en config de cada dispositivo
+
+--- TABLE 38 ---
+Escenario | Comportamiento
+Raspberry no responde | Error en UI con reintento. Productos permanecen en 'pendiente'.
+Impresora no imprime | Servidor responde 500. Error en UI. Mesero reintenta o anota manualmente.
+Conexion restaurada | Solo productos en 'pendiente' se envian. Sin duplicados.
+
+--- TABLE 39 ---
+--------------------------------   MESA 5                1:15 PM   Mesero: Maria   Ticket: #0042  --------------------------------  COMENSAL 1 -- Ana  - Chilaquiles rojos      * Queso  COMENSAL 2  - Tacos de guisado x3      * Chicharron en salsa x2      * Rajas con crema x1  - Menudo Grande      * Con panza  --------------------------------   [CORTE]  --------- CANCELACION ---------   MESA 5               1:28 PM  --------------------------------  CANCELAR: Cafe americano x1  Motivo: cliente lo quito  Autorizo: Admin  --------------------------------   [CORTE]
+
+--- TABLE 40 ---
+================================   La Menuderia   Lazaro Cardenas 283B   El Arenal, Jalisco  ================================   Mesa 5              1:30 PM   [contenido segun escenario de cobro]  --------------------------------   TOTAL A PAGAR       $255.00   TOTAL CON PROPINA   $280.50     (10% sugerido)  --------------------------------   Gracias por su visita  ================================
+
+--- TABLE 41 ---
+Escenario | Formato
+Cuenta general | Todo junto sin distincion de comensal. Un ticket para la mesa completa.
+Cuenta individual | Un ticket por comensal con solo sus productos y su total.
+Uno paga por varios | Un ticket que lista los subpedidos cubiertos con sus totales.
+Cuenta dividida | Un ticket por pagador: 'Tu parte (1/4): $95.00'. Total mesa visible arriba.
+
+--- TABLE 42 ---
+ | Automatico:El servidor de impresion genera el formato correcto segun los subpedidos incluidos y el tipo de cobro recibido en el JSON. El mesero no elige el formato manualmente.
+
+--- TABLE 43 ---
+Reporte | Descripcion
+Ventas del dia | Total del turno por metodo de pago
+Ventas por producto | Ranking de productos y combos mas vendidos
+Ticket promedio | Monto promedio por pedido cerrado
+Total por mesero | Ventas y subpedidos atendidos por cada mesero
+Mesa vs para llevar | Comparativa de canal de venta por turno
+Historial de turnos | Fondos, ventas, descuentos, cancelaciones y diferencias
+Movimientos de caja | Cronologico de cobros, retiros, depositos y ajustes
+Ventas por hora | Distribucion horaria -- identifica horas pico y valles
+Productos agotados | Lista con hora exacta de cada cambio a no disponible
+Tiempo promedio de mesa | Duracion de pedido abierto a cerrado
+Descuentos y corterias | Total descontado por tipo, usuario y turno
+Cancelaciones | Total cancelado por producto y usuario con motivos
+
+--- TABLE 44 ---
+Grafica | Descripcion
+Ventas por hora | Barras -- monto por franja horaria del turno activo
+Top 10 productos | Barras horizontales -- productos y combos mas vendidos
+Ventas por metodo | Dona -- efectivo / tarjeta / transferencia
+Mesa vs para llevar | Dona -- proporcion de canal de venta
+Ticket promedio | Numero con comparativa vs turno anterior
+Descuentos del turno | Monto total descontado y numero de aplicaciones
+
+--- TABLE 45 ---
+Modulo | Funcion
+Inicio / Mesas | Mapa con estado libre/ocupada. Boton 'Para llevar' visible.
+POS | Pedido activo: subpedidos, productos, modificadores, combos, envio a cocina, pre-cuenta, cancelacion, cobro.
+Cobro | Selector de escenario, metodos de pago, pago mixto, vuelto en pantalla.
+Dashboard | 6 graficas Recharts. Solo Admin.
+Reportes | 12 reportes con filtro por turno y exportacion CSV.
+Historial | Recibos del turno e historicos. Reimpresion disponible.
+Turno | Apertura con fondo, estado actual, gestion de tesoreria, cierre.
+Menu del dia | Toggle masivo de disponibilidad. Solo Admin.
+Config | Productos, combos, categorias, modificadores, grupos impresora, impresoras, mesas, areas, usuarios, config_sistema. Solo Admin.
+
+--- TABLE 46 ---
+Area | Complejidad
+Pantalla POS | Alta -- modificadores condicionales y modo rapido son los puntos mas complejos
+Pantalla cobro | Media-alta -- cuatro escenarios + pago mixto + vuelto
+Base de datos | Media -- 18 tablas con relaciones claras
+Servidor impresion | Media -- grupos logicos, dos dispositivos, cinco toggles, cuatro formatos
+Dashboard | Baja -- Recharts sobre queries ya definidas
+Combos y para llevar | Baja -- logica reutilizada y campos adicionales simples
+Reportes | Baja -- queries SQL sobre datos existentes
+Infraestructura | Baja -- Vercel + Supabase + Raspberry Pi
+
+--- TABLE 47 ---
+Mejora | Descripcion
+Mapa visual de mesas | Editor drag-and-drop. Los campos pos_x, pos_y, rotacion ya estan en el schema con NULL.
+Pantalla de cocina | Display en tiempo real con Supabase Realtime.
+Entregas a domicilio | Tercer tipo con direccion, repartidor y hora de entrega.
+Propinas registradas | Captura real por cobro, no solo sugerida en ticket.
+Promociones por horario | Descuentos automaticos por franja -- requiere schema propio.
+App offline real | Service Worker con sincronizacion sin conexion.
+Facturacion | RFC del cliente, CFDI con PAC.
+Integracion contable | Exportacion a Aspel o CONTPAQi.
