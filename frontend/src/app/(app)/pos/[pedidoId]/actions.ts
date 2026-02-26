@@ -48,7 +48,7 @@ export async function cargarModificadores(
   const { data, error } = await supabase
     .from('grupos_modificadores')
     .select(
-      'id, nombre, requerido, minimo, maximo, orden, padre_opcion_id, mostrar_en_rapido, opciones_modificador!grupo_id(id, nombre, precio_extra, activa)',
+      'id, nombre, requerido, minimo, maximo, orden, padre_opcion_id, mostrar_en_rapido, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, ingredientes!ingrediente_id(disponible))',
     )
     .eq('producto_id', productoId)
     .order('orden')
@@ -73,12 +73,14 @@ export async function cargarModificadores(
     orden: gr.orden,
     padre_opcion_id: gr.padre_opcion_id ?? null,
     mostrar_en_rapido: gr.mostrar_en_rapido ?? false,
-    opciones: (gr.opciones_modificador ?? []).map((o: any) => ({
-      id: o.id,
-      nombre: o.nombre,
-      precio_extra: o.precio_extra,
-      activa: o.activa,
-    })),
+    opciones: (gr.opciones_modificador ?? [])
+      .filter((o: any) => o.activa && (o.ingredientes == null || o.ingredientes.disponible !== false))
+      .map((o: any) => ({
+        id: o.id,
+        nombre: o.nombre,
+        precio_extra: o.precio_extra,
+        activa: o.activa,
+      })),
   }))
 
   console.log(`[cargarModificadores] productoId=${productoId} → ${grupos.length} grupos`)
@@ -113,11 +115,12 @@ export async function cargarGuisados(
 
   const grupoIds = gruposData.map((g: any) => g.id)
 
-  // Query 2: opciones de esos grupos
+  // Query 2: opciones activas de esos grupos (excluye eliminadas e ingredientes agotados)
   const { data: opcionesData, error: opcionesErr } = await supabase
     .from('opciones_modificador')
-    .select('id, grupo_id, nombre, precio_extra, activa')
+    .select('id, grupo_id, nombre, precio_extra, activa, ingredientes!ingrediente_id(disponible)')
     .in('grupo_id', grupoIds)
+    .eq('activa', true)
     .order('orden')
 
   if (opcionesErr) {
@@ -132,12 +135,12 @@ export async function cargarGuisados(
     id: gr.id,
     nombre: gr.nombre,
     opciones: (opcionesData ?? [])
-      .filter((o: any) => o.grupo_id === gr.id)
+      .filter((o: any) => o.grupo_id === gr.id && (o.ingredientes == null || o.ingredientes.disponible !== false))
       .map((o: any) => ({
         id: o.id,
         nombre: o.nombre,
         precio_extra: o.precio_extra,
-        disponible: o.activa,
+        disponible: true,
       })),
   }))
 

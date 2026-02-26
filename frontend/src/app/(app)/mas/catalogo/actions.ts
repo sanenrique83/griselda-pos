@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 
 type Err = { error: string }
@@ -291,6 +292,7 @@ export async function crearOpcion(data: {
   nombre: string
   precio_extra?: number
   orden?: number
+  ingredienteId?: number | null
 }): Promise<{ id: number } | Err> {
   const supabase = await createClient()
   const { data: op, error } = await supabase
@@ -300,6 +302,7 @@ export async function crearOpcion(data: {
       nombre: data.nombre,
       precio_extra: data.precio_extra ?? 0,
       orden: data.orden ?? 99,
+      ingrediente_id: data.ingredienteId ?? null,
     })
     .select('id')
     .single()
@@ -323,7 +326,72 @@ export async function eliminarOpcion(id: number): Promise<Err | undefined> {
   const supabase = await createClient()
   const { error } = await supabase
     .from('opciones_modificador')
-    .update({ activa: false })
+    .delete()
     .eq('id', id)
   if (error) return { error: 'Error al eliminar la opción.' }
+}
+
+// ─── Ingredientes ─────────────────────────────────────────────────────────────
+
+export async function crearIngrediente(
+  nombre: string,
+): Promise<{ id: number } | Err> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('ingredientes')
+    .insert({ nombre })
+    .select('id')
+    .single()
+  if (error || !data) return { error: 'Error al crear el ingrediente.' }
+  revalidatePath('/mas/catalogo')
+  return { id: data.id }
+}
+
+export async function actualizarIngrediente(
+  id: number,
+  nombre: string,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('ingredientes')
+    .update({ nombre })
+    .eq('id', id)
+  if (error) return { error: 'Error al actualizar el ingrediente.' }
+  revalidatePath('/mas/catalogo')
+}
+
+export async function eliminarIngrediente(id: number): Promise<Err | undefined> {
+  const supabase = await createClient()
+  const { count } = await supabase
+    .from('opciones_modificador')
+    .select('id', { count: 'exact', head: true })
+    .eq('ingrediente_id', id)
+    .eq('activa', true)
+  if ((count ?? 0) > 0)
+    return { error: 'Este ingrediente está en uso en opciones activas.' }
+  const { error } = await supabase.from('ingredientes').delete().eq('id', id)
+  if (error) return { error: 'Error al eliminar el ingrediente.' }
+  revalidatePath('/mas/catalogo')
+}
+
+export async function toggleIngredienteDisponible(
+  id: number,
+  disponible: boolean,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('ingredientes')
+    .update({ disponible })
+    .eq('id', id)
+  if (error) return { error: 'Error al actualizar el ingrediente.' }
+}
+
+export async function setTodosIngredientesDisponibles(): Promise<Err | undefined> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('ingredientes')
+    .update({ disponible: true })
+    .gte('id', 1)
+  if (error) return { error: 'Error al actualizar ingredientes.' }
+  revalidatePath('/mas/catalogo')
 }

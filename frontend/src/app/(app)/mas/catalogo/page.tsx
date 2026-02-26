@@ -51,6 +51,13 @@ export type OpcionCatalogo = {
   activa: boolean
 }
 
+export type IngredienteCatalogo = {
+  id: number
+  nombre: string
+  disponible: boolean
+  creado_en: string
+}
+
 export type GrupoModificadorCatalogo = {
   id: number
   producto_id: number
@@ -85,11 +92,13 @@ export default async function CatalogoPage() {
     { data: rawMesas },
     { data: rawCategorias },
     { data: rawProductos },
+    { data: rawIngredientes },
   ] = await Promise.all([
     supabase.from('areas').select('id, nombre, orden, activa').eq('activa', true).order('orden'),
     supabase.from('mesas').select('id, area_id, numero, nombre, capacidad, activa').eq('activa', true).order('numero'),
     supabase.from('categorias').select('id, nombre, orden, activa, modo_captura').eq('activa', true).order('orden'),
     supabase.from('productos').select('id, nombre, descripcion, precio, emoji, foto_url, disponible, activo, modo_captura, categoria_id').eq('activo', true).order('orden'),
+    supabase.from('ingredientes').select('id, nombre, disponible, creado_en').order('nombre'),
   ])
 
   // Mapa de categorías por id
@@ -134,11 +143,19 @@ export default async function CatalogoPage() {
     categoria_nombre: catMap.get(p.categoria_id) ?? '',
   }))
 
+  const ingredientes: IngredienteCatalogo[] = (rawIngredientes ?? []).map((i: any) => ({
+    id: i.id,
+    nombre: i.nombre,
+    disponible: i.disponible,
+    creado_en: i.creado_en,
+  }))
+
   return (
     <CatalogoShell
       areas={areas}
       categorias={categorias}
       productos={productos}
+      ingredientes={ingredientes}
     />
   )
 }

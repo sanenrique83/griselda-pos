@@ -257,3 +257,10 @@ export interface CobroSubpedido {
   subpedido_id: number
   monto_aplicado: number
 }
+
+export interface Ingrediente {
+  id: number
+  nombre: string
+  disponible: boolean
+  creado_en: string
+}

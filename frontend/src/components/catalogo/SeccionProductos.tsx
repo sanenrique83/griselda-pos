@@ -14,7 +14,7 @@ import {
   eliminarOpcion,
 } from '@/app/(app)/mas/catalogo/actions'
 import { cargarModificadores } from '@/app/(app)/pos/[pedidoId]/actions'
-import type { ProductoCatalogo, CategoriaCatalogo } from '@/app/(app)/mas/catalogo/page'
+import type { ProductoCatalogo, CategoriaCatalogo, IngredienteCatalogo } from '@/app/(app)/mas/catalogo/page'
 
 // ─── Tipos locales ────────────────────────────────────────────────────────────
 
@@ -40,11 +40,13 @@ type GrupoLocal = {
 interface SeccionProductosProps {
   productos: ProductoCatalogo[]
   categorias: CategoriaCatalogo[]
+  ingredientes: IngredienteCatalogo[]
 }
 
 export function SeccionProductos({
   productos: initial,
   categorias,
+  ingredientes,
 }: SeccionProductosProps) {
   const router = useRouter()
   const [productos, setProductos] = useState(initial)
@@ -92,6 +94,7 @@ export function SeccionProductos({
   const [opFormId, setOpFormId] = useState<number | null>(null)
   const [foNombre, setFoNombre] = useState('')
   const [foPrecio, setFoPrecio] = useState('')
+  const [foIngredienteId, setFoIngredienteId] = useState<number | null>(null)
 
   // ── Abrir / cerrar sheet ───────────────────────────────────────────────────
 
@@ -305,6 +308,7 @@ export function SeccionProductos({
     setOpFormId(grupoId)
     setFoNombre('')
     setFoPrecio('')
+    setFoIngredienteId(null)
     setGrupoError(null)
   }
 
@@ -315,6 +319,7 @@ export function SeccionProductos({
         grupoId,
         nombre: foNombre.trim(),
         precio_extra: parseFloat(foPrecio) || 0,
+        ingredienteId: foIngredienteId,
       })
       if ('error' in result) { setGrupoError(result.error); return }
       setGrupos((prev) =>
@@ -337,6 +342,7 @@ export function SeccionProductos({
       )
       setFoNombre('')
       setFoPrecio('')
+      setFoIngredienteId(null)
       setOpFormId(null)
     })
   }
@@ -699,6 +705,28 @@ export function SeccionProductos({
                     {/* Form o botón nueva opción */}
                     {opFormId === grupo.id ? (
                       <div className="space-y-2 border-t border-[#E5E5EA] px-3 py-2.5">
+                        {/* Selector de ingrediente (opcional) */}
+                        {ingredientes.length > 0 && (
+                          <select
+                            value={foIngredienteId ?? ''}
+                            onChange={(e) => {
+                              const id = e.target.value ? Number(e.target.value) : null
+                              setFoIngredienteId(id)
+                              if (id) {
+                                const ing = ingredientes.find((i) => i.id === id)
+                                if (ing) setFoNombre(ing.nombre)
+                              }
+                            }}
+                            className="w-full rounded-lg border-[1.5px] border-border bg-white px-3 py-2 text-[13px] outline-none focus:border-blue-500"
+                          >
+                            <option value="">Sin ingrediente</option>
+                            {ingredientes.map((ing) => (
+                              <option key={ing.id} value={ing.id}>
+                                {ing.nombre}{!ing.disponible ? ' (agotado)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                         <input
                           type="text"
                           value={foNombre}
