@@ -71,13 +71,17 @@ export function TarjetaMesa({ mesa, onClick, isPending }: TarjetaMesaProps) {
 }
 
 // Timer que actualiza cada minuto
+// Inicializamos con '' para evitar mismatch de hidratación (Date.now() difiere server vs client)
 function TiempoTranscurrido({ desde }: { desde: string }) {
-  const [texto, setTexto] = useState(() => formatearTiempo(desde))
+  const [texto, setTexto] = useState('')
 
   useEffect(() => {
+    setTexto(formatearTiempo(desde))
     const id = setInterval(() => setTexto(formatearTiempo(desde)), 60_000)
     return () => clearInterval(id)
   }, [desde])
+
+  if (!texto) return null
 
   return (
     <div className="mt-0.5 font-mono text-xs text-amber-600">{texto}</div>

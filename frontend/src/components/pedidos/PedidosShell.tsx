@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { PedidoActivo } from '@/app/(app)/pedidos/page'
@@ -14,6 +14,13 @@ function elapsed(iso: string): string {
   const h = Math.floor(mins / 60)
   const m = mins % 60
   return m === 0 ? `${h} h` : `${h} h ${m} min`
+}
+
+// Componente separado para evitar mismatch de hidratación (Date.now() difiere server vs client)
+function ElapsedTime({ iso }: { iso: string }) {
+  const [text, setText] = useState('')
+  useEffect(() => { setText(elapsed(iso)) }, [iso])
+  return <>{text}</>
 }
 
 function fmtMoney(n: number) {
@@ -89,7 +96,7 @@ function PedidoCard({ pedido: p }: { pedido: PedidoActivo }) {
           <p className="font-mono text-[15px] font-bold text-blue-600">
             ${fmtMoney(p.total)}
           </p>
-          <p className="mt-0.5 text-[12px] text-text-4">{elapsed(p.createdAt)}</p>
+          <p className="mt-0.5 text-[12px] text-text-4"><ElapsedTime iso={p.createdAt} /></p>
         </div>
       </div>
 
