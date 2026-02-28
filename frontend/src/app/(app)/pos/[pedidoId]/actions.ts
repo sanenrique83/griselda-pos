@@ -53,6 +53,8 @@ export async function cargarModificadores(
     .eq('producto_id', productoId)
     .order('orden')
 
+  console.log('[cargarModificadores] raw data:', JSON.stringify(data))
+
   if (error) {
     console.error('[cargarModificadores] Supabase error:', {
       message: error.message,
@@ -120,7 +122,7 @@ export async function cargarGuisados(
     .from('opciones_modificador')
     .select('id, grupo_id, nombre, precio_extra, activa, ingredientes!ingrediente_id(disponible)')
     .in('grupo_id', grupoIds)
-    .eq('activa', true)
+    .is('activa', true)
     .order('orden')
 
   if (opcionesErr) {
