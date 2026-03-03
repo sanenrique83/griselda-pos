@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   cobrarPedido,
@@ -8,6 +8,7 @@ import {
   type PagoInput,
 } from '@/app/(app)/cobro/[pedidoId]/actions'
 import type { SubpedidoCobro } from '@/app/(app)/cobro/[pedidoId]/page'
+import { imprimirTicket, type ItemCliente } from '@/lib/print'
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────
 
@@ -31,6 +32,7 @@ interface CobroShellProps {
   datosBancarios?: DatosBancarios
   descuentoHabilitado?: boolean
   descuentoMaxPct?: number
+  itemsTicket?: ItemCliente[]
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -89,6 +91,7 @@ export function CobroShell({
   datosBancarios,
   descuentoHabilitado = false,
   descuentoMaxPct = 0,
+  itemsTicket = [],
 }: CobroShellProps) {
   const router = useRouter()
 
@@ -119,8 +122,16 @@ export function CobroShell({
   const [mixtoTransfer, setMixtoTransfer] = useState('')
 
   const [error, setError] = useState<string | null>(null)
+  const [printError, setPrintError] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [isPendingAnular, startAnular] = useTransition()
+
+  useEffect(() => {
+    if (printError) {
+      const t = setTimeout(() => setPrintError(false), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [printError])
 
   // ── Cálculo del total según escenario ────────────────────────────────────
   const totalEscenario = (() => {
@@ -287,9 +298,40 @@ export function CobroShell({
         descuentoMonto: montoDescuento > 0 ? montoDescuento : undefined,
       })
 
-      if (result?.error) {
+      if ('error' in result) {
         setError(result.error)
+        return
       }
+
+      // Cobro exitoso — imprimir ticket de cliente
+      const metodoLabel = METODOS.find((m) => m.id === metodo)?.label ?? metodo
+      const recibido =
+        metodo === 'efectivo' ? (numRecibido > 0 ? numRecibido : null)
+        : metodo === 'mixto' && numMixtoE > 0 ? numMixtoE
+        : null
+      const cambioTicket =
+        metodo === 'efectivo' ? (cambioEfectivo > 0.005 ? cambioEfectivo : null)
+        : metodo === 'mixto' ? (cambioMixto > 0.005 ? cambioMixto : null)
+        : null
+
+      const printOk = await imprimirTicket({
+        tipo: 'cliente',
+        mesa: mesaLabel,
+        items: itemsTicket,
+        subtotal: totalConDescuento,
+        propina: propinaAmt,
+        total,
+        metodo: metodoLabel,
+        recibido,
+        cambio: cambioTicket,
+      })
+
+      if (!printOk) {
+        setPrintError(true)
+        await new Promise((r) => setTimeout(r, 2000))
+      }
+
+      router.push(result.redirectTo)
     })
   }
 
@@ -307,6 +349,11 @@ export function CobroShell({
       className="flex flex-col bg-s2"
       style={{ minHeight: 'calc(100dvh - 4rem - env(safe-area-inset-bottom, 0px))' }}
     >
+      {printError && (
+        <div className="fixed left-4 right-4 top-4 z-[100] rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white shadow-lg">
+          ⚠️ Sin conexión a impresora
+        </div>
+      )}
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 bg-white border-b border-[#E5E5EA]">
         <div className="flex items-center gap-2 px-4 pt-3 pb-3">

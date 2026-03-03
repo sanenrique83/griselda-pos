@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ItemComandaRow } from './ItemComanda'
 import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { SubpedidoPOS, ItemComanda } from '@/app/(app)/pos/[pedidoId]/page'
+import { imprimirTicket } from '@/lib/print'
 
 const MOTIVOS_CANCELACION = [
   'Error de captura',
@@ -20,6 +21,8 @@ interface VistaComandaProps {
   onCambiarSubpedido: (id: number) => void
   onAgregar: () => void // vuelve a vista menú
   puedesCancelar?: boolean
+  mesaLabel?: string
+  meseroNombre?: string
 }
 
 export function VistaComanda({
@@ -29,6 +32,8 @@ export function VistaComanda({
   onCambiarSubpedido,
   onAgregar,
   puedesCancelar = false,
+  mesaLabel = '',
+  meseroNombre = 'Mesero',
 }: VistaComandaProps) {
   const router = useRouter()
   const [isPendingEnviar, startEnviar] = useTransition()
@@ -36,8 +41,16 @@ export function VistaComanda({
   const [isPendingEliminar, startEliminar] = useTransition()
   const [isPendingCancelar, startCancelar] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [printError, setPrintError] = useState(false)
   const [itemACancelar, setItemACancelar] = useState<ItemComanda | null>(null)
   const [motivoIdx, setMotivoIdx] = useState(0)
+
+  useEffect(() => {
+    if (printError) {
+      const t = setTimeout(() => setPrintError(false), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [printError])
 
   const subActivo = subpedidos.find((s) => s.id === subpedidoActivoId)
   const hayPendientes = subpedidos.some((s) =>
@@ -47,11 +60,33 @@ export function VistaComanda({
   function handleEnviar() {
     setError(null)
     startEnviar(async () => {
+      const pendientes = subpedidos.flatMap((sub) =>
+        sub.items
+          .filter((i) => i.estado === 'pendiente')
+          .map((i) => ({
+            cantidad: i.cantidad,
+            nombre: i.nombre,
+            modificadores: i.opciones.map((o) => o.nombre),
+            nota: i.notas ?? '',
+          }))
+      )
+
       const result = await enviarACocina(pedidoId)
       if (result?.error) {
         setError(result.error)
-      } else {
-        router.refresh()
+        return
+      }
+
+      router.refresh()
+
+      if (pendientes.length > 0) {
+        const printOk = await imprimirTicket({
+          tipo: 'cocina',
+          mesa: mesaLabel,
+          mesero: meseroNombre,
+          items: pendientes,
+        })
+        if (!printOk) setPrintError(true)
       }
     })
   }
@@ -149,6 +184,12 @@ export function VistaComanda({
           {isPendingComensal ? '…' : '+'}
         </button>
       </div>
+
+      {printError && (
+        <div className="flex-shrink-0 bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white">
+          ⚠️ Sin conexión a impresora
+        </div>
+      )}
 
       {/* Lista de items */}
       <div className="flex-1 overflow-y-auto space-y-2 px-3 pt-2 pb-32">

@@ -101,10 +101,12 @@ export default async function PosPage({
   const { data: { user } } = await supabase.auth.getUser()
   const [{ data: config }, { data: perfil }] = await Promise.all([
     supabase.from('config_sistema').select('cancelaciones_mesero').eq('id', 1).single(),
-    user ? supabase.from('perfiles').select('rol').eq('id', user.id).single() : Promise.resolve({ data: null }),
+    user ? supabase.from('perfiles').select('rol, nombre').eq('id', user.id).single() : Promise.resolve({ data: null }),
   ])
   const puedesCancelar =
     (perfil as any)?.rol === 'admin' || (config as any)?.cancelaciones_mesero === true
+  const meseroNombre: string =
+    (perfil as any)?.nombre ?? user?.email?.split('@')[0] ?? 'Mesero'
 
   // ── Catálogo: categorías + productos ──────────────────────────────────────
   const [{ data: rawCategorias }, { data: rawProductos }] = await Promise.all([
@@ -191,6 +193,7 @@ export default async function PosPage({
       productos={productos}
       mesasOcupadas={mesasOcupadas}
       puedesCancelar={puedesCancelar}
+      meseroNombre={meseroNombre}
     />
   )
 }

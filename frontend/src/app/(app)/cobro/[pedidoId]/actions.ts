@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 
 // ─── Anular pedido (sin movimiento de caja) ───────────────────────────────────
 export async function anularPedido(
@@ -65,7 +66,7 @@ export async function cobrarPedido(data: {
   cambio: number | null
   descuentoPct?: number
   descuentoMonto?: number
-}): Promise<{ error: string } | void> {
+}): Promise<{ error: string } | { ok: true; redirectTo: string }> {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -162,7 +163,8 @@ export async function cobrarPedido(data: {
 
   if ((activos ?? 0) > 0) {
     // Pago parcial: quedan comensales sin pagar → no cerrar pedido
-    redirect(`/cobro/${data.pedidoId}`)
+    revalidatePath(`/cobro/${data.pedidoId}`)
+    return { ok: true as const, redirectTo: `/cobro/${data.pedidoId}` }
   }
 
   // ── 6. Cerrar el pedido (todos pagados) ───────────────────────────────────
@@ -197,5 +199,7 @@ export async function cobrarPedido(data: {
     }
   }
 
-  redirect('/mesas')
+  revalidatePath('/mesas')
+  revalidatePath('/pedidos')
+  return { ok: true as const, redirectTo: '/mesas' }
 }

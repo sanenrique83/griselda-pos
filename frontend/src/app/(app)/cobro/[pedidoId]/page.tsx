@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { CobroShell } from '@/components/cobro/CobroShell'
+import type { ItemCliente } from '@/lib/print'
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -40,6 +41,7 @@ export default async function CobroPage({
       id, comensal_numero, nombre, estado,
       pedido_productos(
         cantidad, precio_unit, estado,
+        productos(nombre),
         pedido_producto_opciones(precio_extra)
       )
     `)
@@ -81,6 +83,16 @@ export default async function CobroPage({
 
   const totalPedido = subpedidos.reduce((s, sp) => s + sp.total, 0)
 
+  const itemsTicket: ItemCliente[] = (rawSubs ?? []).flatMap((sub: any) =>
+    (sub.pedido_productos ?? [])
+      .filter((pp: any) => pp.estado !== 'cancelado')
+      .map((pp: any) => ({
+        nombre: pp.productos?.nombre ?? '',
+        cantidad: pp.cantidad,
+        precio: pp.precio_unit,
+      }))
+  )
+
   const mesa = (pedido as any).mesas
   const mesaLabel =
     pedido.tipo === 'mesa'
@@ -108,6 +120,7 @@ export default async function CobroPage({
       }}
       descuentoHabilitado={descuentoHabilitado}
       descuentoMaxPct={descuentoMaxPct}
+      itemsTicket={itemsTicket}
     />
   )
 }
