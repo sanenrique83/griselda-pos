@@ -108,6 +108,8 @@ export default async function PosPage({
     (perfil as any)?.rol === 'admin' || (config as any)?.cancelaciones_mesero === true
   const meseroNombre: string =
     (perfil as any)?.nombre ?? user?.email?.split('@')[0] ?? 'Mesero'
+  const rol: 'admin' | 'mesero' = (perfil as any)?.rol === 'admin' ? 'admin' : 'mesero'
+  const tipoMesa: 'mesa' | 'llevar' = pedido.tipo === 'mesa' ? 'mesa' : 'llevar'
 
   // ── Catálogo: categorías + productos ──────────────────────────────────────
   const [{ data: rawCategorias }, { data: rawProductos }] = await Promise.all([
@@ -197,6 +199,8 @@ export default async function PosPage({
       mesasOcupadas={mesasOcupadas}
       puedesCancelar={puedesCancelar}
       meseroNombre={meseroNombre}
+      rol={rol}
+      tipoMesa={tipoMesa}
     />
   )
 }

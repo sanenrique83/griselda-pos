@@ -22,6 +22,9 @@ export type PrintPayload =
       tipo: 'cocina'
       mesa: string
       mesero: string
+      orden: string
+      rol: string
+      tipoMesa: 'mesa' | 'llevar'
       comensales: ComensalCocina[]
     }
   | {

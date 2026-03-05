@@ -27,6 +27,8 @@ interface PosShellProps {
   mesasOcupadas?: MesaOcupada[]
   puedesCancelar?: boolean
   meseroNombre?: string
+  rol?: string
+  tipoMesa?: 'mesa' | 'llevar'
 }
 
 export function PosShell({
@@ -42,6 +44,8 @@ export function PosShell({
   mesasOcupadas = [],
   puedesCancelar = false,
   meseroNombre = 'Mesero',
+  rol = 'mesero',
+  tipoMesa = 'mesa',
 }: PosShellProps) {
   const router = useRouter()
   const [vista, setVista] = useState<'menu' | 'comanda'>('menu')
@@ -286,6 +290,8 @@ export function PosShell({
             puedesCancelar={puedesCancelar}
             mesaLabel={mesaLabel}
             meseroNombre={meseroNombre}
+            rol={rol}
+            tipoMesa={tipoMesa}
           />
         )}
       </div>

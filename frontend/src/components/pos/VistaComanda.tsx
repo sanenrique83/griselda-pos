@@ -23,6 +23,8 @@ interface VistaComandaProps {
   puedesCancelar?: boolean
   mesaLabel?: string
   meseroNombre?: string
+  rol?: string
+  tipoMesa?: 'mesa' | 'llevar'
 }
 
 export function VistaComanda({
@@ -34,6 +36,8 @@ export function VistaComanda({
   puedesCancelar = false,
   mesaLabel = '',
   meseroNombre = 'Mesero',
+  rol = 'mesero',
+  tipoMesa = 'mesa',
 }: VistaComandaProps) {
   const router = useRouter()
   const [isPendingEnviar, startEnviar] = useTransition()
@@ -88,6 +92,9 @@ export function VistaComanda({
           tipo: 'cocina',
           mesa: mesaLabel,
           mesero: meseroNombre,
+          orden: String(pedidoId),
+          rol,
+          tipoMesa,
           comensales,
         })
         if (!printOk) setPrintError(true)
