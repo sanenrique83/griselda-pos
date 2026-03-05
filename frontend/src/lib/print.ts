@@ -1,8 +1,14 @@
-export type ItemCocina = {
+export interface ItemCocina {
   cantidad: number
   nombre: string
   modificadores: string[]
-  nota: string
+  nota?: string
+  esBebida?: boolean
+}
+
+export interface ComensalCocina {
+  comensal: string
+  items: ItemCocina[]
 }
 
 export type ItemCliente = {
@@ -16,7 +22,7 @@ export type PrintPayload =
       tipo: 'cocina'
       mesa: string
       mesero: string
-      items: ItemCocina[]
+      comensales: ComensalCocina[]
     }
   | {
       tipo: 'cliente'

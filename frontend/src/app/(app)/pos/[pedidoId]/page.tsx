@@ -15,6 +15,7 @@ export type ItemComanda = {
   estado: 'pendiente' | 'enviado' | 'cancelado'
   notas: string | null
   opciones: { id: number; nombre: string; precio_extra: number }[]
+  esBebida: boolean
 }
 
 export type SubpedidoPOS = {
@@ -70,7 +71,7 @@ export default async function PosPage({
       id, comensal_numero, nombre,
       pedido_productos(
         id, cantidad, precio_unit, estado, notas,
-        productos(nombre, emoji),
+        productos(nombre, emoji, categorias(nombre)),
         pedido_producto_opciones(
           precio_extra,
           opciones_modificador(id, nombre)
@@ -136,6 +137,7 @@ export default async function PosPage({
         (s: number, o: any) => s + o.precio_extra,
         0,
       )
+      const catNombre: string = (pp.productos as any)?.categorias?.nombre?.toLowerCase() ?? ''
       return {
         id: pp.id,
         nombre: pp.productos?.nombre ?? '',
@@ -146,6 +148,7 @@ export default async function PosPage({
         estado: pp.estado,
         notas: pp.notas ?? null,
         opciones,
+        esBebida: catNombre.includes('bebida'),
       }
     })
 

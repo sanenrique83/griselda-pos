@@ -60,16 +60,20 @@ export function VistaComanda({
   function handleEnviar() {
     setError(null)
     startEnviar(async () => {
-      const pendientes = subpedidos.flatMap((sub) =>
-        sub.items
-          .filter((i) => i.estado === 'pendiente')
-          .map((i) => ({
-            cantidad: i.cantidad,
-            nombre: i.nombre,
-            modificadores: i.opciones.map((o) => o.nombre),
-            nota: i.notas ?? '',
-          }))
-      )
+      const comensales = subpedidos
+        .filter((sp) => sp.items.some((i) => i.estado === 'pendiente'))
+        .map((sp, idx) => ({
+          comensal: sp.nombre || `Comensal ${idx + 1}`,
+          items: sp.items
+            .filter((i) => i.estado === 'pendiente')
+            .map((i) => ({
+              cantidad: i.cantidad,
+              nombre: i.nombre,
+              modificadores: i.opciones.map((o) => o.nombre),
+              nota: i.notas ?? '',
+              esBebida: i.esBebida,
+            })),
+        }))
 
       const result = await enviarACocina(pedidoId)
       if (result?.error) {
@@ -79,12 +83,12 @@ export function VistaComanda({
 
       router.refresh()
 
-      if (pendientes.length > 0) {
+      if (comensales.length > 0) {
         const printOk = await imprimirTicket({
           tipo: 'cocina',
           mesa: mesaLabel,
           mesero: meseroNombre,
-          items: pendientes,
+          comensales,
         })
         if (!printOk) setPrintError(true)
       }
