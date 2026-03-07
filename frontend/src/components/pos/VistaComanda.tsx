@@ -66,8 +66,8 @@ export function VistaComanda({
     startEnviar(async () => {
       const comensales = subpedidos
         .filter((sp) => sp.items.some((i) => i.estado === 'pendiente'))
-        .map((sp, idx) => ({
-          comensal: sp.nombre || `Comensal ${idx + 1}`,
+        .map((sp) => ({
+          comensal: sp.nombre || `Comensal ${sp.comensal_numero}`,
           items: sp.items
             .filter((i) => i.estado === 'pendiente')
             .map((i) => ({

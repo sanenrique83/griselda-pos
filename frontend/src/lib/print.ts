@@ -39,8 +39,11 @@ export type PrintPayload =
       cambio: number | null
     }
 
-const PRINT_SERVER =
-  process.env.NEXT_PUBLIC_PRINT_SERVER_URL ?? 'http://192.168.1.31:5000/print'
+const _printBase =
+  process.env.NEXT_PUBLIC_PRINT_SERVER_URL ?? 'http://192.168.1.31:5000'
+const PRINT_SERVER = _printBase.endsWith('/print')
+  ? _printBase
+  : `${_printBase.replace(/\/$/, '')}/print`
 
 export async function imprimirTicket(payload: PrintPayload): Promise<boolean> {
   try {

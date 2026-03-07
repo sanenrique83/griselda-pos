@@ -598,7 +598,21 @@ export function CobroShell({
         {/* ── Botón imprimir cuenta ──────────────────────────────────────── */}
         {!mostrarAnular && (
           <button
-            onClick={() => window.print()}
+            onClick={async () => {
+              const metodoLabel = METODOS.find((m) => m.id === metodo)?.label ?? metodo
+              const ok = await imprimirTicket({
+                tipo: 'cliente',
+                mesa: mesaLabel,
+                items: itemsTicket,
+                subtotal: totalConDescuento,
+                propina: propinaAmt,
+                total,
+                metodo: metodoLabel,
+                recibido: null,
+                cambio: null,
+              })
+              if (!ok) setPrintError(true)
+            }}
             className="w-full flex items-center justify-center gap-2 rounded-2xl border-[1.5px] border-[#D1D1D6] bg-white py-3.5 text-[15px] font-semibold text-text-2 active:bg-s2 active:scale-[.98]"
           >
             🖨️ Imprimir cuenta
