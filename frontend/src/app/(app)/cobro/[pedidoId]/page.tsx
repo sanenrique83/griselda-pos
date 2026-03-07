@@ -43,7 +43,7 @@ export default async function CobroPage({
       pedido_productos(
         cantidad, precio_unit, estado,
         productos(nombre),
-        pedido_producto_opciones(precio_extra)
+        pedido_producto_opciones(precio_extra, opciones_modificador(nombre))
       )
     `)
     .eq('pedido_id', pedidoId)
@@ -82,14 +82,16 @@ export default async function CobroPage({
       return s + (pp.precio_unit + extras) * pp.cantidad
     }, 0)
     const items: ItemCliente[] = prods.map((pp: any) => {
-      const extras = (pp.pedido_producto_opciones ?? []).reduce(
-        (e: number, o: any) => e + o.precio_extra,
-        0,
-      )
+      const opciones: any[] = pp.pedido_producto_opciones ?? []
+      const extras = opciones.reduce((e: number, o: any) => e + o.precio_extra, 0)
+      const modificadores = opciones
+        .map((o: any) => o.opciones_modificador?.nombre as string | undefined)
+        .filter((n): n is string => !!n)
       return {
         nombre: pp.productos?.nombre ?? '',
         cantidad: pp.cantidad,
         precio: pp.precio_unit + extras, // precio unitario consolidado
+        ...(modificadores.length > 0 ? { modificadores } : {}),
       }
     })
     return {

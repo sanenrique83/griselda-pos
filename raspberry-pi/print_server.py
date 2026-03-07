@@ -174,13 +174,16 @@ def _print_pie_cliente(p, config: dict, con_corte: bool = True):
         p._raw(CMD_CUT)
 
 
-def _print_item_cliente(p, nombre: str, cantidad: int, precio_unit: float):
-    """Imprime un ítem con precio consolidado alineado a la derecha."""
+def _print_item_cliente(p, nombre: str, cantidad: int, precio_unit: float, modificadores: list = None):
+    """Imprime un ítem con precio consolidado alineado a la derecha y modificadores debajo."""
     linea     = f'{cantidad}x {nombre}'
     monto_str = f'${precio_unit * cantidad:.2f}'
     espacios  = COL - len(linea) - len(monto_str)
     p._raw(_encode(linea + ' ' * max(1, espacios) + monto_str))
     p._raw(CMD_LF)
+    for mod in (modificadores or []):
+        p._raw(_encode(f'  + {mod}'))
+        p._raw(CMD_LF)
 
 
 def _fila(p, label: str, valor: str, bold: bool = False, doble: bool = False):
@@ -314,7 +317,7 @@ def _print_ticket_cliente(p, payload: dict):
     if escenario == 'precuenta':
         _print_encabezado_cliente(p, config, mesa, '** PRE-CUENTA **')
         for item in items:
-            _print_item_cliente(p, item.get('nombre', ''), item.get('cantidad', 1), float(item.get('precio', 0.0)))
+            _print_item_cliente(p, item.get('nombre', ''), item.get('cantidad', 1), float(item.get('precio', 0.0)), item.get('modificadores'))
         p._raw(_encode('-' * COL))
         p._raw(CMD_LF)
         _fila(p, 'Subtotal', f'${subtotal:.2f}')
@@ -331,7 +334,7 @@ def _print_ticket_cliente(p, payload: dict):
     if escenario == 'global':
         _print_encabezado_cliente(p, config, mesa)
         for item in items:
-            _print_item_cliente(p, item.get('nombre', ''), item.get('cantidad', 1), float(item.get('precio', 0.0)))
+            _print_item_cliente(p, item.get('nombre', ''), item.get('cantidad', 1), float(item.get('precio', 0.0)), item.get('modificadores'))
         p._raw(_encode('-' * COL))
         p._raw(CMD_LF)
         _fila(p, 'Subtotal', f'${subtotal:.2f}')
@@ -350,17 +353,30 @@ def _print_ticket_cliente(p, payload: dict):
 
     # ── INDIVIDUAL ────────────────────────────────────────────────────────────
     if escenario == 'individual':
-        comensal_nombre = payload.get('comensalNombre', '')
-        subtitulo = f'COMENSAL: {comensal_nombre}' if comensal_nombre else ''
-        _print_encabezado_cliente(p, config, mesa, subtitulo)
-        for item in items:
-            _print_item_cliente(p, item.get('nombre', ''), item.get('cantidad', 1), float(item.get('precio', 0.0)))
-        p._raw(_encode('-' * COL))
-        p._raw(CMD_LF)
-        _fila(p, 'Subtotal', f'${subtotal:.2f}')
-        _fila(p, 'TOTAL', f'${total:.2f}', bold=True, doble=True)
-        _fila(p, 'Metodo', metodo.capitalize())
-        _print_pie_cliente(p, config)
+        comensales_ind = payload.get('comensales', [])
+        for com in comensales_ind:
+            com_nombre  = com.get('comensalNombre', '')
+            com_items   = com.get('items', [])
+            com_subtotal = float(com.get('subtotal', 0.0))
+            com_total   = float(com.get('total', 0.0))
+            com_metodo  = com.get('metodo', '')
+            com_recibido = com.get('recibido')
+            com_cambio  = com.get('cambio')
+            subtitulo   = f'COMENSAL: {com_nombre}' if com_nombre else ''
+            _print_encabezado_cliente(p, config, mesa, subtitulo)
+            for item in com_items:
+                _print_item_cliente(p, item.get('nombre', ''), item.get('cantidad', 1), float(item.get('precio', 0.0)), item.get('modificadores'))
+            p._raw(_encode('-' * COL))
+            p._raw(CMD_LF)
+            _fila(p, 'Subtotal', f'${com_subtotal:.2f}')
+            _fila(p, 'TOTAL', f'${com_total:.2f}', bold=True, doble=True)
+            if com_metodo:
+                _fila(p, 'Metodo', com_metodo.capitalize())
+            if com_recibido is not None:
+                _fila(p, 'Recibido', f'${float(com_recibido):.2f}')
+            if com_cambio is not None:
+                _fila(p, 'Cambio', f'${float(com_cambio):.2f}')
+            _print_pie_cliente(p, config)
         return
 
     # ── VARIOS ────────────────────────────────────────────────────────────────
@@ -373,7 +389,7 @@ def _print_ticket_cliente(p, payload: dict):
         p._raw(_encode('-' * COL))
         p._raw(CMD_LF)
         for item in items:
-            _print_item_cliente(p, item.get('nombre', ''), item.get('cantidad', 1), float(item.get('precio', 0.0)))
+            _print_item_cliente(p, item.get('nombre', ''), item.get('cantidad', 1), float(item.get('precio', 0.0)), item.get('modificadores'))
         p._raw(_encode('-' * COL))
         p._raw(CMD_LF)
         _fila(p, 'Subtotal', f'${subtotal:.2f}')

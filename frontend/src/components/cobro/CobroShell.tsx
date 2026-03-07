@@ -315,43 +315,61 @@ export function CobroShell({
         : metodo === 'mixto' ? (cambioMixto > 0.005 ? cambioMixto : null)
         : null
 
-      const printItems =
-        escenario === 'individual' || escenario === 'varios'
-          ? subpedidosACobrar.flatMap((sp) => sp.items)
-          : itemsTicket
-
-      const printEscenario =
-        escenario === 'general' ? 'global' : escenario
-
-      const printOk = await imprimirTicket({
-        tipo: 'cliente',
-        escenario: printEscenario,
-        mesa: mesaLabel,
-        items: printItems,
-        subtotal: totalConDescuento,
-        descuento: montoDescuento > 0 ? montoDescuento : undefined,
-        propina: propinaAmt,
-        total,
-        metodo: metodoLabel,
-        recibido: recibidoTicket,
-        cambio: cambioTicket,
-        config: ticketConfig,
-        comensalNombre:
-          escenario === 'individual'
-            ? (subpedidosACobrar[0]?.nombre ??
-               `Comensal ${subpedidosACobrar[0]?.comensal_numero}`)
-            : undefined,
-        comensalesSeleccionados:
+      let printOk: boolean
+      if (escenario === 'individual') {
+        // Un ticket por cada comensal (en esta llamada solo el cobrado)
+        const sp = subpedidosACobrar[0]
+        printOk = await imprimirTicket({
+          tipo: 'cliente',
+          escenario: 'individual',
+          mesa: mesaLabel,
+          config: ticketConfig,
+          comensales: [
+            {
+              comensalNombre: sp?.nombre ?? `Comensal ${sp?.comensal_numero}`,
+              items: sp?.items ?? [],
+              subtotal: totalConDescuento,
+              total,
+              metodo: metodoLabel,
+              recibido: recibidoTicket,
+              cambio: cambioTicket,
+            },
+          ],
+        })
+      } else {
+        const printItems =
           escenario === 'varios'
-            ? subpedidosACobrar.map(
-                (sp) => sp.nombre ?? `Comensal ${sp.comensal_numero}`,
-              )
-            : undefined,
-        parteActual:
-          escenario === 'dividir' ? (parseInt(partesAPagar) || 1) : undefined,
-        totalPartes:
-          escenario === 'dividir' ? (parseInt(nPartes) || 1) : undefined,
-      })
+            ? subpedidosACobrar.flatMap((sp) => sp.items)
+            : itemsTicket
+
+        const printEscenario =
+          escenario === 'general' ? 'global' : escenario
+
+        printOk = await imprimirTicket({
+          tipo: 'cliente',
+          escenario: printEscenario,
+          mesa: mesaLabel,
+          items: printItems,
+          subtotal: totalConDescuento,
+          descuento: montoDescuento > 0 ? montoDescuento : undefined,
+          propina: propinaAmt,
+          total,
+          metodo: metodoLabel,
+          recibido: recibidoTicket,
+          cambio: cambioTicket,
+          config: ticketConfig,
+          comensalesSeleccionados:
+            escenario === 'varios'
+              ? subpedidosACobrar.map(
+                  (sp) => sp.nombre ?? `Comensal ${sp.comensal_numero}`,
+                )
+              : undefined,
+          parteActual:
+            escenario === 'dividir' ? (parseInt(partesAPagar) || 1) : undefined,
+          totalPartes:
+            escenario === 'dividir' ? (parseInt(nPartes) || 1) : undefined,
+        })
+      }
 
       if (!printOk) {
         setPrintError(true)
@@ -626,22 +644,40 @@ export function CobroShell({
         {!mostrarAnular && (
           <button
             onClick={async () => {
-              const propinaPreCuenta = propinaPct > 0
-                ? round2(totalConDescuento * propinaPct / 100)
-                : 0
-              const ok = await imprimirTicket({
-                tipo: 'cliente',
-                escenario: 'precuenta',
-                mesa: mesaLabel,
-                items: itemsTicket,
-                subtotal: totalConDescuento,
-                propina: propinaPreCuenta,
-                total: round2(totalConDescuento + propinaPreCuenta),
-                metodo: '',
-                recibido: null,
-                cambio: null,
-                config: ticketConfig,
-              })
+              let ok: boolean
+              if (escenario === 'individual') {
+                // Imprime un ticket separado por cada comensal
+                ok = await imprimirTicket({
+                  tipo: 'cliente',
+                  escenario: 'individual',
+                  mesa: mesaLabel,
+                  config: ticketConfig,
+                  comensales: subpedidos.map((sp) => ({
+                    comensalNombre: sp.nombre ?? `Comensal ${sp.comensal_numero}`,
+                    items: sp.items,
+                    subtotal: sp.total,
+                    total: sp.total,
+                  })),
+                })
+              } else {
+                // Pre-cuenta global
+                const propinaPreCuenta = propinaPct > 0
+                  ? round2(totalConDescuento * propinaPct / 100)
+                  : 0
+                ok = await imprimirTicket({
+                  tipo: 'cliente',
+                  escenario: 'precuenta',
+                  mesa: mesaLabel,
+                  items: itemsTicket,
+                  subtotal: totalConDescuento,
+                  propina: propinaPreCuenta,
+                  total: round2(totalConDescuento + propinaPreCuenta),
+                  metodo: '',
+                  recibido: null,
+                  cambio: null,
+                  config: ticketConfig,
+                })
+              }
               if (!ok) setPrintError(true)
             }}
             className="w-full flex items-center justify-center gap-2 rounded-2xl border-[1.5px] border-[#D1D1D6] bg-white py-3.5 text-[15px] font-semibold text-text-2 active:bg-s2 active:scale-[.98]"

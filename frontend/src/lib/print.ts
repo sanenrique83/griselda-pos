@@ -15,6 +15,17 @@ export type ItemCliente = {
   nombre: string
   cantidad: number
   precio: number // precio unitario consolidado (base + extras)
+  modificadores?: string[]
+}
+
+export type IndividualComensal = {
+  comensalNombre: string
+  items: ItemCliente[]
+  subtotal: number
+  total: number
+  metodo?: string
+  recibido?: number | null
+  cambio?: number | null
 }
 
 export type TicketConfig = {
@@ -40,7 +51,15 @@ export type PrintPayload =
     }
   | {
       tipo: 'cliente'
-      escenario: 'global' | 'individual' | 'varios' | 'dividir' | 'precuenta'
+      escenario: 'individual'
+      mesa: string
+      config: TicketConfig
+      /** Un elemento por subpedido. El servidor imprime un ticket con corte por cada uno. */
+      comensales: IndividualComensal[]
+    }
+  | {
+      tipo: 'cliente'
+      escenario: 'global' | 'varios' | 'dividir' | 'precuenta'
       mesa: string
       items: ItemCliente[]
       subtotal: number
@@ -51,13 +70,9 @@ export type PrintPayload =
       recibido: number | null
       cambio: number | null
       config: TicketConfig
-      // individual
-      comensalNombre?: string
-      // varios
-      comensalesSeleccionados?: string[]
-      // dividir
-      parteActual?: number
-      totalPartes?: number
+      comensalesSeleccionados?: string[] // varios
+      parteActual?: number               // dividir
+      totalPartes?: number               // dividir
     }
 
 const _printBase =
