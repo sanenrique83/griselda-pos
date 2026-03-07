@@ -56,7 +56,7 @@ export default async function CobroPage({
     supabase
       .from('config_sistema')
       .select(`
-        propina_sugerida_pct, moneda,
+        propina_sugerida_pct, moneda, impresion_activa,
         transferencia_banco, transferencia_clabe, transferencia_titular,
         descuentos_mesero, descuento_max_pct,
         ticket_nombre, ticket_direccion, ticket_telefono, ticket_rfc,
@@ -144,6 +144,7 @@ export default async function CobroPage({
       descuentoHabilitado={descuentoHabilitado}
       descuentoMaxPct={descuentoMaxPct}
       ticketConfig={ticketConfig}
+      impresionActiva={(config as any)?.impresion_activa ?? false}
     />
   )
 }

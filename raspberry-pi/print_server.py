@@ -1,81 +1,47 @@
 #!/usr/bin/env python3
 """
 Servidor de impresión para Griselda POS
-Raspberry Pi — Flask 5000/print
-
-Payload cocina esperado:
-{
-  "tipo": "cocina",
-  "mesa": "Mesa 3",
-  "mesero": "Ana",
-  "comensales": [
-    {
-      "comensal": "Comensal 1",
-      "items": [
-        {
-          "cantidad": 2,
-          "nombre": "Tacos de pastor",
-          "modificadores": ["Sin cebolla"],
-          "nota": "bien dorado",
-          "esBebida": false
-        }
-      ]
-    }
-  ]
-}
-
-Payload cliente esperado:
-{
-  "tipo": "cliente",
-  "escenario": "global" | "individual" | "varios" | "dividir" | "precuenta",
-  "mesa": "Mesa 3",
-  "items": [{"nombre": "Tacos", "cantidad": 2, "precio": 60.0}],
-  "subtotal": 120.0,
-  "descuento": 0.0,
-  "propina": 12.0,
-  "total": 132.0,
-  "metodo": "Efectivo",
-  "recibido": 150.0,
-  "cambio": 18.0,
-  "config": {
-    "nombre": "La Menuderia",
-    "direccion": "Calle 123",
-    "telefono": "55 1234-5678",
-    "rfc": "",
-    "linea1": "",
-    "linea2": "",
-    "pie": "Gracias por su visita!",
-    "pie2": ""
-  },
-  "comensalNombre": "Comensal 1",
-  "comensalesSeleccionados": ["Comensal 1", "Comensal 3"],
-  "parteActual": 1,
-  "totalPartes": 4
-}
+Raspberry Pi — Flask 5000 → impresora TCP 192.168.1.100:9100
+Sin dependencia de python-escpos: usa socket puro.
 """
 
-from flask import Flask, request, jsonify
-from escpos.printer import Usb, Serial, Network
+from flask import Flask, request, jsonify, make_response
 from datetime import datetime
+import socket
 import os
 
 app = Flask(__name__)
 
-# ── Configuración de impresora ─────────────────────────────────────────────────
-PRINTER_TYPE = os.environ.get('PRINTER_TYPE', 'usb')
-PRINTER_HOST = os.environ.get('PRINTER_HOST', '192.168.1.50')
+PRINTER_HOST = os.environ.get('PRINTER_HOST', '192.168.1.100')
 PRINTER_PORT = int(os.environ.get('PRINTER_PORT', 9100))
-USB_VENDOR   = int(os.environ.get('USB_VENDOR', '0x04b8'), 16)
-USB_PRODUCT  = int(os.environ.get('USB_PRODUCT', '0x0202'), 16)
 
 
-def get_printer():
-    if PRINTER_TYPE == 'network':
-        return Network(PRINTER_HOST, PRINTER_PORT)
-    elif PRINTER_TYPE == 'serial':
-        return Serial(PRINTER_HOST, baudrate=9600)
-    else:
-        return Usb(USB_VENDOR, USB_PRODUCT)
+def send_to_printer(data: bytes):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(5)
+        s.connect((PRINTER_HOST, PRINTER_PORT))
+        s.sendall(data)
+
+
+# ── CORS ───────────────────────────────────────────────────────────────────────
+CORS_HEADERS = {
+    'Access-Control-Allow-Origin':  '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+}
+
+@app.after_request
+def add_cors(response):
+    for k, v in CORS_HEADERS.items():
+        response.headers[k] = v
+    return response
+
+@app.route('/print', methods=['OPTIONS'])
+def print_preflight():
+    r = make_response('', 204)
+    for k, v in CORS_HEADERS.items():
+        r.headers[k] = v
+    return r
 
 
 # ── Comandos ESC/POS raw ───────────────────────────────────────────────────────
@@ -87,25 +53,24 @@ CMD_BOLD_ON      = ESC + b'E\x01'
 CMD_BOLD_OFF     = ESC + b'E\x00'
 CMD_ALIGN_CENTER = ESC + b'a\x01'
 CMD_ALIGN_LEFT   = ESC + b'a\x00'
-CMD_FONT_DOUBLE  = ESC + b'!\x10'   # doble alto
+CMD_FONT_DOUBLE  = ESC + b'!\x10'
 CMD_FONT_NORMAL  = ESC + b'!\x00'
 CMD_CUT          = GS  + b'V\x41\x03'
 CMD_LF           = b'\n'
-COL              = 32  # ancho en caracteres
+COL              = 32
 
 
 def _encode(text: str) -> bytes:
     return text.encode('latin-1', errors='replace')
 
 
-# ── Helpers de ticket de cliente ───────────────────────────────────────────────
+# ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _fmt_fecha() -> str:
     return datetime.now().strftime('%d/%m/%Y %H:%M')
 
 
-def _print_encabezado_cliente(p, config: dict, mesa: str, subtitulo: str = ''):
-    """Encabezado centrado con nombre del negocio y datos del ticket."""
+def _encabezado_cliente(config: dict, mesa: str, subtitulo: str = '') -> bytes:
     nombre    = config.get('nombre', 'La Menuderia')
     direccion = config.get('direccion', '').strip()
     telefono  = config.get('telefono', '').strip()
@@ -113,104 +78,92 @@ def _print_encabezado_cliente(p, config: dict, mesa: str, subtitulo: str = ''):
     linea1    = config.get('linea1', '').strip()
     linea2    = config.get('linea2', '').strip()
 
-    p._raw(CMD_RESET)
-    p._raw(CMD_ALIGN_CENTER)
-    p._raw(_encode('=' * COL))
-    p._raw(CMD_LF)
-
-    # Nombre en doble altura
-    p._raw(CMD_BOLD_ON)
-    p._raw(CMD_FONT_DOUBLE)
-    p._raw(_encode(nombre))
-    p._raw(CMD_LF)
-    p._raw(CMD_FONT_NORMAL)
-    p._raw(CMD_BOLD_OFF)
-
-    # Datos opcionales
+    b = b''
+    b += CMD_RESET + CMD_ALIGN_CENTER
+    b += _encode('=' * COL) + CMD_LF
+    b += CMD_BOLD_ON + CMD_FONT_DOUBLE
+    b += _encode(nombre) + CMD_LF
+    b += CMD_FONT_NORMAL + CMD_BOLD_OFF
     for campo in [direccion, telefono, rfc, linea1, linea2]:
         if campo:
-            p._raw(_encode(campo))
-            p._raw(CMD_LF)
-
-    # Mesa — Fecha
-    p._raw(_encode(f'{mesa}  \u2014  {_fmt_fecha()}'))
-    p._raw(CMD_LF)
-
-    # Subtítulo opcional (PRE-CUENTA, COMENSAL, etc.)
+            b += _encode(campo) + CMD_LF
+    b += _encode(f'{mesa}  \u2014  {_fmt_fecha()}') + CMD_LF
     if subtitulo:
-        p._raw(CMD_LF)
-        p._raw(CMD_BOLD_ON)
-        p._raw(_encode(subtitulo))
-        p._raw(CMD_BOLD_OFF)
-        p._raw(CMD_LF)
-
-    p._raw(_encode('=' * COL))
-    p._raw(CMD_LF)
-    p._raw(CMD_ALIGN_LEFT)
+        b += CMD_LF + CMD_BOLD_ON + _encode(subtitulo) + CMD_BOLD_OFF + CMD_LF
+    b += _encode('=' * COL) + CMD_LF
+    b += CMD_ALIGN_LEFT
+    return b
 
 
-def _print_pie_cliente(p, config: dict, con_corte: bool = True):
-    """Pie de página con mensaje de despedida."""
+def _pie_cliente(config: dict, con_corte: bool = True) -> bytes:
     pie  = config.get('pie', 'Gracias por su visita!').strip()
     pie2 = config.get('pie2', '').strip()
 
-    p._raw(CMD_ALIGN_CENTER)
-    p._raw(_encode('=' * COL))
-    p._raw(CMD_LF)
-    for _ in range(4):
-        p._raw(CMD_LF)
-    p._raw(CMD_BOLD_ON)
-    p._raw(_encode(pie))
-    p._raw(CMD_BOLD_OFF)
-    p._raw(CMD_LF)
+    b = b''
+    b += CMD_ALIGN_CENTER
+    b += _encode('=' * COL) + CMD_LF
+    b += CMD_LF * 4
+    b += CMD_BOLD_ON + _encode(pie) + CMD_BOLD_OFF + CMD_LF
     if pie2:
-        p._raw(_encode(pie2))
-        p._raw(CMD_LF)
-    for _ in range(4):
-        p._raw(CMD_LF)
-    p._raw(CMD_ALIGN_LEFT)
-
+        b += _encode(pie2) + CMD_LF
+    b += CMD_LF * 4
+    b += CMD_ALIGN_LEFT
     if con_corte:
-        p._raw(CMD_CUT)
+        b += CMD_CUT
+    return b
 
 
-def _print_item_cliente(p, nombre: str, cantidad: int, precio_unit: float, modificadores: list = None):
-    """Imprime un ítem con precio consolidado alineado a la derecha y modificadores debajo."""
+def _item_cliente(nombre: str, cantidad: int, precio_unit: float, modificadores: list = None) -> bytes:
     linea     = f'{cantidad}x {nombre}'
     monto_str = f'${precio_unit * cantidad:.2f}'
     espacios  = COL - len(linea) - len(monto_str)
-    p._raw(_encode(linea + ' ' * max(1, espacios) + monto_str))
-    p._raw(CMD_LF)
+    b = _encode(linea + ' ' * max(1, espacios) + monto_str) + CMD_LF
     for mod in (modificadores or []):
-        p._raw(_encode(f'  + {mod}'))
-        p._raw(CMD_LF)
+        b += _encode(f'  + {mod}') + CMD_LF
+    return b
 
 
-def _fila(p, label: str, valor: str, bold: bool = False, doble: bool = False):
-    if doble:
-        p._raw(CMD_FONT_DOUBLE)
-    if bold:
-        p._raw(CMD_BOLD_ON)
+def _fila(label: str, valor: str, bold: bool = False, doble: bool = False) -> bytes:
+    b = b''
+    if doble: b += CMD_FONT_DOUBLE
+    if bold:  b += CMD_BOLD_ON
     espacios = COL - len(label) - len(valor)
-    p._raw(_encode(label + ' ' * max(1, espacios) + valor))
-    p._raw(CMD_LF)
-    if bold:
-        p._raw(CMD_BOLD_OFF)
-    if doble:
-        p._raw(CMD_FONT_NORMAL)
+    b += _encode(label + ' ' * max(1, espacios) + valor) + CMD_LF
+    if bold:  b += CMD_BOLD_OFF
+    if doble: b += CMD_FONT_NORMAL
+    return b
 
 
-# ── Ticket de cocina ───────────────────────────────────────────────────────────
+# ── Ticket cocina ──────────────────────────────────────────────────────────────
 
-def _print_ticket_cocina(p, payload: dict):
-    """Imprime un ticket de cocina con separadores por comensal."""
+def _seccion_comensal(com: dict) -> bytes:
+    label = com.get('comensal', 'Comensal')
+    b  = CMD_ALIGN_CENTER + CMD_BOLD_ON + CMD_FONT_DOUBLE
+    b += _encode(f'=== {label} ===') + CMD_LF
+    b += CMD_FONT_NORMAL + CMD_BOLD_OFF + CMD_ALIGN_LEFT
+    for item in com.get('items', []):
+        cantidad = item.get('cantidad', 1)
+        nombre   = item.get('nombre', '')
+        mods     = item.get('modificadores', [])
+        nota     = (item.get('nota', '') or '').strip()
+        b += CMD_FONT_DOUBLE + CMD_BOLD_ON
+        b += _encode(f'{cantidad}x {nombre}') + CMD_LF
+        b += CMD_BOLD_OFF + CMD_FONT_NORMAL
+        for mod in mods:
+            b += _encode(f'   + {mod}') + CMD_LF
+        if nota:
+            b += _encode(f'   * {nota}') + CMD_LF
+    b += _encode('-' * COL) + CMD_LF
+    return b
+
+
+def _build_cocina(payload: dict) -> bytes:
     mesa       = payload.get('mesa', '')
     mesero     = payload.get('mesero', '')
     comensales = payload.get('comensales', [])
 
     comensales_comida = []
     comensales_bebida = []
-
     for com in comensales:
         items_comida = [i for i in com.get('items', []) if not i.get('esBebida', False)]
         items_bebida = [i for i in com.get('items', []) if i.get('esBebida', False)]
@@ -219,88 +172,34 @@ def _print_ticket_cocina(p, payload: dict):
         if items_bebida:
             comensales_bebida.append({**com, 'items': items_bebida})
 
+    b = b''
+
     if comensales_comida:
-        _print_encabezado_cocina(p, mesa, mesero)
+        b += CMD_RESET + CMD_ALIGN_CENTER
+        b += CMD_BOLD_ON + CMD_FONT_DOUBLE + _encode('COCINA') + CMD_LF
+        b += CMD_FONT_NORMAL + CMD_BOLD_OFF
+        b += _encode(f'  {mesa}  |  {mesero}') + CMD_LF
+        b += CMD_ALIGN_LEFT + _encode('-' * COL) + CMD_LF
         for com in comensales_comida:
-            _print_seccion_comensal(p, com)
-        p._raw(CMD_CUT)
+            b += _seccion_comensal(com)
+        b += CMD_CUT
 
     if comensales_bebida:
-        p._raw(CMD_RESET)
-        p._raw(CMD_ALIGN_CENTER)
-        p._raw(CMD_BOLD_ON)
-        p._raw(CMD_FONT_DOUBLE)
-        p._raw(_encode('*** BEBIDAS ***'))
-        p._raw(CMD_LF)
-        p._raw(CMD_FONT_NORMAL)
-        p._raw(CMD_BOLD_OFF)
-        p._raw(_encode(f'  {mesa}  |  {mesero}'))
-        p._raw(CMD_LF)
-        p._raw(CMD_ALIGN_LEFT)
-        p._raw(_encode('-' * COL))
-        p._raw(CMD_LF)
+        b += CMD_RESET + CMD_ALIGN_CENTER
+        b += CMD_BOLD_ON + CMD_FONT_DOUBLE + _encode('*** BEBIDAS ***') + CMD_LF
+        b += CMD_FONT_NORMAL + CMD_BOLD_OFF
+        b += _encode(f'  {mesa}  |  {mesero}') + CMD_LF
+        b += CMD_ALIGN_LEFT + _encode('-' * COL) + CMD_LF
         for com in comensales_bebida:
-            _print_seccion_comensal(p, com)
-        p._raw(CMD_CUT)
+            b += _seccion_comensal(com)
+        b += CMD_CUT
+
+    return b
 
 
-def _print_encabezado_cocina(p, mesa: str, mesero: str):
-    p._raw(CMD_RESET)
-    p._raw(CMD_ALIGN_CENTER)
-    p._raw(CMD_BOLD_ON)
-    p._raw(CMD_FONT_DOUBLE)
-    p._raw(_encode('COCINA'))
-    p._raw(CMD_LF)
-    p._raw(CMD_FONT_NORMAL)
-    p._raw(CMD_BOLD_OFF)
-    p._raw(_encode(f'  {mesa}  |  {mesero}'))
-    p._raw(CMD_LF)
-    p._raw(CMD_ALIGN_LEFT)
-    p._raw(_encode('-' * COL))
-    p._raw(CMD_LF)
+# ── Ticket cliente ─────────────────────────────────────────────────────────────
 
-
-def _print_seccion_comensal(p, com: dict):
-    label = com.get('comensal', 'Comensal')
-
-    p._raw(CMD_ALIGN_CENTER)
-    p._raw(CMD_BOLD_ON)
-    p._raw(CMD_FONT_DOUBLE)
-    p._raw(_encode(f'=== {label} ==='))
-    p._raw(CMD_LF)
-    p._raw(CMD_FONT_NORMAL)
-    p._raw(CMD_BOLD_OFF)
-    p._raw(CMD_ALIGN_LEFT)
-
-    for item in com.get('items', []):
-        cantidad = item.get('cantidad', 1)
-        nombre   = item.get('nombre', '')
-        mods     = item.get('modificadores', [])
-        nota     = item.get('nota', '') or ''
-
-        p._raw(CMD_FONT_DOUBLE)
-        p._raw(CMD_BOLD_ON)
-        p._raw(_encode(f'{cantidad}x {nombre}'))
-        p._raw(CMD_LF)
-        p._raw(CMD_BOLD_OFF)
-        p._raw(CMD_FONT_NORMAL)
-
-        for mod in mods:
-            p._raw(_encode(f'   + {mod}'))
-            p._raw(CMD_LF)
-
-        if nota.strip():
-            p._raw(_encode(f'   * {nota}'))
-            p._raw(CMD_LF)
-
-    p._raw(_encode('-' * COL))
-    p._raw(CMD_LF)
-
-
-# ── Ticket de cliente ──────────────────────────────────────────────────────────
-
-def _print_ticket_cliente(p, payload: dict):
-    """Imprime el ticket de cobro para el cliente según escenario."""
+def _build_cliente(payload: dict) -> bytes:
     escenario = payload.get('escenario', 'global')
     mesa      = payload.get('mesa', '')
     items     = payload.get('items', [])
@@ -313,150 +212,156 @@ def _print_ticket_cliente(p, payload: dict):
     cambio    = payload.get('cambio')
     config    = payload.get('config', {})
 
+    b = b''
+
     # ── PRE-CUENTA ────────────────────────────────────────────────────────────
     if escenario == 'precuenta':
-        _print_encabezado_cliente(p, config, mesa, '** PRE-CUENTA **')
+        b += _encabezado_cliente(config, mesa, '** PRE-CUENTA **')
         for item in items:
-            _print_item_cliente(p, item.get('nombre', ''), item.get('cantidad', 1), float(item.get('precio', 0.0)), item.get('modificadores'))
-        p._raw(_encode('-' * COL))
-        p._raw(CMD_LF)
-        _fila(p, 'Subtotal', f'${subtotal:.2f}')
-        _fila(p, 'TOTAL', f'${total:.2f}', bold=True, doble=True)
+            b += _item_cliente(
+                item.get('nombre', ''), item.get('cantidad', 1),
+                float(item.get('precio', 0.0)), item.get('modificadores') or []
+            )
+        b += _encode('-' * COL) + CMD_LF
+        b += _fila('Subtotal', f'${subtotal:.2f}')
         if propina > 0:
             pct = round(propina / subtotal * 100) if subtotal > 0 else 0
-            _fila(p, f'Propina sugerida ({pct}%)', f'${propina:.2f}')
-        _print_pie_cliente(p, config, con_corte=False)
-        for _ in range(6):
-            p._raw(CMD_LF)
-        return
+            b += _fila(f'Propina sugerida ({pct}%)', f'${propina:.2f}')
+        b += _fila('TOTAL', f'${total:.2f}', bold=True, doble=True)
+        b += _pie_cliente(config, con_corte=True)
+        return b
 
     # ── GLOBAL ────────────────────────────────────────────────────────────────
     if escenario == 'global':
-        _print_encabezado_cliente(p, config, mesa)
+        b += _encabezado_cliente(config, mesa)
         for item in items:
-            _print_item_cliente(p, item.get('nombre', ''), item.get('cantidad', 1), float(item.get('precio', 0.0)), item.get('modificadores'))
-        p._raw(_encode('-' * COL))
-        p._raw(CMD_LF)
-        _fila(p, 'Subtotal', f'${subtotal:.2f}')
+            b += _item_cliente(
+                item.get('nombre', ''), item.get('cantidad', 1),
+                float(item.get('precio', 0.0)), item.get('modificadores') or []
+            )
+        b += _encode('-' * COL) + CMD_LF
+        b += _fila('Subtotal', f'${subtotal:.2f}')
         if descuento > 0:
-            _fila(p, 'Descuento', f'-${descuento:.2f}')
-        _fila(p, 'TOTAL', f'${total:.2f}', bold=True, doble=True)
-        _fila(p, 'Metodo', metodo.capitalize())
+            b += _fila('Descuento', f'-${descuento:.2f}')
+        b += _fila('TOTAL', f'${total:.2f}', bold=True, doble=True)
+        b += _fila('Metodo', metodo.capitalize())
         if recibido is not None:
-            _fila(p, 'Recibido', f'${float(recibido):.2f}')
+            b += _fila('Recibido', f'${float(recibido):.2f}')
         if cambio is not None:
-            _fila(p, 'Cambio', f'${float(cambio):.2f}')
+            b += _fila('Cambio', f'${float(cambio):.2f}')
         if propina > 0:
-            _fila(p, 'Propina sugerida', f'${propina:.2f}')
-        _print_pie_cliente(p, config)
-        return
+            b += _fila('Propina sugerida', f'${propina:.2f}')
+        b += _pie_cliente(config)
+        return b
 
-    # ── INDIVIDUAL ────────────────────────────────────────────────────────────
+    # ── INDIVIDUAL — un ticket por comensal, corte entre cada uno ─────────────
     if escenario == 'individual':
-        comensales_ind = payload.get('comensales', [])
-        for com in comensales_ind:
-            com_nombre  = com.get('comensalNombre', '')
-            com_items   = com.get('items', [])
+        for com in payload.get('comensales', []):
+            com_nombre   = com.get('comensalNombre', '')
+            com_items    = com.get('items', [])
             com_subtotal = float(com.get('subtotal', 0.0))
-            com_total   = float(com.get('total', 0.0))
-            com_metodo  = com.get('metodo', '')
+            com_total    = float(com.get('total', 0.0))
+            com_metodo   = com.get('metodo', '')
             com_recibido = com.get('recibido')
-            com_cambio  = com.get('cambio')
-            subtitulo   = f'COMENSAL: {com_nombre}' if com_nombre else ''
-            _print_encabezado_cliente(p, config, mesa, subtitulo)
+            com_cambio   = com.get('cambio')
+            subtitulo    = f'COMENSAL: {com_nombre}' if com_nombre else ''
+
+            b += _encabezado_cliente(config, mesa, subtitulo)
             for item in com_items:
-                _print_item_cliente(p, item.get('nombre', ''), item.get('cantidad', 1), float(item.get('precio', 0.0)), item.get('modificadores'))
-            p._raw(_encode('-' * COL))
-            p._raw(CMD_LF)
-            _fila(p, 'Subtotal', f'${com_subtotal:.2f}')
-            _fila(p, 'TOTAL', f'${com_total:.2f}', bold=True, doble=True)
+                b += _item_cliente(
+                    item.get('nombre', ''), item.get('cantidad', 1),
+                    float(item.get('precio', 0.0)), item.get('modificadores') or []
+                )
+            b += _encode('-' * COL) + CMD_LF
+            b += _fila('Subtotal', f'${com_subtotal:.2f}')
+            if propina > 0:
+                pct = round(propina / subtotal * 100) if subtotal > 0 else 0
+                b += _fila(f'Propina sugerida ({pct}%)', f'${propina:.2f}')
+            b += _fila('TOTAL', f'${com_total:.2f}', bold=True, doble=True)
             if com_metodo:
-                _fila(p, 'Metodo', com_metodo.capitalize())
+                b += _fila('Metodo', com_metodo.capitalize())
             if com_recibido is not None:
-                _fila(p, 'Recibido', f'${float(com_recibido):.2f}')
+                b += _fila('Recibido', f'${float(com_recibido):.2f}')
             if com_cambio is not None:
-                _fila(p, 'Cambio', f'${float(com_cambio):.2f}')
-            _print_pie_cliente(p, config)
-        return
+                b += _fila('Cambio', f'${float(com_cambio):.2f}')
+            b += _pie_cliente(config, con_corte=True)
+        return b
 
     # ── VARIOS ────────────────────────────────────────────────────────────────
     if escenario == 'varios':
-        comensales_nombres = payload.get('comensalesSeleccionados', [])
-        _print_encabezado_cliente(p, config, mesa)
-        if comensales_nombres:
-            p._raw(_encode(' + '.join(comensales_nombres)))
-            p._raw(CMD_LF)
-        p._raw(_encode('-' * COL))
-        p._raw(CMD_LF)
+        nombres = payload.get('comensalesSeleccionados', [])
+        b += _encabezado_cliente(config, mesa)
+        if nombres:
+            b += _encode(' + '.join(nombres)) + CMD_LF
+        b += _encode('-' * COL) + CMD_LF
         for item in items:
-            _print_item_cliente(p, item.get('nombre', ''), item.get('cantidad', 1), float(item.get('precio', 0.0)), item.get('modificadores'))
-        p._raw(_encode('-' * COL))
-        p._raw(CMD_LF)
-        _fila(p, 'Subtotal', f'${subtotal:.2f}')
-        _fila(p, 'TOTAL', f'${total:.2f}', bold=True, doble=True)
-        _fila(p, 'Metodo', metodo.capitalize())
+            b += _item_cliente(
+                item.get('nombre', ''), item.get('cantidad', 1),
+                float(item.get('precio', 0.0)), item.get('modificadores') or []
+            )
+        b += _encode('-' * COL) + CMD_LF
+        b += _fila('Subtotal', f'${subtotal:.2f}')
+        if propina > 0:
+            pct = round(propina / subtotal * 100) if subtotal > 0 else 0
+            b += _fila(f'Propina sugerida ({pct}%)', f'${propina:.2f}')
+        b += _fila('TOTAL', f'${total:.2f}', bold=True, doble=True)
+        b += _fila('Metodo', metodo.capitalize())
         if recibido is not None:
-            _fila(p, 'Recibido', f'${float(recibido):.2f}')
+            b += _fila('Recibido', f'${float(recibido):.2f}')
         if cambio is not None:
-            _fila(p, 'Cambio', f'${float(cambio):.2f}')
-        _print_pie_cliente(p, config)
-        return
+            b += _fila('Cambio', f'${float(cambio):.2f}')
+        b += _pie_cliente(config)
+        return b
 
     # ── DIVIDIR ───────────────────────────────────────────────────────────────
     if escenario == 'dividir':
-        parte_actual  = int(payload.get('parteActual', 1))
-        total_partes  = int(payload.get('totalPartes', 1))
-        _print_encabezado_cliente(p, config, mesa)
-        p._raw(CMD_ALIGN_CENTER)
-        p._raw(CMD_BOLD_ON)
-        p._raw(_encode('PAGO DIVIDIDO'))
-        p._raw(CMD_LF)
-        p._raw(CMD_BOLD_OFF)
-        p._raw(_encode(f'Parte {parte_actual} de {total_partes}'))
-        p._raw(CMD_LF)
-        p._raw(CMD_ALIGN_LEFT)
-        p._raw(_encode('-' * COL))
-        p._raw(CMD_LF)
-        # subtotal_total y por_parte derivados de total y partes
-        por_parte      = round(total / parte_actual, 2) if parte_actual > 0 else total
-        subtotal_total = round(por_parte * total_partes, 2)
-        _fila(p, 'Subtotal total', f'${subtotal_total:.2f}')
-        _fila(p, 'Por parte', f'${por_parte:.2f}')
-        _fila(p, 'TOTAL', f'${total:.2f}', bold=True, doble=True)
-        _fila(p, 'Metodo', metodo.capitalize())
-        if recibido is not None:
-            _fila(p, 'Recibido', f'${float(recibido):.2f}')
-        if cambio is not None:
-            _fila(p, 'Cambio', f'${float(cambio):.2f}')
-        _print_pie_cliente(p, config)
-        return
+        parte_actual = int(payload.get('parteActual', 1))
+        total_partes = int(payload.get('totalPartes', 1))
+        por_parte    = round(total / total_partes, 2) if total_partes > 0 else total
 
-    # Fallback: tratar como global
-    _print_ticket_cliente(p, {**payload, 'escenario': 'global'})
+        b += _encabezado_cliente(config, mesa)
+        b += CMD_ALIGN_CENTER + CMD_BOLD_ON + _encode('PAGO DIVIDIDO') + CMD_LF
+        b += CMD_BOLD_OFF + _encode(f'Parte {parte_actual} de {total_partes}') + CMD_LF
+        b += CMD_ALIGN_LEFT + _encode('-' * COL) + CMD_LF
+        b += _fila('Subtotal total', f'${round(por_parte * total_partes, 2):.2f}')
+        b += _fila('Por parte', f'${por_parte:.2f}')
+        b += _fila('TOTAL', f'${total:.2f}', bold=True, doble=True)
+        b += _fila('Metodo', metodo.capitalize())
+        if recibido is not None:
+            b += _fila('Recibido', f'${float(recibido):.2f}')
+        if cambio is not None:
+            b += _fila('Cambio', f'${float(cambio):.2f}')
+        b += _pie_cliente(config)
+        return b
+
+    # Fallback global
+    return _build_cliente({**payload, 'escenario': 'global'})
 
 
 # ── Endpoint ───────────────────────────────────────────────────────────────────
+
 @app.route('/print', methods=['POST'])
 def print_ticket():
     data = request.get_json(force=True, silent=True)
     if not data:
-        return jsonify({'error': 'JSON invalido'}), 400
+        return make_response(jsonify({'error': 'JSON invalido'}), 400)
 
     tipo = data.get('tipo')
     if tipo not in ('cocina', 'cliente'):
-        return jsonify({'error': f'tipo desconocido: {tipo}'}), 400
+        return make_response(jsonify({'error': f'tipo desconocido: {tipo}'}), 400)
 
     try:
-        p = get_printer()
         if tipo == 'cocina':
-            _print_ticket_cocina(p, data)
+            raw = _build_cocina(data)
         else:
-            _print_ticket_cliente(p, data)
-        p.close()
-        return jsonify({'ok': True}), 200
+            raw = _build_cliente(data)
+
+        send_to_printer(raw)
+        return make_response(jsonify({'ok': True}), 200)
+
     except Exception as exc:
         app.logger.error('Error de impresion: %s', exc)
-        return jsonify({'error': str(exc)}), 500
+        return make_response(jsonify({'error': str(exc)}), 500)
 
 
 if __name__ == '__main__':

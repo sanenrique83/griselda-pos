@@ -33,6 +33,7 @@ interface CobroShellProps {
   descuentoHabilitado?: boolean
   descuentoMaxPct?: number
   ticketConfig: TicketConfig
+  impresionActiva?: boolean
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -92,6 +93,7 @@ export function CobroShell({
   descuentoHabilitado = false,
   descuentoMaxPct = 0,
   ticketConfig,
+  impresionActiva = false,
 }: CobroShellProps) {
   const itemsTicket = subpedidos.flatMap((sp) => sp.items)
   const router = useRouter()
@@ -335,7 +337,7 @@ export function CobroShell({
               cambio: cambioTicket,
             },
           ],
-        })
+        }, impresionActiva)
       } else {
         const printItems =
           escenario === 'varios'
@@ -368,7 +370,7 @@ export function CobroShell({
             escenario === 'dividir' ? (parseInt(partesAPagar) || 1) : undefined,
           totalPartes:
             escenario === 'dividir' ? (parseInt(nPartes) || 1) : undefined,
-        })
+        }, impresionActiva)
       }
 
       if (!printOk) {
@@ -658,7 +660,7 @@ export function CobroShell({
                     subtotal: sp.total,
                     total: sp.total,
                   })),
-                })
+                }, impresionActiva)
               } else {
                 // Pre-cuenta global
                 const propinaPreCuenta = propinaPct > 0
@@ -676,7 +678,7 @@ export function CobroShell({
                   recibido: null,
                   cambio: null,
                   config: ticketConfig,
-                })
+                }, impresionActiva)
               }
               if (!ok) setPrintError(true)
             }}

@@ -81,7 +81,11 @@ const PRINT_SERVER = _printBase.endsWith('/print')
   ? _printBase
   : `${_printBase.replace(/\/$/, '')}/print`
 
-export async function imprimirTicket(payload: PrintPayload): Promise<boolean> {
+export async function imprimirTicket(
+  payload: PrintPayload,
+  enabled = true,
+): Promise<boolean> {
+  if (!enabled) return true // impresión deshabilitada globalmente — no es un error
   try {
     const res = await fetch(PRINT_SERVER, {
       method: 'POST',
