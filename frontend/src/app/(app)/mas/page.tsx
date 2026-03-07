@@ -106,6 +106,7 @@ export default async function MasPage() {
             <MenuRow label="Dashboard" href="/dashboard" isLast={false} />
             <MenuRow label="Menú del día" href="/mas/menu-del-dia" isLast={false} />
             <MenuRow label="Impresoras" href="/mas/config" isLast={false} />
+            <MenuRow label="Ticket" href="/mas/configuracion" isLast={false} />
             <MenuRow label="Catálogo" href="/mas/catalogo" isLast={false} />
             <MenuRow label="Permisos" href="/mas/permisos" isLast />
           </Section>

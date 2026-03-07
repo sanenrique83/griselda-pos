@@ -14,7 +14,18 @@ export interface ComensalCocina {
 export type ItemCliente = {
   nombre: string
   cantidad: number
-  precio: number
+  precio: number // precio unitario consolidado (base + extras)
+}
+
+export type TicketConfig = {
+  nombre: string
+  direccion: string
+  telefono: string
+  rfc: string
+  linea1: string
+  linea2: string
+  pie: string
+  pie2: string
 }
 
 export type PrintPayload =
@@ -29,14 +40,24 @@ export type PrintPayload =
     }
   | {
       tipo: 'cliente'
+      escenario: 'global' | 'individual' | 'varios' | 'dividir' | 'precuenta'
       mesa: string
       items: ItemCliente[]
       subtotal: number
+      descuento?: number
       propina: number
       total: number
       metodo: string
       recibido: number | null
       cambio: number | null
+      config: TicketConfig
+      // individual
+      comensalNombre?: string
+      // varios
+      comensalesSeleccionados?: string[]
+      // dividir
+      parteActual?: number
+      totalPartes?: number
     }
 
 const _printBase =

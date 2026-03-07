@@ -8,7 +8,7 @@ import {
   type PagoInput,
 } from '@/app/(app)/cobro/[pedidoId]/actions'
 import type { SubpedidoCobro } from '@/app/(app)/cobro/[pedidoId]/page'
-import { imprimirTicket, type ItemCliente } from '@/lib/print'
+import { imprimirTicket, type TicketConfig } from '@/lib/print'
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────
 
@@ -32,7 +32,7 @@ interface CobroShellProps {
   datosBancarios?: DatosBancarios
   descuentoHabilitado?: boolean
   descuentoMaxPct?: number
-  itemsTicket?: ItemCliente[]
+  ticketConfig: TicketConfig
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -91,8 +91,9 @@ export function CobroShell({
   datosBancarios,
   descuentoHabilitado = false,
   descuentoMaxPct = 0,
-  itemsTicket = [],
+  ticketConfig,
 }: CobroShellProps) {
+  const itemsTicket = subpedidos.flatMap((sp) => sp.items)
   const router = useRouter()
 
   // ── Escenario de facturación ───────────────────────────────────────────────
@@ -305,7 +306,7 @@ export function CobroShell({
 
       // Cobro exitoso — imprimir ticket de cliente
       const metodoLabel = METODOS.find((m) => m.id === metodo)?.label ?? metodo
-      const recibido =
+      const recibidoTicket =
         metodo === 'efectivo' ? (numRecibido > 0 ? numRecibido : null)
         : metodo === 'mixto' && numMixtoE > 0 ? numMixtoE
         : null
@@ -314,16 +315,42 @@ export function CobroShell({
         : metodo === 'mixto' ? (cambioMixto > 0.005 ? cambioMixto : null)
         : null
 
+      const printItems =
+        escenario === 'individual' || escenario === 'varios'
+          ? subpedidosACobrar.flatMap((sp) => sp.items)
+          : itemsTicket
+
+      const printEscenario =
+        escenario === 'general' ? 'global' : escenario
+
       const printOk = await imprimirTicket({
         tipo: 'cliente',
+        escenario: printEscenario,
         mesa: mesaLabel,
-        items: itemsTicket,
+        items: printItems,
         subtotal: totalConDescuento,
+        descuento: montoDescuento > 0 ? montoDescuento : undefined,
         propina: propinaAmt,
         total,
         metodo: metodoLabel,
-        recibido,
+        recibido: recibidoTicket,
         cambio: cambioTicket,
+        config: ticketConfig,
+        comensalNombre:
+          escenario === 'individual'
+            ? (subpedidosACobrar[0]?.nombre ??
+               `Comensal ${subpedidosACobrar[0]?.comensal_numero}`)
+            : undefined,
+        comensalesSeleccionados:
+          escenario === 'varios'
+            ? subpedidosACobrar.map(
+                (sp) => sp.nombre ?? `Comensal ${sp.comensal_numero}`,
+              )
+            : undefined,
+        parteActual:
+          escenario === 'dividir' ? (parseInt(partesAPagar) || 1) : undefined,
+        totalPartes:
+          escenario === 'dividir' ? (parseInt(nPartes) || 1) : undefined,
       })
 
       if (!printOk) {
@@ -599,17 +626,21 @@ export function CobroShell({
         {!mostrarAnular && (
           <button
             onClick={async () => {
-              const metodoLabel = METODOS.find((m) => m.id === metodo)?.label ?? metodo
+              const propinaPreCuenta = propinaPct > 0
+                ? round2(totalConDescuento * propinaPct / 100)
+                : 0
               const ok = await imprimirTicket({
                 tipo: 'cliente',
+                escenario: 'precuenta',
                 mesa: mesaLabel,
                 items: itemsTicket,
                 subtotal: totalConDescuento,
-                propina: propinaAmt,
-                total,
-                metodo: metodoLabel,
+                propina: propinaPreCuenta,
+                total: round2(totalConDescuento + propinaPreCuenta),
+                metodo: '',
                 recibido: null,
                 cambio: null,
+                config: ticketConfig,
               })
               if (!ok) setPrintError(true)
             }}

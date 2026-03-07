@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { CobroShell } from '@/components/cobro/CobroShell'
-import type { ItemCliente } from '@/lib/print'
+import type { ItemCliente, TicketConfig } from '@/lib/print'
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -10,6 +10,7 @@ export type SubpedidoCobro = {
   comensal_numero: number
   nombre: string | null
   total: number
+  items: ItemCliente[]
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -34,7 +35,7 @@ export default async function CobroPage({
 
   if (!pedido || pedido.estado !== 'abierto') redirect('/mesas')
 
-  // ── Subpedidos con totales ──────────────────────────────────────────────────
+  // ── Subpedidos con totales e ítems ─────────────────────────────────────────
   const { data: rawSubs } = await supabase
     .from('subpedidos')
     .select(`
@@ -54,7 +55,13 @@ export default async function CobroPage({
   const [{ data: config }, { data: perfil }] = await Promise.all([
     supabase
       .from('config_sistema')
-      .select('propina_sugerida_pct, moneda, transferencia_banco, transferencia_clabe, transferencia_titular, descuentos_mesero, descuento_max_pct')
+      .select(`
+        propina_sugerida_pct, moneda,
+        transferencia_banco, transferencia_clabe, transferencia_titular,
+        descuentos_mesero, descuento_max_pct,
+        ticket_nombre, ticket_direccion, ticket_telefono, ticket_rfc,
+        ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2
+      `)
       .eq('id', 1)
       .single(),
     user
@@ -64,34 +71,37 @@ export default async function CobroPage({
 
   // ── Transformar subpedidos ──────────────────────────────────────────────────
   const subpedidos: SubpedidoCobro[] = (rawSubs ?? []).map((sub: any) => {
-    const total = (sub.pedido_productos ?? [])
-      .filter((pp: any) => pp.estado !== 'cancelado')
-      .reduce((s: number, pp: any) => {
-        const extras = (pp.pedido_producto_opciones ?? []).reduce(
-          (e: number, o: any) => e + o.precio_extra,
-          0,
-        )
-        return s + (pp.precio_unit + extras) * pp.cantidad
-      }, 0)
+    const prods = (sub.pedido_productos ?? []).filter(
+      (pp: any) => pp.estado !== 'cancelado',
+    )
+    const total = prods.reduce((s: number, pp: any) => {
+      const extras = (pp.pedido_producto_opciones ?? []).reduce(
+        (e: number, o: any) => e + o.precio_extra,
+        0,
+      )
+      return s + (pp.precio_unit + extras) * pp.cantidad
+    }, 0)
+    const items: ItemCliente[] = prods.map((pp: any) => {
+      const extras = (pp.pedido_producto_opciones ?? []).reduce(
+        (e: number, o: any) => e + o.precio_extra,
+        0,
+      )
+      return {
+        nombre: pp.productos?.nombre ?? '',
+        cantidad: pp.cantidad,
+        precio: pp.precio_unit + extras, // precio unitario consolidado
+      }
+    })
     return {
       id: sub.id,
       comensal_numero: sub.comensal_numero,
       nombre: sub.nombre ?? null,
       total,
+      items,
     }
   })
 
   const totalPedido = subpedidos.reduce((s, sp) => s + sp.total, 0)
-
-  const itemsTicket: ItemCliente[] = (rawSubs ?? []).flatMap((sub: any) =>
-    (sub.pedido_productos ?? [])
-      .filter((pp: any) => pp.estado !== 'cancelado')
-      .map((pp: any) => ({
-        nombre: pp.productos?.nombre ?? '',
-        cantidad: pp.cantidad,
-        precio: pp.precio_unit,
-      }))
-  )
 
   const mesa = (pedido as any).mesas
   const mesaLabel =
@@ -103,6 +113,17 @@ export default async function CobroPage({
   const descuentoHabilitado =
     esAdmin || ((config as any)?.descuentos_mesero === true)
   const descuentoMaxPct = esAdmin ? 100 : ((config as any)?.descuento_max_pct ?? 0)
+
+  const ticketConfig: TicketConfig = {
+    nombre: (config as any)?.ticket_nombre ?? 'La Menuderia',
+    direccion: (config as any)?.ticket_direccion ?? '',
+    telefono: (config as any)?.ticket_telefono ?? '',
+    rfc: (config as any)?.ticket_rfc ?? '',
+    linea1: (config as any)?.ticket_linea1 ?? '',
+    linea2: (config as any)?.ticket_linea2 ?? '',
+    pie: (config as any)?.ticket_pie ?? 'Gracias por su visita!',
+    pie2: (config as any)?.ticket_pie2 ?? '',
+  }
 
   return (
     <CobroShell
@@ -120,7 +141,7 @@ export default async function CobroPage({
       }}
       descuentoHabilitado={descuentoHabilitado}
       descuentoMaxPct={descuentoMaxPct}
-      itemsTicket={itemsTicket}
+      ticketConfig={ticketConfig}
     />
   )
 }
