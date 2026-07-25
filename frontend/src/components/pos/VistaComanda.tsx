@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ItemComandaRow } from './ItemComanda'
-import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem } from '@/app/(app)/pos/[pedidoId]/actions'
+import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem, moverProducto } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { SubpedidoPOS, ItemComanda } from '@/app/(app)/pos/[pedidoId]/page'
 import { imprimirTicket } from '@/lib/print'
 
@@ -44,10 +44,12 @@ export function VistaComanda({
   const [isPendingComensal, startComensal] = useTransition()
   const [isPendingEliminar, startEliminar] = useTransition()
   const [isPendingCancelar, startCancelar] = useTransition()
+  const [isPendingMover, startMover] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [printError, setPrintError] = useState(false)
   const [itemACancelar, setItemACancelar] = useState<ItemComanda | null>(null)
   const [motivoIdx, setMotivoIdx] = useState(0)
+  const [itemAMover, setItemAMover] = useState<ItemComanda | null>(null)
 
   useEffect(() => {
     if (printError) {
@@ -128,6 +130,40 @@ export function VistaComanda({
         setItemACancelar(null)
         setMotivoIdx(0)
         router.refresh()
+      }
+    })
+  }
+
+  function handleMover(subpedidoDestinoId: number) {
+    if (!itemAMover) return
+    setError(null)
+    startMover(async () => {
+      const result = await moverProducto(itemAMover.id, subpedidoDestinoId)
+      if (result?.error) {
+        setError(result.error)
+      } else {
+        setItemAMover(null)
+        router.refresh()
+      }
+    })
+  }
+
+  function handleMoverANuevoComensal() {
+    if (!itemAMover) return
+    setError(null)
+    startMover(async () => {
+      const nuevo = await agregarComensal(pedidoId)
+      if ('error' in nuevo) {
+        setError(nuevo.error)
+        return
+      }
+      const result = await moverProducto(itemAMover.id, nuevo.nuevoId)
+      if (result?.error) {
+        setError(result.error)
+      } else {
+        setItemAMover(null)
+        router.refresh()
+        onCambiarSubpedido(nuevo.nuevoId)
       }
     })
   }
@@ -224,6 +260,11 @@ export function VistaComanda({
                   ? () => { setItemACancelar(item); setMotivoIdx(0) }
                   : undefined
               }
+              onMover={
+                item.estado !== 'cancelado'
+                  ? () => setItemAMover(item)
+                  : undefined
+              }
             />
           ))
         )}
@@ -284,6 +325,60 @@ export function VistaComanda({
                 className="w-full rounded-xl bg-s2 py-[15px] text-[15px] font-semibold text-text-2 active:scale-[.98]"
               >
                 No cancelar
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Bottom sheet: Mover a otro comensal ─────────────────────────── */}
+      {itemAMover && (
+        <>
+          <div
+            className="fixed inset-0 z-[65] bg-black/40"
+            onClick={() => setItemAMover(null)}
+          />
+          <div className="fixed bottom-0 left-0 right-0 z-[70] max-h-[85vh] flex flex-col rounded-t-2xl bg-white">
+            <div className="flex-shrink-0 px-4 pt-5 pb-3 border-b border-[#E5E5EA]">
+              <p className="text-[16px] font-bold leading-snug">
+                Mover {itemAMover.emoji ? `${itemAMover.emoji} ` : ''}{itemAMover.nombre}
+              </p>
+              <p className="mt-0.5 text-xs text-text-3">Selecciona el comensal destino</p>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+              {subpedidos
+                .filter((s) => s.id !== subpedidoActivoId)
+                .map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => handleMover(s.id)}
+                    disabled={isPendingMover}
+                    className="w-full flex items-center justify-between rounded-xl bg-s2 px-4 py-3.5 text-left active:scale-[.98] disabled:opacity-40"
+                  >
+                    <span className="text-[14px] font-medium">
+                      {s.nombre ?? `Comensal ${s.comensal_numero}`}
+                    </span>
+                    <span className="font-mono text-xs text-text-3">
+                      ${s.total.toFixed(2)}
+                    </span>
+                  </button>
+                ))}
+              <button
+                onClick={handleMoverANuevoComensal}
+                disabled={isPendingMover}
+                className="w-full flex items-center gap-2 rounded-xl border-[1.5px] border-dashed border-border px-4 py-3.5 text-left text-blue-600 active:scale-[.98] disabled:opacity-40"
+              >
+                <span className="text-lg leading-none">+</span>
+                <span className="text-[14px] font-semibold">Nuevo comensal</span>
+              </button>
+            </div>
+            <div className="flex-shrink-0 px-4 py-4 border-t border-[#E5E5EA]">
+              <button
+                onClick={() => setItemAMover(null)}
+                disabled={isPendingMover}
+                className="w-full rounded-xl bg-s2 py-[15px] text-[15px] font-semibold text-text-2 active:scale-[.98] disabled:opacity-40"
+              >
+                Cancelar
               </button>
             </div>
           </div>

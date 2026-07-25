@@ -39,6 +39,14 @@ export type TicketConfig = {
   pie2: string
 }
 
+export type ItemCancelacion = {
+  nombre: string
+  cantidad: number
+  modificadores: string[]
+  motivo: string
+  canceladoPor: string
+}
+
 export type PrintPayload =
   | {
       tipo: 'cocina'
@@ -48,6 +56,12 @@ export type PrintPayload =
       rol: string
       tipoMesa: 'mesa' | 'llevar'
       comensales: ComensalCocina[]
+    }
+  | {
+      tipo: 'cancelacion'
+      mesa: string
+      mesero: string
+      items: ItemCancelacion[]
     }
   | {
       tipo: 'cliente'

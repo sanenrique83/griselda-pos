@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { imprimirTicket } from '@/lib/print'
 
 type Err = { error: string }
 
@@ -51,6 +52,7 @@ export async function cargarModificadores(
       'id, nombre, requerido, minimo, maximo, orden, padre_opcion_id, mostrar_en_rapido, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, ingredientes!ingrediente_id(disponible))',
     )
     .eq('producto_id', productoId)
+    .eq('activo', true)
     .order('orden')
 
   console.log('[cargarModificadores] raw data:', JSON.stringify(data))
@@ -102,6 +104,7 @@ export async function cargarGuisados(
     .select('id, nombre')
     .eq('producto_id', productoId)
     .is('mostrar_en_rapido', true)
+    .eq('activo', true)
     .order('orden')
 
   if (gruposErr) {
@@ -469,7 +472,7 @@ export async function cancelarItem(
   // 1. Datos del item
   const { data: pp } = await supabase
     .from('pedido_productos')
-    .select('precio_unit, cantidad, subpedido_id')
+    .select('precio_unit, cantidad, subpedido_id, productos(nombre)')
     .eq('id', pedidoProductoId)
     .single()
 
@@ -478,7 +481,7 @@ export async function cancelarItem(
   // 2. Extras
   const { data: opciones } = await supabase
     .from('pedido_producto_opciones')
-    .select('precio_extra')
+    .select('precio_extra, opciones_modificador(nombre)')
     .eq('pedido_producto_id', pedidoProductoId)
 
   const extrasTotal = (opciones ?? []).reduce((s: number, o: any) => s + o.precio_extra, 0)
@@ -495,7 +498,7 @@ export async function cancelarItem(
 
   const { data: pedido } = await supabase
     .from('pedidos')
-    .select('turno_id')
+    .select('turno_id, mesa_id, tipo, mesas(numero, nombre)')
     .eq('id', sub.pedido_id)
     .single()
 
@@ -526,7 +529,61 @@ export async function cancelarItem(
     usuario_id: user.id,
   })
 
+  // 7. Ticket de cancelación en cocina (fallo silencioso — no bloquea)
+  const [{ data: cfg }, { data: perfil }] = await Promise.all([
+    supabase.from('config_sistema').select('impresion_activa').eq('id', 1).single(),
+    supabase.from('perfiles').select('nombre').eq('id', user.id).single(),
+  ])
+
+  const nombreProducto = (pp as any).productos?.nombre ?? 'Producto'
+  const modificadores: string[] = (opciones ?? [])
+    .map((o: any) => o.opciones_modificador?.nombre as string | undefined)
+    .filter((n): n is string => !!n)
+
+  const mesaData = (pedido as any).mesas
+  const mesaLabel =
+    (pedido as any).tipo === 'mesa'
+      ? (mesaData?.nombre ?? `Mesa ${mesaData?.numero ?? sub.pedido_id}`)
+      : 'Para llevar'
+  const meseroNombre =
+    (perfil as any)?.nombre ?? user.email?.split('@')[0] ?? 'Mesero'
+
+  void imprimirTicket(
+    {
+      tipo: 'cancelacion',
+      mesa: mesaLabel,
+      mesero: meseroNombre,
+      items: [{ nombre: nombreProducto, cantidad: pp.cantidad, modificadores, motivo, canceladoPor: meseroNombre }],
+    },
+    cfg?.impresion_activa ?? false,
+  )
+
   return {}
+}
+
+// ─── Mover producto a otro comensal ────────────────────────────────────────────
+export async function moverProducto(
+  pedidoProductoId: number,
+  subpedidoDestinoId: number,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { data: pp } = await supabase
+    .from('pedido_productos')
+    .select('subpedido_id, estado')
+    .eq('id', pedidoProductoId)
+    .single()
+
+  if (!pp) return { error: 'Producto no encontrado.' }
+  if (pp.estado === 'cancelado') return { error: 'No se puede mover un producto cancelado.' }
+  if (pp.subpedido_id === subpedidoDestinoId) return { error: 'El producto ya está en ese comensal.' }
+
+  const { error } = await supabase
+    .from('pedido_productos')
+    .update({ subpedido_id: subpedidoDestinoId })
+    .eq('id', pedidoProductoId)
+
+  if (error) return { error: 'Error al mover el producto.' }
 }
 
 // ─── Agregar comensal ──────────────────────────────────────────────────────────

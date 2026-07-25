@@ -248,6 +248,7 @@ export async function crearGrupoModificador(data: {
       maximo: data.maximo ?? 1,
       orden: data.orden ?? 99,
       mostrar_en_rapido: data.mostrar_en_rapido ?? false,
+      activo: true,
     })
     .select('id')
     .single()
@@ -280,7 +281,7 @@ export async function eliminarGrupoModificador(
   const supabase = await createClient()
   const { error } = await supabase
     .from('grupos_modificadores')
-    .delete()
+    .update({ activo: false })
     .eq('id', id)
   if (error) return { error: 'Error al eliminar el grupo.' }
 }
@@ -326,7 +327,7 @@ export async function eliminarOpcion(id: number): Promise<Err | undefined> {
   const supabase = await createClient()
   const { error } = await supabase
     .from('opciones_modificador')
-    .delete()
+    .update({ activa: false })
     .eq('id', id)
   if (error) return { error: 'Error al eliminar la opción.' }
 }

@@ -20,9 +20,11 @@ const TAG = {
 export function ItemComandaRow({
   item,
   onCancelar,
+  onMover,
 }: {
   item: ItemComanda
   onCancelar?: () => void
+  onMover?: () => void
 }) {
   const cancelado = item.estado === 'cancelado'
   const pendiente = item.estado === 'pendiente'
@@ -38,14 +40,27 @@ export function ItemComandaRow({
         ${cancelado ? 'opacity-55' : ''}
       `}
     >
-      {onCancelar && item.estado === 'enviado' && (
-        <button
-          onClick={onCancelar}
-          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-[15px] font-bold text-red-600 active:scale-90"
-          aria-label="Cancelar ítem"
-        >
-          ×
-        </button>
+      {(onMover || (onCancelar && item.estado === 'enviado')) && (
+        <div className="mb-1.5 flex items-center justify-end gap-1.5">
+          {onMover && (
+            <button
+              onClick={onMover}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-[13px] font-bold text-blue-600 active:scale-90"
+              aria-label="Mover a otro comensal"
+            >
+              ⇄
+            </button>
+          )}
+          {onCancelar && item.estado === 'enviado' && (
+            <button
+              onClick={onCancelar}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-[15px] font-bold text-red-600 active:scale-90"
+              aria-label="Cancelar ítem"
+            >
+              ×
+            </button>
+          )}
+        </div>
       )}
       <div className="flex items-start gap-2.5">
         {/* Cantidad */}

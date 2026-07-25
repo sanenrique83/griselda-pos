@@ -55,6 +55,8 @@ CMD_ALIGN_CENTER = ESC + b'a\x01'
 CMD_ALIGN_LEFT   = ESC + b'a\x00'
 CMD_FONT_DOUBLE  = ESC + b'!\x10'
 CMD_FONT_NORMAL  = ESC + b'!\x00'
+CMD_INVERT_ON    = GS  + b'B\x01'
+CMD_INVERT_OFF   = GS  + b'B\x00'
 CMD_CUT          = GS  + b'V\x41\x03'
 CMD_LF           = b'\n'
 COL              = 32
@@ -194,6 +196,44 @@ def _build_cocina(payload: dict) -> bytes:
             b += _seccion_comensal(com)
         b += CMD_CUT
 
+    return b
+
+
+# ── Ticket cancelación ─────────────────────────────────────────────────────────
+
+def _build_cancelacion(payload: dict) -> bytes:
+    mesa   = payload.get('mesa', '')
+    mesero = payload.get('mesero', '')
+    items  = payload.get('items', [])
+
+    b  = CMD_RESET + CMD_ALIGN_CENTER
+    b += CMD_BOLD_ON + CMD_FONT_DOUBLE
+    b += CMD_INVERT_ON
+    b += _encode('*** CANCELACION ***') + CMD_LF
+    b += CMD_INVERT_OFF
+    b += CMD_FONT_NORMAL + CMD_BOLD_OFF
+    b += _encode(f'Mesa: {mesa}') + CMD_LF
+    b += _encode(f'Mesero: {mesero}') + CMD_LF
+    b += CMD_ALIGN_LEFT + _encode('-' * COL) + CMD_LF
+
+    for item in items:
+        nombre   = item.get('nombre', '')
+        cantidad = item.get('cantidad', 1)
+        mods     = item.get('modificadores', [])
+        motivo   = item.get('motivo', '').strip()
+
+        b += CMD_FONT_DOUBLE + CMD_BOLD_ON
+        b += _encode(f'{cantidad}x {nombre}') + CMD_LF
+        b += CMD_BOLD_OFF + CMD_FONT_NORMAL
+        for mod in mods:
+            b += _encode(f'   + {mod}') + CMD_LF
+        if motivo:
+            b += _encode(f'   Motivo: {motivo}') + CMD_LF
+        b += _encode('-' * COL) + CMD_LF
+
+    b += CMD_ALIGN_CENTER + _encode(_fmt_fecha()) + CMD_LF
+    b += CMD_LF * 3
+    b += CMD_CUT
     return b
 
 
@@ -347,12 +387,14 @@ def print_ticket():
         return make_response(jsonify({'error': 'JSON invalido'}), 400)
 
     tipo = data.get('tipo')
-    if tipo not in ('cocina', 'cliente'):
+    if tipo not in ('cocina', 'cliente', 'cancelacion'):
         return make_response(jsonify({'error': f'tipo desconocido: {tipo}'}), 400)
 
     try:
         if tipo == 'cocina':
             raw = _build_cocina(data)
+        elif tipo == 'cancelacion':
+            raw = _build_cancelacion(data)
         else:
             raw = _build_cliente(data)
 

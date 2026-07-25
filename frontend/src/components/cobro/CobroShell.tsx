@@ -112,6 +112,7 @@ export function CobroShell({
   // ── Método de pago ─────────────────────────────────────────────────────────
   const [metodo, setMetodo] = useState<Metodo>('efectivo')
   const [conPropina, setConPropina] = useState(false)
+  const [imprimirTicketPago, setImprimirTicketPago] = useState(false)
 
   // Efectivo
   const [efectivoRecibido, setEfectivoRecibido] = useState('')
@@ -306,76 +307,78 @@ export function CobroShell({
         return
       }
 
-      // Cobro exitoso — imprimir ticket de cliente
-      const metodoLabel = METODOS.find((m) => m.id === metodo)?.label ?? metodo
-      const recibidoTicket =
-        metodo === 'efectivo' ? (numRecibido > 0 ? numRecibido : null)
-        : metodo === 'mixto' && numMixtoE > 0 ? numMixtoE
-        : null
-      const cambioTicket =
-        metodo === 'efectivo' ? (cambioEfectivo > 0.005 ? cambioEfectivo : null)
-        : metodo === 'mixto' ? (cambioMixto > 0.005 ? cambioMixto : null)
-        : null
+      // Cobro exitoso — imprimir ticket de pago de cliente (si el usuario lo pidió)
+      if (imprimirTicketPago) {
+        const metodoLabel = METODOS.find((m) => m.id === metodo)?.label ?? metodo
+        const recibidoTicket =
+          metodo === 'efectivo' ? (numRecibido > 0 ? numRecibido : null)
+          : metodo === 'mixto' && numMixtoE > 0 ? numMixtoE
+          : null
+        const cambioTicket =
+          metodo === 'efectivo' ? (cambioEfectivo > 0.005 ? cambioEfectivo : null)
+          : metodo === 'mixto' ? (cambioMixto > 0.005 ? cambioMixto : null)
+          : null
 
-      let printOk: boolean
-      if (escenario === 'individual') {
-        // Un ticket por cada comensal (en esta llamada solo el cobrado)
-        const sp = subpedidosACobrar[0]
-        printOk = await imprimirTicket({
-          tipo: 'cliente',
-          escenario: 'individual',
-          mesa: mesaLabel,
-          config: ticketConfig,
-          comensales: [
-            {
-              comensalNombre: sp?.nombre ?? `Comensal ${sp?.comensal_numero}`,
-              items: sp?.items ?? [],
-              subtotal: totalConDescuento,
-              total,
-              metodo: metodoLabel,
-              recibido: recibidoTicket,
-              cambio: cambioTicket,
-            },
-          ],
-        }, impresionActiva)
-      } else {
-        const printItems =
-          escenario === 'varios'
-            ? subpedidosACobrar.flatMap((sp) => sp.items)
-            : itemsTicket
-
-        const printEscenario =
-          escenario === 'general' ? 'global' : escenario
-
-        printOk = await imprimirTicket({
-          tipo: 'cliente',
-          escenario: printEscenario,
-          mesa: mesaLabel,
-          items: printItems,
-          subtotal: totalConDescuento,
-          descuento: montoDescuento > 0 ? montoDescuento : undefined,
-          propina: propinaAmt,
-          total,
-          metodo: metodoLabel,
-          recibido: recibidoTicket,
-          cambio: cambioTicket,
-          config: ticketConfig,
-          comensalesSeleccionados:
+        let printOk: boolean
+        if (escenario === 'individual') {
+          // Un ticket por cada comensal (en esta llamada solo el cobrado)
+          const sp = subpedidosACobrar[0]
+          printOk = await imprimirTicket({
+            tipo: 'cliente',
+            escenario: 'individual',
+            mesa: mesaLabel,
+            config: ticketConfig,
+            comensales: [
+              {
+                comensalNombre: sp?.nombre ?? `Comensal ${sp?.comensal_numero}`,
+                items: sp?.items ?? [],
+                subtotal: totalConDescuento,
+                total,
+                metodo: metodoLabel,
+                recibido: recibidoTicket,
+                cambio: cambioTicket,
+              },
+            ],
+          }, impresionActiva)
+        } else {
+          const printItems =
             escenario === 'varios'
-              ? subpedidosACobrar.map(
-                  (sp) => sp.nombre ?? `Comensal ${sp.comensal_numero}`,
-                )
-              : undefined,
-          parteActual:
-            escenario === 'dividir' ? (parseInt(partesAPagar) || 1) : undefined,
-          totalPartes:
-            escenario === 'dividir' ? (parseInt(nPartes) || 1) : undefined,
-        }, impresionActiva)
-      }
+              ? subpedidosACobrar.flatMap((sp) => sp.items)
+              : itemsTicket
 
-      if (!printOk) {
-        setPrintError(true)
-        await new Promise((r) => setTimeout(r, 2000))
+          const printEscenario =
+            escenario === 'general' ? 'global' : escenario
+
+          printOk = await imprimirTicket({
+            tipo: 'cliente',
+            escenario: printEscenario,
+            mesa: mesaLabel,
+            items: printItems,
+            subtotal: totalConDescuento,
+            descuento: montoDescuento > 0 ? montoDescuento : undefined,
+            propina: propinaAmt,
+            total,
+            metodo: metodoLabel,
+            recibido: recibidoTicket,
+            cambio: cambioTicket,
+            config: ticketConfig,
+            comensalesSeleccionados:
+              escenario === 'varios'
+                ? subpedidosACobrar.map(
+                    (sp) => sp.nombre ?? `Comensal ${sp.comensal_numero}`,
+                  )
+                : undefined,
+            parteActual:
+              escenario === 'dividir' ? (parseInt(partesAPagar) || 1) : undefined,
+            totalPartes:
+              escenario === 'dividir' ? (parseInt(nPartes) || 1) : undefined,
+          }, impresionActiva)
+        }
+
+        if (!printOk) {
+          setPrintError(true)
+          await new Promise((r) => setTimeout(r, 2000))
+        }
       }
 
       router.push(result.redirectTo)
@@ -642,6 +645,36 @@ export function CobroShell({
           </button>
         )}
 
+        {/* ── Imprimir ticket de pago ─────────────────────────────────────── */}
+        {!mostrarAnular && (
+          <button
+            onClick={() => setImprimirTicketPago((v) => !v)}
+            className={`w-full flex items-center justify-between rounded-2xl border-[1.5px] px-4 py-3.5 transition-colors ${
+              imprimirTicketPago
+                ? 'border-blue-400 bg-blue-50'
+                : 'border-[#D1D1D6] bg-white'
+            }`}
+          >
+            <div className="text-left">
+              <p className={`text-sm font-semibold ${imprimirTicketPago ? 'text-blue-700' : 'text-text-1'}`}>
+                🖨️ Imprimir ticket de pago
+              </p>
+              <p className={`text-xs mt-0.5 ${imprimirTicketPago ? 'text-blue-600' : 'text-text-3'}`}>
+                La cuenta ya impresa no siempre requiere ticket de pago
+              </p>
+            </div>
+            <div
+              className={`flex h-[24px] w-[24px] flex-shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold text-white transition-all ${
+                imprimirTicketPago
+                  ? 'border-blue-500 bg-blue-500'
+                  : 'border-border'
+              }`}
+            >
+              {imprimirTicketPago && '✓'}
+            </div>
+          </button>
+        )}
+
         {/* ── Botón imprimir cuenta ──────────────────────────────────────── */}
         {!mostrarAnular && (
           <button
@@ -663,7 +696,7 @@ export function CobroShell({
                 }, impresionActiva)
               } else {
                 // Pre-cuenta global
-                const propinaPreCuenta = propinaPct > 0
+                const propinaPreCuenta = conPropina && propinaPct > 0
                   ? round2(totalConDescuento * propinaPct / 100)
                   : 0
                 ok = await imprimirTicket({
