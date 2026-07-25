@@ -53,9 +53,10 @@ CMD_BOLD_ON      = ESC + b'E\x01'
 CMD_BOLD_OFF     = ESC + b'E\x00'
 CMD_ALIGN_CENTER = ESC + b'a\x01'
 CMD_ALIGN_LEFT   = ESC + b'a\x00'
-CMD_FONT_DOUBLE  = ESC + b'!\x28'  # doble alto + doble ancho — nombre del producto
-CMD_FONT_MEDIO   = ESC + b'!\x10'  # solo doble alto — modificadores (mas grande que normal, sin competir con el producto)
+CMD_FONT_DOUBLE  = ESC + b'!\x10'
 CMD_FONT_NORMAL  = ESC + b'!\x00'
+CMD_INVERT_ON    = GS  + b'B\x01'
+CMD_INVERT_OFF   = GS  + b'B\x00'
 CMD_CUT          = GS  + b'V\x41\x03'
 CMD_LF           = b'\n'
 COL              = 32
@@ -69,18 +70,6 @@ def _encode(text: str) -> bytes:
 
 def _fmt_fecha() -> str:
     return datetime.now().strftime('%d/%m/%Y %H:%M')
-
-
-def _fmt_fecha_cocina() -> str:
-    # Estilo "25/7/26, 1:50 p.m." — sin ceros a la izquierda en día/mes/hora
-    ahora = datetime.now()
-    dia   = ahora.day
-    mes   = ahora.month
-    anio  = ahora.strftime('%y')
-    hora12 = ahora.strftime('%I').lstrip('0') or '12'
-    minuto = ahora.strftime('%M')
-    ampm   = ahora.strftime('%p').lower().replace('am', 'a.m.').replace('pm', 'p.m.')
-    return f'{dia}/{mes}/{anio}, {hora12}:{minuto} {ampm}'
 
 
 def _encabezado_cliente(config: dict, mesa: str, subtitulo: str = '') -> bytes:
@@ -149,74 +138,31 @@ def _fila(label: str, valor: str, bold: bool = False, doble: bool = False) -> by
 
 # ── Ticket cocina ──────────────────────────────────────────────────────────────
 
-def _encabezado_cocina(titulo: str, orden: str, mesa: str, mesero: str,
-                        rol: str, tipo_mesa: str, reimpresion: bool = False) -> bytes:
-    """Cabecera con jerarquia tipo Loyverse: folio, mesa grande, fecha/hora,
-    mesero+rol, y tipo de servicio (Comer dentro / Para llevar)."""
-    b = CMD_RESET + CMD_ALIGN_CENTER
-    b += _encode('=' * COL) + CMD_LF
-    if reimpresion:
-        b += CMD_BOLD_ON + _encode('*** REIMPRESION ***') + CMD_BOLD_OFF + CMD_LF
-    b += CMD_BOLD_ON + _encode(f'*** {titulo} ***') + CMD_BOLD_OFF + CMD_LF
-    if orden:
-        b += _encode(f'#{orden}') + CMD_LF
-    b += CMD_LF
-    b += CMD_BOLD_ON + CMD_FONT_DOUBLE
-    b += _encode('PARA LLEVAR' if tipo_mesa == 'llevar' else mesa) + CMD_LF
-    b += CMD_FONT_NORMAL + CMD_BOLD_OFF
-    b += CMD_LF
-    b += _encode(_fmt_fecha_cocina()) + CMD_LF
-    rol_txt = rol.capitalize() if rol else ''
-    quien   = f'{mesero}{", " + rol_txt if rol_txt else ""}' if mesero else rol_txt
-    if quien:
-        b += _encode(quien) + CMD_LF
-    b += CMD_LF
-    b += CMD_ALIGN_LEFT + _encode('- ' * (COL // 2)) + CMD_LF
-    b += CMD_ALIGN_CENTER + CMD_BOLD_ON
-    b += _encode('Comer dentro' if tipo_mesa != 'llevar' else 'PARA LLEVAR') + CMD_LF
-    b += CMD_BOLD_OFF + CMD_ALIGN_LEFT + _encode('- ' * (COL // 2)) + CMD_LF
-    return b
-
-
-def _seccion_comensal(com: dict, con_encabezado_comensal: bool = True) -> bytes:
+def _seccion_comensal(com: dict) -> bytes:
     label = com.get('comensal', 'Comensal')
-    b = b''
-    if con_encabezado_comensal:
-        b += CMD_ALIGN_CENTER + CMD_BOLD_ON
-        b += _encode(f'=== {label} ===') + CMD_LF
-        b += CMD_BOLD_OFF + CMD_ALIGN_LEFT + CMD_LF
+    b  = CMD_ALIGN_CENTER + CMD_BOLD_ON + CMD_FONT_DOUBLE
+    b += _encode(f'=== {label} ===') + CMD_LF
+    b += CMD_FONT_NORMAL + CMD_BOLD_OFF + CMD_ALIGN_LEFT
     for item in com.get('items', []):
         cantidad = item.get('cantidad', 1)
         nombre   = item.get('nombre', '')
         mods     = item.get('modificadores', [])
         nota     = (item.get('nota', '') or '').strip()
         b += CMD_FONT_DOUBLE + CMD_BOLD_ON
-        b += _encode(f'{cantidad} x {nombre}') + CMD_LF
+        b += _encode(f'{cantidad}x {nombre}') + CMD_LF
         b += CMD_BOLD_OFF + CMD_FONT_NORMAL
-        b += CMD_FONT_MEDIO
         for mod in mods:
-            b += _encode(f'  + {mod}') + CMD_LF
+            b += _encode(f'   + {mod}') + CMD_LF
         if nota:
-            b += _encode(f'  * {nota}') + CMD_LF
-        b += CMD_FONT_NORMAL
-        b += CMD_LF
+            b += _encode(f'   * {nota}') + CMD_LF
     b += _encode('-' * COL) + CMD_LF
     return b
 
 
 def _build_cocina(payload: dict) -> bytes:
-    mesa        = payload.get('mesa', '')
-    mesero      = payload.get('mesero', '')
-    orden       = payload.get('orden', '')
-    rol         = payload.get('rol', '')
-    tipo_mesa   = payload.get('tipoMesa', 'mesa')
-    comensales  = payload.get('comensales', [])
-    reimpresion = bool(payload.get('reimpresion', False))
-
-    # Un solo comensal sin nota real (nombre "Comensal 1" por defecto) → no repetir
-    # la etiqueta "=== Comensal N ===" si solo hay una comanda, para no alargar
-    # el ticket con una jerarquia que no aporta.
-    mostrar_encabezado_comensal = len(comensales) > 1
+    mesa       = payload.get('mesa', '')
+    mesero     = payload.get('mesero', '')
+    comensales = payload.get('comensales', [])
 
     comensales_comida = []
     comensales_bebida = []
@@ -231,19 +177,63 @@ def _build_cocina(payload: dict) -> bytes:
     b = b''
 
     if comensales_comida:
-        b += _encabezado_cocina('Cocina', orden, mesa, mesero, rol, tipo_mesa, reimpresion)
+        b += CMD_RESET + CMD_ALIGN_CENTER
+        b += CMD_BOLD_ON + CMD_FONT_DOUBLE + _encode('COCINA') + CMD_LF
+        b += CMD_FONT_NORMAL + CMD_BOLD_OFF
+        b += _encode(f'  {mesa}  |  {mesero}') + CMD_LF
+        b += CMD_ALIGN_LEFT + _encode('-' * COL) + CMD_LF
         for com in comensales_comida:
-            b += _seccion_comensal(com, mostrar_encabezado_comensal)
-        b += CMD_LF * 2
+            b += _seccion_comensal(com)
         b += CMD_CUT
 
     if comensales_bebida:
-        b += _encabezado_cocina('Bebidas', orden, mesa, mesero, rol, tipo_mesa, reimpresion)
+        b += CMD_RESET + CMD_ALIGN_CENTER
+        b += CMD_BOLD_ON + CMD_FONT_DOUBLE + _encode('*** BEBIDAS ***') + CMD_LF
+        b += CMD_FONT_NORMAL + CMD_BOLD_OFF
+        b += _encode(f'  {mesa}  |  {mesero}') + CMD_LF
+        b += CMD_ALIGN_LEFT + _encode('-' * COL) + CMD_LF
         for com in comensales_bebida:
-            b += _seccion_comensal(com, mostrar_encabezado_comensal)
-        b += CMD_LF * 2
+            b += _seccion_comensal(com)
         b += CMD_CUT
 
+    return b
+
+
+# ── Ticket cancelación ─────────────────────────────────────────────────────────
+
+def _build_cancelacion(payload: dict) -> bytes:
+    mesa   = payload.get('mesa', '')
+    mesero = payload.get('mesero', '')
+    items  = payload.get('items', [])
+
+    b  = CMD_RESET + CMD_ALIGN_CENTER
+    b += CMD_BOLD_ON + CMD_FONT_DOUBLE
+    b += CMD_INVERT_ON
+    b += _encode('*** CANCELACION ***') + CMD_LF
+    b += CMD_INVERT_OFF
+    b += CMD_FONT_NORMAL + CMD_BOLD_OFF
+    b += _encode(f'Mesa: {mesa}') + CMD_LF
+    b += _encode(f'Mesero: {mesero}') + CMD_LF
+    b += CMD_ALIGN_LEFT + _encode('-' * COL) + CMD_LF
+
+    for item in items:
+        nombre   = item.get('nombre', '')
+        cantidad = item.get('cantidad', 1)
+        mods     = item.get('modificadores', [])
+        motivo   = item.get('motivo', '').strip()
+
+        b += CMD_FONT_DOUBLE + CMD_BOLD_ON
+        b += _encode(f'{cantidad}x {nombre}') + CMD_LF
+        b += CMD_BOLD_OFF + CMD_FONT_NORMAL
+        for mod in mods:
+            b += _encode(f'   + {mod}') + CMD_LF
+        if motivo:
+            b += _encode(f'   Motivo: {motivo}') + CMD_LF
+        b += _encode('-' * COL) + CMD_LF
+
+    b += CMD_ALIGN_CENTER + _encode(_fmt_fecha()) + CMD_LF
+    b += CMD_LF * 3
+    b += CMD_CUT
     return b
 
 
@@ -397,12 +387,14 @@ def print_ticket():
         return make_response(jsonify({'error': 'JSON invalido'}), 400)
 
     tipo = data.get('tipo')
-    if tipo not in ('cocina', 'cliente'):
+    if tipo not in ('cocina', 'cliente', 'cancelacion'):
         return make_response(jsonify({'error': f'tipo desconocido: {tipo}'}), 400)
 
     try:
         if tipo == 'cocina':
             raw = _build_cocina(data)
+        elif tipo == 'cancelacion':
+            raw = _build_cancelacion(data)
         else:
             raw = _build_cliente(data)
 
