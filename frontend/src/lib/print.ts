@@ -56,6 +56,8 @@ export type PrintPayload =
       rol: string
       tipoMesa: 'mesa' | 'llevar'
       comensales: ComensalCocina[]
+      /** true = reimpresión de items ya enviados (no un envío nuevo) */
+      reimpresion?: boolean
     }
   | {
       tipo: 'cancelacion'

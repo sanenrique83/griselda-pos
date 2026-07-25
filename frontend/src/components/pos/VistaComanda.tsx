@@ -50,6 +50,7 @@ export function VistaComanda({
   const [itemACancelar, setItemACancelar] = useState<ItemComanda | null>(null)
   const [motivoIdx, setMotivoIdx] = useState(0)
   const [itemAMover, setItemAMover] = useState<ItemComanda | null>(null)
+  const [isPendingReimprimir, setIsPendingReimprimir] = useState(false)
 
   useEffect(() => {
     if (printError) {
@@ -61,6 +62,9 @@ export function VistaComanda({
   const subActivo = subpedidos.find((s) => s.id === subpedidoActivoId)
   const hayPendientes = subpedidos.some((s) =>
     s.items.some((i) => i.estado === 'pendiente'),
+  )
+  const hayEnviados = subpedidos.some((s) =>
+    s.items.some((i) => i.estado === 'enviado'),
   )
 
   function handleEnviar() {
@@ -102,6 +106,42 @@ export function VistaComanda({
         if (!printOk) setPrintError(true)
       }
     })
+  }
+
+  function handleReimprimirCocina() {
+    setError(null)
+    setIsPendingReimprimir(true)
+    ;(async () => {
+      const comensales = subpedidos
+        .filter((sp) => sp.items.some((i) => i.estado === 'enviado'))
+        .map((sp) => ({
+          comensal: sp.nombre || `Comensal ${sp.comensal_numero}`,
+          items: sp.items
+            .filter((i) => i.estado === 'enviado')
+            .map((i) => ({
+              cantidad: i.cantidad,
+              nombre: i.nombre,
+              modificadores: i.opciones.map((o) => o.nombre),
+              nota: i.notas ?? '',
+              esBebida: i.esBebida,
+            })),
+        }))
+
+      if (comensales.length > 0) {
+        const printOk = await imprimirTicket({
+          tipo: 'cocina',
+          mesa: mesaLabel,
+          mesero: meseroNombre,
+          orden: String(pedidoId),
+          rol,
+          tipoMesa,
+          comensales,
+          reimpresion: true,
+        })
+        if (!printOk) setPrintError(true)
+      }
+      setIsPendingReimprimir(false)
+    })()
   }
 
   function handleEliminarComensal(subId: number) {
@@ -230,6 +270,18 @@ export function VistaComanda({
         >
           {isPendingComensal ? '…' : '+'}
         </button>
+
+        {/* Reimprimir comanda de cocina (items ya enviados) */}
+        {hayEnviados && (
+          <button
+            onClick={handleReimprimirCocina}
+            disabled={isPendingReimprimir}
+            title="Reimprimir comanda de cocina"
+            className="flex-shrink-0 px-3 py-2.5 text-[13px] font-medium text-text-3 active:opacity-60 disabled:opacity-40"
+          >
+            {isPendingReimprimir ? '…' : '🖨 Reimprimir'}
+          </button>
+        )}
       </div>
 
       {printError && (
