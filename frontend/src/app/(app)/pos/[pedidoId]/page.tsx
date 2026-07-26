@@ -70,7 +70,7 @@ export default async function PosPage({
     .select(`
       id, comensal_numero, nombre,
       pedido_productos(
-        id, cantidad, precio_unit, estado, notas,
+        id, cantidad, precio_unit, estado, notas, nombre_libre,
         productos(nombre, emoji, categorias(nombre)),
         pedido_producto_opciones(
           precio_extra,
@@ -142,8 +142,8 @@ export default async function PosPage({
       const catNombre: string = (pp.productos as any)?.categorias?.nombre?.toLowerCase() ?? ''
       return {
         id: pp.id,
-        nombre: pp.productos?.nombre ?? '',
-        emoji: pp.productos?.emoji ?? null,
+        nombre: pp.nombre_libre || pp.productos?.nombre || '',
+        emoji: pp.nombre_libre ? '✏️' : (pp.productos?.emoji ?? null),
         cantidad: pp.cantidad,
         precio_unit: pp.precio_unit,
         total: (pp.precio_unit + extrasTotal) * pp.cantidad,

@@ -9,6 +9,7 @@ interface VistaMenuProps {
   totalPedido: number
   onVerComanda: () => void
   onAgregarProducto: (producto: ProductoCatalogo) => void
+  onAgregarLibre?: () => void
 }
 
 export function VistaMenu({
@@ -17,6 +18,7 @@ export function VistaMenu({
   totalPedido,
   onVerComanda,
   onAgregarProducto,
+  onAgregarLibre,
 }: VistaMenuProps) {
   const [categoriaActiva, setCategoriaActiva] = useState<number | null>(null)
 
@@ -55,6 +57,18 @@ export function VistaMenu({
 
       {/* Lista de productos */}
       <div className="flex-1 overflow-y-auto pt-2 pb-24">
+        {onAgregarLibre && (
+          <button
+            onClick={onAgregarLibre}
+            className="mx-3 mb-2 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-xl border border-dashed border-blue-300 bg-blue-50 px-3.5 py-2.5 text-left active:opacity-70"
+          >
+            <span className="text-lg">✏️</span>
+            <span className="text-[13px] font-semibold text-blue-700">
+              Producto libre — algo que no está en el menú
+            </span>
+          </button>
+        )}
+
         {productosFiltrados.length === 0 && (
           <p className="py-12 text-center text-sm text-text-3">
             No hay productos en esta categoría.

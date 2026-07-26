@@ -150,13 +150,26 @@ export default async function DashboardPage() {
     const subIds = (subs ?? []).map((s: any) => s.id)
 
     if (subIds.length > 0) {
-      const { data: rawProds } = await supabase
+      const { data: config } = await supabase
+        .from('config_sistema')
+        .select('producto_libre_id')
+        .eq('id', 1)
+        .single()
+      const productoLibreId = (config as any)?.producto_libre_id ?? null
+
+      let query = supabase
         .from('pedido_productos')
         .select(
           'cantidad, precio_unit, productos(id, nombre, emoji), pedido_producto_opciones(precio_extra)',
         )
         .in('subpedido_id', subIds)
         .neq('estado', 'cancelado')
+
+      // Los ítems "producto libre" son improvisados de una sola vez — no
+      // aportan al ranking de productos del catálogo, se excluyen.
+      if (productoLibreId) query = query.neq('producto_id', productoLibreId)
+
+      const { data: rawProds } = await query
 
       const topMap = new Map<number, TopProducto>()
       for (const pp of rawProds ?? []) {

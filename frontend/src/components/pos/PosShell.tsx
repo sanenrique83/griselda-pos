@@ -7,7 +7,8 @@ import { VistaComanda } from './VistaComanda'
 import { SheetModificadores, type ConfirmarModPayload } from './SheetModificadores'
 import { SheetCapturaPida, type ConfirmarRapidoPayload } from './SheetCapturaPida'
 import { SheetUnirMesa, type MesaOcupada } from './SheetUnirMesa'
-import { agregarProducto, agregarProductoRapido, compartirMesa } from '@/app/(app)/pos/[pedidoId]/actions'
+import { SheetProductoLibre } from './SheetProductoLibre'
+import { agregarProducto, agregarProductoRapido, agregarProductoLibre, compartirMesa } from '@/app/(app)/pos/[pedidoId]/actions'
 import type {
   SubpedidoPOS,
   ProductoCatalogo,
@@ -57,6 +58,7 @@ export function PosShell({
     null,
   )
   const [sheetUnirOpen, setSheetUnirOpen] = useState(false)
+  const [sheetLibreOpen, setSheetLibreOpen] = useState(false)
   const [errorCompartir, setErrorCompartir] = useState<string | null>(null)
   const [isPendingCompartir, setIsPendingCompartir] = useState(false)
 
@@ -143,6 +145,20 @@ export function PosShell({
       router.push(`/pos/${result.pedidoId}`)
       return {}
     }
+  }
+
+  async function handleConfirmarLibre(payload: { nombre: string; precio: number }): Promise<{ error?: string }> {
+    if (pedidoId === null) return { error: 'Abre la mesa agregando un producto normal primero.' }
+    const subpedidoId = subpedidoActivoId || subpedidos[0]?.id || 0
+    const result = await agregarProductoLibre({
+      pedidoId,
+      subpedidoId,
+      nombre: payload.nombre,
+      precio: payload.precio,
+    })
+    if (result?.error) return { error: result.error }
+    handleSheetSuccess()
+    return {}
   }
 
   async function handleCompartirMesa() {
@@ -279,6 +295,7 @@ export function PosShell({
             totalPedido={totalPedido}
             onVerComanda={() => !isDraft && setVista('comanda')}
             onAgregarProducto={handleAgregarProducto}
+            onAgregarLibre={isDraft ? undefined : () => setSheetLibreOpen(true)}
           />
         ) : (
           <VistaComanda
@@ -319,6 +336,11 @@ export function PosShell({
           onClose={() => setSheetUnirOpen(false)}
         />
       )}
+      <SheetProductoLibre
+        open={sheetLibreOpen}
+        onConfirmar={handleConfirmarLibre}
+        onClose={() => setSheetLibreOpen(false)}
+      />
     </div>
   )
 }

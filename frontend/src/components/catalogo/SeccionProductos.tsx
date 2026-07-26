@@ -11,6 +11,7 @@ import {
   crearGrupoModificador,
   eliminarGrupoModificador,
   crearOpcion,
+  actualizarOpcion,
   eliminarOpcion,
 } from '@/app/(app)/mas/catalogo/actions'
 import { cargarModificadores } from '@/app/(app)/pos/[pedidoId]/actions'
@@ -92,6 +93,7 @@ export function SeccionProductos({
 
   // Form nueva opción (qué grupoId tiene el form abierto)
   const [opFormId, setOpFormId] = useState<number | null>(null)
+  const [opEditandoId, setOpEditandoId] = useState<number | null>(null)
   const [foNombre, setFoNombre] = useState('')
   const [foPrecio, setFoPrecio] = useState('')
   const [foIngredienteId, setFoIngredienteId] = useState<number | null>(null)
@@ -106,6 +108,7 @@ export function SeccionProductos({
     setGrupoError(null)
     setShowFormGrupo(false)
     setOpFormId(null)
+    setOpEditandoId(null)
 
     if (mode.tipo === 'editar') {
       setFormNombre(mode.prod.nombre)
@@ -306,10 +309,52 @@ export function SeccionProductos({
 
   function abrirOpcionForm(grupoId: number) {
     setOpFormId(grupoId)
+    setOpEditandoId(null)
     setFoNombre('')
     setFoPrecio('')
     setFoIngredienteId(null)
     setGrupoError(null)
+  }
+
+  function abrirEditarOpcion(grupoId: number, opcion: OpcionLocal) {
+    setOpFormId(grupoId)
+    setOpEditandoId(opcion.id)
+    setFoNombre(opcion.nombre)
+    setFoPrecio(opcion.precio_extra ? opcion.precio_extra.toString() : '')
+    setFoIngredienteId(null)
+    setGrupoError(null)
+  }
+
+  function handleGuardarOpcion(grupoId: number) {
+    if (!foNombre.trim()) return
+    if (opEditandoId) {
+      const id = opEditandoId
+      const nombre = foNombre.trim()
+      const precio_extra = parseFloat(foPrecio) || 0
+      startGrupoTransition(async () => {
+        const result = await actualizarOpcion(id, { nombre, precio_extra })
+        if (result?.error) { setGrupoError(result.error); return }
+        setGrupos((prev) =>
+          prev.map((g) =>
+            g.id === grupoId
+              ? {
+                  ...g,
+                  opciones: g.opciones.map((o) =>
+                    o.id === id ? { ...o, nombre, precio_extra } : o,
+                  ),
+                }
+              : g,
+          ),
+        )
+        setFoNombre('')
+        setFoPrecio('')
+        setFoIngredienteId(null)
+        setOpFormId(null)
+        setOpEditandoId(null)
+      })
+      return
+    }
+    handleCrearOpcion(grupoId)
   }
 
   function handleCrearOpcion(grupoId: number) {
@@ -358,6 +403,7 @@ export function SeccionProductos({
             : g,
         ),
       )
+      if (opEditandoId === opcionId) { setOpFormId(null); setOpEditandoId(null) }
     })
   }
 
@@ -694,6 +740,13 @@ export function SeccionProductos({
                           </span>
                         )}
                         <button
+                          onClick={() => abrirEditarOpcion(grupo.id, opcion)}
+                          className="text-[12px] text-blue-600 active:opacity-60"
+                          title="Editar opción"
+                        >
+                          ✎
+                        </button>
+                        <button
                           onClick={() => handleEliminarOpcion(grupo.id, opcion.id)}
                           className="text-[12px] text-red-500 active:opacity-60"
                         >
@@ -705,8 +758,11 @@ export function SeccionProductos({
                     {/* Form o botón nueva opción */}
                     {opFormId === grupo.id ? (
                       <div className="space-y-2 border-t border-[#E5E5EA] px-3 py-2.5">
-                        {/* Selector de ingrediente (opcional) */}
-                        {ingredientes.length > 0 && (
+                        {opEditandoId && (
+                          <p className="text-[11px] font-semibold text-blue-600">Editando opción</p>
+                        )}
+                        {/* Selector de ingrediente (opcional) — solo al crear */}
+                        {!opEditandoId && ingredientes.length > 0 && (
                           <select
                             value={foIngredienteId ?? ''}
                             onChange={(e) => {
@@ -751,13 +807,13 @@ export function SeccionProductos({
                             />
                           </div>
                           <button
-                            onClick={() => handleCrearOpcion(grupo.id)}
+                            onClick={() => handleGuardarOpcion(grupo.id)}
                             className="rounded-lg bg-blue-600 px-3 py-2 text-[13px] font-semibold text-white active:opacity-80"
                           >
-                            Agregar
+                            {opEditandoId ? 'Guardar' : 'Agregar'}
                           </button>
                           <button
-                            onClick={() => setOpFormId(null)}
+                            onClick={() => { setOpFormId(null); setOpEditandoId(null) }}
                             className="rounded-lg bg-s2 px-3 py-2 text-[13px] font-semibold text-text-3 active:opacity-80"
                           >
                             ✕
