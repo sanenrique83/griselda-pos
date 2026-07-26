@@ -138,7 +138,7 @@ export default async function DashboardPage() {
 
   const promedioTicket = pedidosCerrados > 0 ? totalCobrado / pedidosCerrados : 0
 
-  // ── Top 10 productos ──────────────────────────────────────────────────────
+  // ── Top 10 productos (con desglose por variante/modificador) ─────────────
   let topProductos: TopProducto[] = []
 
   if (pedidoIds.length > 0) {
@@ -150,50 +150,66 @@ export default async function DashboardPage() {
     const subIds = (subs ?? []).map((s: any) => s.id)
 
     if (subIds.length > 0) {
-      const { data: config } = await supabase
-        .from('config_sistema')
-        .select('producto_libre_id')
-        .eq('id', 1)
-        .single()
-      const productoLibreId = (config as any)?.producto_libre_id ?? null
-
-      let query = supabase
+      const { data: rawProds } = await supabase
         .from('pedido_productos')
         .select(
-          'cantidad, precio_unit, productos(id, nombre, emoji), pedido_producto_opciones(precio_extra)',
+          'cantidad, precio_unit, productos(id, nombre, emoji), pedido_producto_opciones(precio_extra, opciones_modificador(nombre))',
         )
         .in('subpedido_id', subIds)
         .neq('estado', 'cancelado')
 
-      // Los ítems "producto libre" son improvisados de una sola vez — no
-      // aportan al ranking de productos del catálogo, se excluyen.
-      if (productoLibreId) query = query.neq('producto_id', productoLibreId)
-
-      const { data: rawProds } = await query
-
       const topMap = new Map<number, TopProducto>()
+      // variantesMap: producto_id -> Map<nombreVariante, {vendidos, total}>
+      const variantesMap = new Map<number, Map<string, { vendidos: number; total: number }>>()
+
       for (const pp of rawProds ?? []) {
         const prod = (pp as any).productos
         if (!prod) continue
-        const extras = ((pp as any).pedido_producto_opciones ?? []).reduce(
-          (s: number, o: any) => s + o.precio_extra,
-          0,
-        )
-        const lineTotal = ((pp as any).precio_unit + extras) * (pp as any).cantidad
+        const opciones = (pp as any).pedido_producto_opciones ?? []
+        const extras = opciones.reduce((s: number, o: any) => s + o.precio_extra, 0)
+        const cantidad = (pp as any).cantidad
+        const lineTotal = ((pp as any).precio_unit + extras) * cantidad
+
         const entry = topMap.get(prod.id) ?? {
           nombre: prod.nombre,
           emoji: prod.emoji,
           vendidos: 0,
           total: 0,
+          variantes: [],
         }
         topMap.set(prod.id, {
           ...entry,
-          vendidos: entry.vendidos + (pp as any).cantidad,
+          vendidos: entry.vendidos + cantidad,
           total: entry.total + lineTotal,
         })
+
+        // Nombre de la variante: modificadores elegidos, ordenados; "Sencillo" si no eligió ninguno
+        const nombresOpciones = opciones
+          .map((o: any) => o.opciones_modificador?.nombre)
+          .filter(Boolean)
+          .sort()
+        const varianteNombre = nombresOpciones.length > 0 ? nombresOpciones.join(' + ') : 'Sencillo'
+
+        const varMap = variantesMap.get(prod.id) ?? new Map<string, { vendidos: number; total: number }>()
+        const varEntry = varMap.get(varianteNombre) ?? { vendidos: 0, total: 0 }
+        varMap.set(varianteNombre, {
+          vendidos: varEntry.vendidos + cantidad,
+          total: varEntry.total + lineTotal,
+        })
+        variantesMap.set(prod.id, varMap)
       }
 
-      topProductos = [...topMap.values()]
+      topProductos = [...topMap.entries()]
+        .map(([prodId, p]) => {
+          const varMap = variantesMap.get(prodId)
+          const variantes = varMap
+            ? [...varMap.entries()]
+                .map(([nombre, v]) => ({ nombre, vendidos: v.vendidos, total: v.total }))
+                .sort((a, b) => b.vendidos - a.vendidos)
+            : []
+          // Si solo hay una variante ("Sencillo" o una sola opción), no aporta desglosar
+          return { ...p, variantes: variantes.length > 1 ? variantes : [] }
+        })
         .sort((a, b) => b.vendidos - a.vendidos)
         .slice(0, 10)
     }

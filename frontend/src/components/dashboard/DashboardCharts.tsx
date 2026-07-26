@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import {
   BarChart,
   Bar,
@@ -24,6 +25,8 @@ export interface TopProducto {
   emoji: string | null
   vendidos: number
   total: number
+  /** Desglose por variante/modificador (ej. "Res" vs "Pollo"). Vacio si no aplica. */
+  variantes: { nombre: string; vendidos: number; total: number }[]
 }
 
 export interface MetodoPagoData {
@@ -112,6 +115,7 @@ export function DashboardCharts({
   metodosPago,
   tiposPedido,
 }: DashboardChartsProps) {
+  const [seleccionado, setSeleccionado] = useState<TopProducto | null>(null)
   const hayHoras = ventasPorHora.some((v) => v.total > 0)
   const hayProd = topProductos.length > 0
   const hayMetodos = metodosPago.some((m) => m.monto > 0)
@@ -150,12 +154,14 @@ export function DashboardCharts({
       {hayProd && (
         <div className="rounded-2xl bg-white shadow-card overflow-hidden">
           <SectionHeader title="Top 10 productos" />
-          <div className="px-2 pt-3 pb-4">
+          <div className="px-2 pt-3 pb-1">
             <ResponsiveContainer width="100%" height={Math.max(topProductos.length * 28 + 16, 80)}>
               <BarChart
-                data={topProductos.map((p) => ({
+                data={topProductos.map((p, idx) => ({
+                  idx,
                   nombre: `${p.emoji ?? '🍽️'} ${p.nombre}`,
                   vendidos: p.vendidos,
+                  tieneDesglose: p.variantes.length > 0,
                 }))}
                 layout="vertical"
                 margin={{ top: 0, right: 48, left: 4, bottom: 0 }}
@@ -170,12 +176,30 @@ export function DashboardCharts({
                   tickLine={false}
                 />
                 <Tooltip content={<TooltipProductos />} />
-                <Bar dataKey="vendidos" fill="#3b82f6" radius={[0, 4, 4, 0]} maxBarSize={18}
+                <Bar
+                  dataKey="vendidos"
+                  fill="#3b82f6"
+                  radius={[0, 4, 4, 0]}
+                  maxBarSize={18}
                   label={{ position: 'right', fontSize: 11, fill: '#3C3C43', formatter: (v: number) => `×${v}` }}
-                />
+                  onClick={(data: any) => {
+                    const p = topProductos[data.idx]
+                    if (p && p.variantes.length > 0) setSeleccionado(p)
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {topProductos.map((p, i) => (
+                    <Cell key={i} fill={p.variantes.length > 0 ? '#3b82f6' : '#93c5fd'} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
+          {topProductos.some((p) => p.variantes.length > 0) && (
+            <p className="px-4 pb-3 text-[10px] text-text-3">
+              💡 Toca una barra en azul fuerte para ver el desglose por variante
+            </p>
+          )}
         </div>
       )}
 
@@ -258,6 +282,53 @@ export function DashboardCharts({
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Bottom sheet: desglose por variante ────────────────────────────── */}
+      {seleccionado && (
+        <>
+          <div
+            className="fixed inset-0 z-[55] bg-black/40"
+            onClick={() => setSeleccionado(null)}
+          />
+          <div className="fixed inset-x-0 bottom-0 z-[60] rounded-t-2xl bg-white pb-safe">
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="h-[5px] w-10 rounded-full bg-[#C7C7CC]" />
+            </div>
+            <div className="px-5 pb-6 space-y-3">
+              <div>
+                <p className="text-[16px] font-bold">
+                  {seleccionado.emoji ?? '🍽️'} {seleccionado.nombre}
+                </p>
+                <p className="text-[13px] text-text-3">
+                  {seleccionado.vendidos} vendidos en total · ${fmtMoney(seleccionado.total)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#E5E5EA] divide-y divide-[#F2F2F7] overflow-hidden">
+                {seleccionado.variantes.map((v, i) => (
+                  <div key={i} className="flex items-center justify-between px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{v.nombre}</p>
+                      <p className="text-[11px] text-text-3">
+                        {Math.round((v.vendidos / seleccionado.vendidos) * 100)}% del producto
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-3">
+                      <p className="font-mono text-sm font-bold text-blue-600">×{v.vendidos}</p>
+                      <p className="text-[11px] text-text-3">${fmtMoney(v.total)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => setSeleccionado(null)}
+                className="w-full rounded-xl bg-s2 py-3.5 text-sm font-semibold text-text-2 active:opacity-70"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )
