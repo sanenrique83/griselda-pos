@@ -79,6 +79,12 @@ function round2(n: number) {
   return Math.round(n * 100) / 100
 }
 
+// Redondeo de propina al peso entero más cercano: .01-.49 baja, .50-.99 sube.
+// Así la propina nunca queda con centavos sueltos en la cuenta.
+function roundPropina(n: number) {
+  return Math.round(n)
+}
+
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export function CobroShell({
@@ -167,7 +173,7 @@ export function CobroShell({
     : 0
   const totalConDescuento = round2(totalEscenario - montoDescuento)
 
-  const propinaAmt = conPropina ? round2(totalConDescuento * propinaPct / 100) : 0
+  const propinaAmt = conPropina ? roundPropina(totalConDescuento * propinaPct / 100) : 0
   const total = round2(totalConDescuento + propinaAmt)
 
   // Efectivo
@@ -695,15 +701,24 @@ export function CobroShell({
                   })),
                 }, impresionActiva)
               } else {
-                // Pre-cuenta global
+                // Pre-cuenta: si es "Uno paga varios", solo los comensales
+                // seleccionados — no toda la mesa. "Cuenta general" y
+                // "Dividir igual" sí muestran todo, porque ahí aplica a todos.
+                const precuentaItems =
+                  escenario === 'varios'
+                    ? subpedidos
+                        .filter((sp) => subSeleccionados.has(sp.id))
+                        .flatMap((sp) => sp.items)
+                    : itemsTicket
+
                 const propinaPreCuenta = conPropina && propinaPct > 0
-                  ? round2(totalConDescuento * propinaPct / 100)
+                  ? roundPropina(totalConDescuento * propinaPct / 100)
                   : 0
                 ok = await imprimirTicket({
                   tipo: 'cliente',
                   escenario: 'precuenta',
                   mesa: mesaLabel,
-                  items: itemsTicket,
+                  items: precuentaItems,
                   subtotal: totalConDescuento,
                   propina: propinaPreCuenta,
                   total: round2(totalConDescuento + propinaPreCuenta),

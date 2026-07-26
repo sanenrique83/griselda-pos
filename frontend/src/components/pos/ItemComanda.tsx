@@ -40,7 +40,7 @@ export function ItemComandaRow({
         ${cancelado ? 'opacity-55' : ''}
       `}
     >
-      {(onMover || (onCancelar && item.estado === 'enviado')) && (
+      {(onMover || (onCancelar && item.estado !== 'cancelado')) && (
         <div className="mb-1.5 flex items-center justify-end gap-1.5">
           {onMover && (
             <button
@@ -51,11 +51,11 @@ export function ItemComandaRow({
               ⇄
             </button>
           )}
-          {onCancelar && item.estado === 'enviado' && (
+          {onCancelar && item.estado !== 'cancelado' && (
             <button
               onClick={onCancelar}
               className="flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-[15px] font-bold text-red-600 active:scale-90"
-              aria-label="Cancelar ítem"
+              aria-label={pendiente ? 'Eliminar ítem' : 'Cancelar ítem'}
             >
               ×
             </button>

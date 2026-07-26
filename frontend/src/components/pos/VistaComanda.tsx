@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ItemComandaRow } from './ItemComanda'
-import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem, moverProducto } from '@/app/(app)/pos/[pedidoId]/actions'
+import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem, eliminarProductoPendiente, moverProducto } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { SubpedidoPOS, ItemComanda } from '@/app/(app)/pos/[pedidoId]/page'
 import { imprimirTicket } from '@/lib/print'
 
@@ -45,6 +45,7 @@ export function VistaComanda({
   const [isPendingEliminar, startEliminar] = useTransition()
   const [isPendingCancelar, startCancelar] = useTransition()
   const [isPendingMover, startMover] = useTransition()
+  const [isPendingEliminarItem, startEliminarItem] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [printError, setPrintError] = useState(false)
   const [itemACancelar, setItemACancelar] = useState<ItemComanda | null>(null)
@@ -169,6 +170,18 @@ export function VistaComanda({
       } else {
         setItemACancelar(null)
         setMotivoIdx(0)
+        router.refresh()
+      }
+    })
+  }
+
+  function handleEliminarPendiente(itemId: number) {
+    setError(null)
+    startEliminarItem(async () => {
+      const result = await eliminarProductoPendiente(itemId)
+      if (result?.error) {
+        setError(result.error)
+      } else {
         router.refresh()
       }
     })
@@ -308,9 +321,11 @@ export function VistaComanda({
               key={item.id}
               item={item}
               onCancelar={
-                puedesCancelar && item.estado === 'enviado'
-                  ? () => { setItemACancelar(item); setMotivoIdx(0) }
-                  : undefined
+                item.estado === 'pendiente'
+                  ? () => handleEliminarPendiente(item.id)
+                  : puedesCancelar && item.estado === 'enviado'
+                    ? () => { setItemACancelar(item); setMotivoIdx(0) }
+                    : undefined
               }
               onMover={
                 item.estado !== 'cancelado'

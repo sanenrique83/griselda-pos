@@ -195,6 +195,38 @@ export async function agregarProducto(data: {
   }
 }
 
+// ─── Producto libre (item improvisado, no se guarda en catálogo) ──────────────
+export async function agregarProductoLibre(data: {
+  pedidoId: number
+  subpedidoId: number
+  nombre: string
+  precio: number
+}): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { data: config } = await supabase
+    .from('config_sistema')
+    .select('producto_libre_id')
+    .eq('id', 1)
+    .single()
+
+  const productoLibreId = (config as any)?.producto_libre_id
+  if (!productoLibreId) {
+    return { error: 'Falta configurar el producto libre (corre la migración pendiente).' }
+  }
+
+  const { error } = await supabase.from('pedido_productos').insert({
+    subpedido_id: data.subpedidoId,
+    producto_id: productoLibreId,
+    precio_unit: data.precio,
+    cantidad: 1,
+    nombre_libre: data.nombre.trim(),
+    estado: 'pendiente',
+  })
+
+  if (error) return { error: 'Error al agregar el ítem.' }
+}
+
 // ─── Agregar productos modo rápido (un pedido_producto por guisado) ────────────
 export async function agregarProductoRapido(data: {
   pedidoId: number
@@ -457,6 +489,41 @@ export async function compartirMesa(
   })
 
   return { nuevoPedidoId: nuevoPedido.id }
+}
+
+// ─── Eliminar ítem pendiente (aún no enviado a cocina) ────────────────────────
+// Eliminación directa, sin motivo ni registro de cancelación, porque nada se
+// preparó todavía.
+export async function eliminarProductoPendiente(
+  pedidoProductoId: number,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  // Solo borra si sigue 'pendiente' — si ya se envió, debe pasar por
+  // cancelarItem() para quedar registrado.
+  const { data: pp } = await supabase
+    .from('pedido_productos')
+    .select('id, estado')
+    .eq('id', pedidoProductoId)
+    .single()
+
+  if (!pp) return { error: 'Producto no encontrado.' }
+  if (pp.estado !== 'pendiente') {
+    return { error: 'Este ítem ya se envió a cocina, usa cancelar en su lugar.' }
+  }
+
+  await supabase
+    .from('pedido_producto_opciones')
+    .delete()
+    .eq('pedido_producto_id', pedidoProductoId)
+
+  const { error } = await supabase
+    .from('pedido_productos')
+    .delete()
+    .eq('id', pedidoProductoId)
+    .eq('estado', 'pendiente')
+
+  if (error) return { error: 'Error al eliminar el ítem.' }
 }
 
 // ─── Cancelar ítem enviado ────────────────────────────────────────────────────
