@@ -587,7 +587,7 @@ export async function cargarComboComponentes(
     .from('combo_productos')
     .select('id, producto_id, cantidad, productos(nombre, precio)')
     .eq('combo_id', comboId)
-  if (error) return { error: 'Error al cargar los componentes del combo.' }
+  if (error) return { error: `Error al cargar componentes: ${error.message}` }
   return {
     componentes: (data ?? []).map((c: any) => ({
       id: c.id,
