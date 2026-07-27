@@ -91,6 +91,18 @@ export async function cobrarPedido(data: {
   }
 
   // ── 1. Movimiento de caja ──────────────────────────────────────────────────
+  // Propina en efectivo (se retira físicamente del cajón) vs. en tarjeta/
+  // transferencia (queda en la terminal, nunca toca el cajón). En pago mixto
+  // se reparte proporcional al monto físico de cada método.
+  const montoEfectivo = data.pagos
+    .filter((p) => p.metodo === 'efectivo')
+    .reduce((s, p) => s + p.monto, 0)
+  const propinaEfectivo =
+    totalFisico > 0
+      ? Math.round(((data.propina * montoEfectivo) / totalFisico) * 100) / 100
+      : 0
+  const propinaTarjeta = Math.round((data.propina - propinaEfectivo) * 100) / 100
+
   const { data: mov, error: movErr } = await supabase
     .from('movimientos_caja')
     .insert({
@@ -98,6 +110,8 @@ export async function cobrarPedido(data: {
       tipo: 'cobro',
       monto: data.totalCobrado,
       propina: data.propina,
+      propina_efectivo: propinaEfectivo,
+      propina_tarjeta: propinaTarjeta,
       efectivo_recibido: data.efectivoRecibido,
       cambio: data.cambio,
       notas: null,

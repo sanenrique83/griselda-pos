@@ -19,6 +19,8 @@ export type TurnoResumen = {
   abierto_en: string
   totalCobrado: number
   propinaTotal: number
+  propinaEfectivo: number
+  propinaTarjeta: number
   porMetodo: {
     efectivo: number
     tarjeta: number
@@ -70,7 +72,7 @@ export default async function TurnoPage() {
     await Promise.all([
       supabase
         .from('movimientos_caja')
-        .select('id, tipo, monto, propina')
+        .select('id, tipo, monto, propina, propina_efectivo, propina_tarjeta')
         .eq('turno_id', turno.id),
       supabase
         .from('pedidos')
@@ -121,6 +123,14 @@ export default async function TurnoPage() {
     .filter((m) => m.tipo === 'cobro')
     .reduce((s, m) => s + ((m as { propina?: number }).propina ?? 0), 0)
 
+  const propinaEfectivo = movimientos
+    .filter((m) => m.tipo === 'cobro')
+    .reduce((s, m) => s + ((m as { propina_efectivo?: number }).propina_efectivo ?? 0), 0)
+
+  const propinaTarjeta = movimientos
+    .filter((m) => m.tipo === 'cobro')
+    .reduce((s, m) => s + ((m as { propina_tarjeta?: number }).propina_tarjeta ?? 0), 0)
+
   const fondosExtra = movimientos
     .filter((m) => m.tipo === 'fondo')
     .reduce((s, m) => s + m.monto, 0)
@@ -128,6 +138,10 @@ export default async function TurnoPage() {
     .filter((m) => m.tipo === 'retiro')
     .reduce((s, m) => s + m.monto, 0)
 
+  // porMetodo.efectivo ya es el monto físico recibido en efectivo (incluye
+  // la propina en efectivo, ver PagoInput en cobro/[pedidoId]/actions.ts), y
+  // excluye la propina en tarjeta/transferencia al sumar solo pagos 'efectivo'.
+  // No sumar propinaEfectivo aparte: ya está contada aquí.
   const efectivoTeorico =
     turno.fondo_inicial + porMetodo.efectivo + fondosExtra - retirosTotal
 
@@ -137,6 +151,8 @@ export default async function TurnoPage() {
     abierto_en: turno.abierto_en,
     totalCobrado,
     propinaTotal,
+    propinaEfectivo,
+    propinaTarjeta,
     porMetodo,
     cobrosEfectivo: porMetodo.efectivo,
     fondosExtra,

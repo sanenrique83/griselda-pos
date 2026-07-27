@@ -321,6 +321,25 @@ function TurnoActivo({ turno }: { turno: TurnoResumen }) {
               ${fmtMoney(turno.efectivoTeorico)}
             </span>
           </div>
+          {turno.propinaEfectivo > 0 && (
+            <div className="px-4 py-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-text-2">Propina en efectivo</p>
+                <span className="font-mono text-sm font-semibold text-amber-600">
+                  ${fmtMoney(turno.propinaEfectivo)}
+                </span>
+              </div>
+              <p className="mt-0.5 text-[11px] font-medium text-amber-600">
+                Retirar antes de cerrar turno
+              </p>
+            </div>
+          )}
+          {turno.propinaTarjeta > 0 && (
+            <ResumenRow
+              label="Propina en tarjeta"
+              value={`$${fmtMoney(turno.propinaTarjeta)}`}
+            />
+          )}
         </div>
 
         {/* Input efectivo contado */}
