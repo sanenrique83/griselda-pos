@@ -6,14 +6,23 @@
 -- cobrarPedido marca como 'pagado' es subpedidos.estado. Por eso esta función
 -- revierte subpedidos (no pedido_productos) de 'pagado' a 'activo'.
 --
--- No toca el inventario ya descontado ni el estado de la mesa: se maneja
--- aparte si hace falta.
+-- No toca el inventario ya descontado.
+--
+-- Mesa: cobrarPedido() deja mesas.estado = 'libre' al cobrar un pedido tipo
+-- 'mesa' (no aplica a 'llevar'/'mostrador', donde mesa_id es NULL, ni a mesas
+-- temporales, que se borran en el cobro y dejan pedidos.mesa_id en NULL). Al
+-- reabrir hay que devolver esa mesa a 'ocupada'; pero si mientras el pedido
+-- estaba cerrado alguien más abrió un pedido nuevo en esa misma mesa, no se
+-- puede reabrir ciegamente sin terminar con dos pedidos abiertos sobre la
+-- misma mesa — en ese caso se aborta con una excepción.
 
 CREATE OR REPLACE FUNCTION reabrir_pedido(p_pedido_id INTEGER)
 RETURNS VOID AS $$
 DECLARE
     v_turno_id         INTEGER;
     v_turno_abierto_id INTEGER;
+    v_mesa_id          INTEGER;
+    v_otro_pedido_id   INTEGER;
     v_movimiento_ids   INTEGER[];
 BEGIN
     IF NOT es_admin() THEN
@@ -25,13 +34,26 @@ BEGIN
         RAISE EXCEPTION 'No hay un turno activo.';
     END IF;
 
-    SELECT turno_id INTO v_turno_id FROM pedidos WHERE id = p_pedido_id;
+    SELECT turno_id, mesa_id INTO v_turno_id, v_mesa_id FROM pedidos WHERE id = p_pedido_id;
     IF v_turno_id IS NULL THEN
         RAISE EXCEPTION 'Pedido no encontrado.';
     END IF;
 
     IF v_turno_id != v_turno_abierto_id THEN
         RAISE EXCEPTION 'El pedido no pertenece al turno activo.';
+    END IF;
+
+    -- Si la mesa ya tiene otro pedido abierto (se ocupó de nuevo mientras
+    -- este estaba cerrado), abortar para no duplicar pedidos sobre la mesa.
+    IF v_mesa_id IS NOT NULL THEN
+        SELECT id INTO v_otro_pedido_id
+        FROM pedidos
+        WHERE mesa_id = v_mesa_id AND estado = 'abierto' AND id != p_pedido_id
+        LIMIT 1;
+
+        IF v_otro_pedido_id IS NOT NULL THEN
+            RAISE EXCEPTION 'Esta mesa ya tiene un pedido activo, no se puede reabrir.';
+        END IF;
     END IF;
 
     -- Movimientos de caja generados por cobros de este pedido
@@ -51,6 +73,12 @@ BEGIN
     UPDATE subpedidos
     SET estado = 'activo'
     WHERE pedido_id = p_pedido_id AND estado = 'pagado';
+
+    -- Devolver la mesa a ocupada (pedidos tipo 'llevar'/'mostrador' o mesas
+    -- temporales ya borradas tienen mesa_id NULL y no aplican aquí)
+    IF v_mesa_id IS NOT NULL THEN
+        UPDATE mesas SET estado = 'ocupada' WHERE id = v_mesa_id;
+    END IF;
 
     -- Reabrir el pedido
     UPDATE pedidos
