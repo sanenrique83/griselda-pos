@@ -262,28 +262,20 @@ export async function agregarProductoRapido(data: {
 }
 
 // ─── Enviar pendientes a cocina ────────────────────────────────────────────────
-// Solo actualiza estado; la integración con el servidor de impresión va después.
+// Marca 'enviado' y descuenta inventario en la misma transacción, vía la
+// función SQL enviar_pedido_a_cocina() (20260726000006_receta_modo_preparacion_consumo.sql).
 export async function enviarACocina(pedidoId: number): Promise<Err | undefined> {
   const supabase = await createClient()
 
-  // Obtener IDs de subpedidos del pedido
-  const { data: subs } = await supabase
-    .from('subpedidos')
-    .select('id')
-    .eq('pedido_id', pedidoId)
+  const { error } = await supabase.rpc('enviar_pedido_a_cocina', {
+    p_pedido_id: pedidoId,
+  })
 
-  if (!subs?.length) return { error: 'No hay comensales en este pedido.' }
-
-  const { error } = await supabase
-    .from('pedido_productos')
-    .update({ estado: 'enviado' })
-    .in(
-      'subpedido_id',
-      subs.map((s) => s.id),
-    )
-    .eq('estado', 'pendiente')
-
-  if (error) return { error: 'Error al enviar a cocina.' }
+  if (error) {
+    // El RPC lanza excepciones con mensaje claro (ej. "No hay comensales
+    // en este pedido.") — se propaga tal cual en vez de un genérico.
+    return { error: error.message || 'Error al enviar a cocina.' }
+  }
 }
 
 // ─── Unir mesas ───────────────────────────────────────────────────────────────
@@ -571,13 +563,13 @@ export async function cancelarItem(
 
   if (!pedido) return { error: 'Pedido no encontrado.' }
 
-  // 4. Marcar cancelado
-  const { error: updErr } = await supabase
-    .from('pedido_productos')
-    .update({ estado: 'cancelado' })
-    .eq('id', pedidoProductoId)
+  // 4. Marcar cancelado y revertir inventario en la misma transacción,
+  // vía cancelar_item_enviado() (20260726000006_receta_modo_preparacion_consumo.sql).
+  const { error: updErr } = await supabase.rpc('cancelar_item_enviado', {
+    p_pedido_producto_id: pedidoProductoId,
+  })
 
-  if (updErr) return { error: 'Error al cancelar el ítem.' }
+  if (updErr) return { error: updErr.message || 'Error al cancelar el ítem.' }
 
   // 5. Registrar cancelación
   await supabase.from('cancelaciones').insert({
