@@ -76,7 +76,7 @@ export type PrintPayload =
       mesero: string
       orden: string
       rol: string
-      tipoMesa: 'mesa' | 'llevar'
+      tipoMesa: 'mesa' | 'llevar' | 'mostrador'
       comensales: ComensalCocina[]
       /** true = reimpresión de items ya enviados (no un envío nuevo) */
       reimpresion?: boolean
