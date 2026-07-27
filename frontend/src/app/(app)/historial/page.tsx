@@ -17,6 +17,7 @@ export type ReciboData = {
   efectivoRecibido: number | null
   cambio: number | null
   pagos: PagoResumen[]
+  pedidoId: number | null
 }
 
 export type TurnoItem = {
@@ -36,6 +37,7 @@ async function cargarRecibos(supabase: Awaited<ReturnType<typeof import('@/lib/s
        pagos(metodo_pago, monto),
        cobro_subpedidos(
          subpedidos(
+           pedido_id,
            pedidos(
              tipo, mesa_id,
              mesas(numero, nombre)
@@ -74,6 +76,7 @@ async function cargarRecibos(supabase: Awaited<ReturnType<typeof import('@/lib/s
       efectivoRecibido: m.efectivo_recibido,
       cambio: m.cambio,
       pagos,
+      pedidoId: primerSubpedido?.subpedidos?.pedido_id ?? null,
     }
   })
 }
@@ -133,6 +136,7 @@ export default async function HistorialPage({
         turnos={turnos}
         turnoSeleccionadoId={null}
         isAdmin={isAdmin}
+        esTurnoActivo={false}
       />
     )
   }
@@ -146,6 +150,7 @@ export default async function HistorialPage({
       turnos={turnos}
       turnoSeleccionadoId={turnoIdFinal}
       isAdmin={isAdmin}
+      esTurnoActivo={turnoIdFinal === (turnoActivo?.id ?? null)}
     />
   )
 }

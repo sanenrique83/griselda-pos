@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ReciboData, PagoResumen, TurnoItem } from '@/app/(app)/historial/page'
+import { reimprimirTicketCliente, reabrirPedido } from '@/app/(app)/historial/actions'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -70,12 +71,14 @@ export function HistorialShell({
   turnos,
   turnoSeleccionadoId,
   isAdmin,
+  esTurnoActivo,
 }: {
   recibos: ReciboData[]
   sinTurno: boolean
   turnos: TurnoItem[]
   turnoSeleccionadoId: number | null
   isAdmin: boolean
+  esTurnoActivo: boolean
 }) {
   const router = useRouter()
   const [seleccionado, setSeleccionado] = useState<ReciboData | null>(null)
@@ -142,7 +145,15 @@ export function HistorialShell({
 
       {/* Bottom sheet: detalle de recibo */}
       {seleccionado && (
-        <ReciboSheet recibo={seleccionado} onClose={() => setSeleccionado(null)} />
+        <ReciboSheet
+          recibo={seleccionado}
+          puedeReabrir={isAdmin && esTurnoActivo}
+          onClose={() => setSeleccionado(null)}
+          onReabierto={() => {
+            setSeleccionado(null)
+            router.refresh()
+          }}
+        />
       )}
 
       {/* Bottom sheet: selector de turno */}
@@ -244,11 +255,66 @@ function ReciboRow({
 
 function ReciboSheet({
   recibo: r,
+  puedeReabrir,
   onClose,
+  onReabierto,
 }: {
   recibo: ReciboData
+  puedeReabrir: boolean
   onClose: () => void
+  onReabierto: () => void
 }) {
+  const [imprimiendo, setImprimiendo] = useState(false)
+  const [printError, setPrintError] = useState(false)
+  const [confirmandoReabrir, setConfirmandoReabrir] = useState(false)
+  const [reabriendo, setReabriendo] = useState(false)
+  const [reabrirError, setReabrirError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!printError) return
+    const t = setTimeout(() => setPrintError(false), 4000)
+    return () => clearTimeout(t)
+  }, [printError])
+
+  useEffect(() => {
+    if (!reabrirError) return
+    const t = setTimeout(() => setReabrirError(null), 4000)
+    return () => clearTimeout(t)
+  }, [reabrirError])
+
+  async function handleReimprimir() {
+    setImprimiendo(true)
+    setPrintError(false)
+    try {
+      const res = await reimprimirTicketCliente(r.id)
+      if (!res.ok) setPrintError(true)
+    } catch {
+      setPrintError(true)
+    } finally {
+      setImprimiendo(false)
+    }
+  }
+
+  async function handleReabrir() {
+    if (!r.pedidoId) return
+    setReabriendo(true)
+    setReabrirError(null)
+    try {
+      const res = await reabrirPedido(r.pedidoId)
+      if (res.ok) {
+        onReabierto()
+      } else {
+        setReabrirError(res.error)
+        setConfirmandoReabrir(false)
+      }
+    } catch {
+      setReabrirError('No se pudo reabrir el pedido.')
+      setConfirmandoReabrir(false)
+    } finally {
+      setReabriendo(false)
+    }
+  }
+
   return (
     <>
       <div className="fixed inset-0 z-[55] bg-black/40" onClick={onClose} />
@@ -294,12 +360,59 @@ function ReciboSheet({
             )}
           </div>
 
+          {printError && (
+            <p className="text-center text-xs font-semibold text-red-600">
+              No se pudo conectar con la impresora.
+            </p>
+          )}
+
           <button
-            disabled
-            className="w-full rounded-xl border-2 border-dashed border-[#C7C7CC] py-4 text-sm font-semibold text-text-3 disabled:opacity-60"
+            onClick={handleReimprimir}
+            disabled={imprimiendo}
+            className="w-full rounded-xl border-2 border-dashed border-[#C7C7CC] py-4 text-sm font-semibold text-text-2 active:opacity-70 disabled:opacity-60"
           >
-            🖨 Enviar a impresora — próximamente
+            {imprimiendo ? 'Enviando…' : '🖨 Enviar a impresora'}
           </button>
+
+          {puedeReabrir && r.pedidoId && (
+            <>
+              {reabrirError && (
+                <p className="text-center text-xs font-semibold text-red-600">{reabrirError}</p>
+              )}
+
+              {confirmandoReabrir ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
+                  <p className="text-sm font-semibold text-red-700">
+                    ¿Reabrir este pedido? Se eliminará el cobro registrado y el pedido volverá a
+                    estar abierto.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setConfirmandoReabrir(false)}
+                      disabled={reabriendo}
+                      className="flex-1 rounded-xl bg-white border border-[#E5E5EA] py-3 text-sm font-semibold text-text-2 active:opacity-70 disabled:opacity-60"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleReabrir}
+                      disabled={reabriendo}
+                      className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white active:opacity-70 disabled:opacity-60"
+                    >
+                      {reabriendo ? 'Reabriendo…' : 'Sí, reabrir'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmandoReabrir(true)}
+                  className="w-full rounded-xl border-2 border-dashed border-red-300 py-4 text-sm font-semibold text-red-600 active:opacity-70"
+                >
+                  ↩︎ Reabrir pedido
+                </button>
+              )}
+            </>
+          )}
 
           <button
             onClick={onClose}
