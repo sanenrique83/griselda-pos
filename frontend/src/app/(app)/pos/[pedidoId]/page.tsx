@@ -109,7 +109,8 @@ export default async function PosPage({
   const meseroNombre: string =
     (perfil as any)?.nombre ?? user?.email?.split('@')[0] ?? 'Mesero'
   const rol: 'admin' | 'mesero' = (perfil as any)?.rol === 'admin' ? 'admin' : 'mesero'
-  const tipoMesa: 'mesa' | 'llevar' = pedido.tipo === 'mesa' ? 'mesa' : 'llevar'
+  const tipoMesa: 'mesa' | 'llevar' | 'mostrador' =
+    pedido.tipo === 'mesa' ? 'mesa' : pedido.tipo === 'mostrador' ? 'mostrador' : 'llevar'
 
   // ── Catálogo: categorías + productos ──────────────────────────────────────
   const [{ data: rawCategorias }, { data: rawProductos }] = await Promise.all([
@@ -172,7 +173,9 @@ export default async function PosPage({
   const mesaLabel =
     pedido.tipo === 'mesa'
       ? (mesa?.nombre ?? `Mesa ${mesa?.numero ?? pedidoId}`)
-      : 'Para llevar'
+      : pedido.tipo === 'mostrador'
+        ? 'Mostrador'
+        : 'Para llevar'
 
   const categorias: CategoriaPOS[] = rawCategorias ?? []
   const productos: ProductoCatalogo[] = (rawProductos ?? []).map((p: any) => ({

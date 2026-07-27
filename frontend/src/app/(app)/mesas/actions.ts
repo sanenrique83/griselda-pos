@@ -116,3 +116,46 @@ export async function abrirPedidoLlevar(formData: FormData): Promise<ActionResul
 
   redirect(`/pos/${pedido.id}`)
 }
+
+// ─── Venta rápida (mostrador) ──────────────────────────────────────────────────
+// Sin mesa y sin hoja de datos de cliente — crea el pedido de inmediato y salta
+// directo al menú, a diferencia de "para llevar" que sí pasa por SheetParaLlevar.
+export async function abrirPedidoMostrador(): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: turno } = await supabase
+    .from('turnos')
+    .select('id')
+    .eq('estado', 'abierto')
+    .maybeSingle()
+
+  if (!turno) {
+    return { error: 'No hay turno activo. Ve a Más → Turno para abrir uno.' }
+  }
+
+  const { data: pedido, error } = await supabase
+    .from('pedidos')
+    .insert({
+      turno_id: turno.id,
+      mesa_id: null,
+      mesero_id: user.id,
+      tipo: 'mostrador',
+    })
+    .select('id')
+    .single()
+
+  if (error || !pedido) {
+    return { error: 'Error al crear el pedido.' }
+  }
+
+  await supabase.from('subpedidos').insert({
+    pedido_id: pedido.id,
+    mesero_id: user.id,
+    comensal_numero: 1,
+  })
+
+  redirect(`/pos/${pedido.id}`)
+}

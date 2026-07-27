@@ -164,6 +164,7 @@ export async function crearProducto(data: {
   emoji?: string | null
   foto_url?: string | null
   modo_captura?: 'estandar' | 'rapido'
+  es_combo?: boolean
 }): Promise<{ id: number } | Err> {
   const supabase = await createClient()
   const { data: prod, error } = await supabase
@@ -176,6 +177,7 @@ export async function crearProducto(data: {
       emoji: data.emoji ?? null,
       foto_url: data.foto_url ?? null,
       modo_captura: data.modo_captura ?? 'estandar',
+      es_combo: data.es_combo ?? false,
       activo: true,
       disponible: true,
     })
@@ -195,6 +197,7 @@ export async function actualizarProducto(
     foto_url?: string | null
     categoria_id?: number
     modo_captura?: 'estandar' | 'rapido'
+    es_combo?: boolean
   },
 ): Promise<Err | undefined> {
   const supabase = await createClient()
@@ -395,4 +398,297 @@ export async function setTodosIngredientesDisponibles(): Promise<Err | undefined
     .gte('id', 1)
   if (error) return { error: 'Error al actualizar ingredientes.' }
   revalidatePath('/mas/catalogo')
+}
+
+// ─── Receta ───────────────────────────────────────────────────────────────────
+// Un producto normal (es_combo=FALSE) tiene a lo más una receta (recetas.producto_id
+// es UNIQUE). Un combo no tiene fila en recetas — ver sección "Combo" más abajo.
+
+type UnidadMedidaReceta = 'kg' | 'g' | 'l' | 'ml' | 'pieza' | 'paquete'
+
+// modo_preparacion se elige desde la pantalla de Receta (selector de 3 vías):
+// 'por_orden' se prepara al momento (Fase E), 'por_lote' se cocina en tandas y
+// vende de un lote ya hecho (Fase F, ver porciones_disponibles/rendimiento_esperado
+// abajo), 'reventa' es un artículo de reventa cuyo único insumo es él mismo
+// (Fase G, souvenirs).
+export type ModoPreparacionReceta = 'por_orden' | 'por_lote' | 'reventa'
+
+export type RecetaData = {
+  id: number
+  nombre: string
+  modo_preparacion: ModoPreparacionReceta
+  rendimiento: string | null
+  tiempo_prep_min: number | null
+  instrucciones: string | null
+  // Solo aplican con modo_preparacion='por_lote'.
+  porciones_disponibles: number
+  rendimiento_esperado: number | null
+  insumos: {
+    id: number
+    insumoId: number
+    insumoNombre: string
+    unidad_medida: UnidadMedidaReceta
+    cantidad_usada: number
+  }[]
+}
+
+export async function cargarReceta(
+  productoId: number,
+): Promise<{ receta: RecetaData | null } | Err> {
+  const supabase = await createClient()
+
+  const { data: receta, error } = await supabase
+    .from('recetas')
+    .select(
+      'id, nombre, modo_preparacion, rendimiento, tiempo_prep_min, instrucciones, porciones_disponibles, rendimiento_esperado',
+    )
+    .eq('producto_id', productoId)
+    .maybeSingle()
+  if (error) return { error: 'Error al cargar la receta.' }
+  if (!receta) return { receta: null }
+
+  const { data: insumosRows, error: errInsumos } = await supabase
+    .from('receta_insumos')
+    .select('id, insumo_id, cantidad_usada, unidad_medida, insumos(nombre)')
+    .eq('receta_id', receta.id)
+  if (errInsumos) return { error: 'Error al cargar los insumos de la receta.' }
+
+  return {
+    receta: {
+      id: receta.id,
+      nombre: receta.nombre,
+      modo_preparacion: receta.modo_preparacion,
+      rendimiento: receta.rendimiento ?? null,
+      tiempo_prep_min: receta.tiempo_prep_min ?? null,
+      instrucciones: receta.instrucciones ?? null,
+      porciones_disponibles: receta.porciones_disponibles ?? 0,
+      rendimiento_esperado: receta.rendimiento_esperado ?? null,
+      insumos: (insumosRows ?? []).map((r: any) => ({
+        id: r.id,
+        insumoId: r.insumo_id,
+        insumoNombre: r.insumos?.nombre ?? '',
+        unidad_medida: r.unidad_medida,
+        cantidad_usada: r.cantidad_usada,
+      })),
+    },
+  }
+}
+
+export async function guardarReceta(
+  productoId: number,
+  data: {
+    nombre: string
+    modo_preparacion: ModoPreparacionReceta
+    rendimiento: string | null
+    tiempo_prep_min: number | null
+    instrucciones: string | null
+    // Solo se envían (y solo se persisten) cuando modo_preparacion='por_lote'.
+    porciones_disponibles?: number
+    rendimiento_esperado?: number | null
+    insumos: { insumoId: number; cantidad_usada: number; unidad_medida: UnidadMedidaReceta }[]
+  },
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { data: existente, error: errExistente } = await supabase
+    .from('recetas')
+    .select('id')
+    .eq('producto_id', productoId)
+    .maybeSingle()
+  if (errExistente) return { error: 'Error al guardar la receta.' }
+
+  // Reventa: el artículo mismo es el insumo — exactamente uno, cantidad 1.
+  if (data.modo_preparacion === 'reventa') {
+    if (data.insumos.length !== 1 || data.insumos[0].cantidad_usada !== 1) {
+      return { error: 'Un producto de reventa debe tener exactamente un insumo con cantidad 1.' }
+    }
+  }
+
+  let recetaId: number
+  if (existente) {
+    recetaId = existente.id
+    const { error } = await supabase
+      .from('recetas')
+      .update({
+        nombre: data.nombre,
+        modo_preparacion: data.modo_preparacion,
+        rendimiento: data.rendimiento,
+        tiempo_prep_min: data.tiempo_prep_min,
+        instrucciones: data.instrucciones,
+        ...(data.porciones_disponibles !== undefined
+          ? { porciones_disponibles: data.porciones_disponibles }
+          : {}),
+        ...(data.rendimiento_esperado !== undefined
+          ? { rendimiento_esperado: data.rendimiento_esperado }
+          : {}),
+      })
+      .eq('id', recetaId)
+    if (error) return { error: 'Error al actualizar la receta.' }
+  } else {
+    const { data: nueva, error } = await supabase
+      .from('recetas')
+      .insert({
+        producto_id: productoId,
+        nombre: data.nombre,
+        modo_preparacion: data.modo_preparacion,
+        rendimiento: data.rendimiento,
+        tiempo_prep_min: data.tiempo_prep_min,
+        instrucciones: data.instrucciones,
+        porciones_disponibles: data.porciones_disponibles ?? 0,
+        rendimiento_esperado: data.rendimiento_esperado ?? null,
+      })
+      .select('id')
+      .single()
+    if (error || !nueva) return { error: 'Error al crear la receta.' }
+    recetaId = nueva.id
+  }
+
+  const { error: errDelete } = await supabase
+    .from('receta_insumos')
+    .delete()
+    .eq('receta_id', recetaId)
+  if (errDelete) return { error: 'Error al actualizar los insumos de la receta.' }
+
+  if (data.insumos.length > 0) {
+    const { error: errInsert } = await supabase.from('receta_insumos').insert(
+      data.insumos.map((i) => ({
+        receta_id: recetaId,
+        insumo_id: i.insumoId,
+        cantidad_usada: i.cantidad_usada,
+        unidad_medida: i.unidad_medida,
+      })),
+    )
+    if (errInsert) return { error: 'Error al guardar los insumos de la receta.' }
+  }
+
+  revalidatePath('/mas/catalogo')
+  revalidatePath('/mas/recetario')
+  revalidatePath('/dashboard')
+}
+
+// ─── Combo (componentes) ────────────────────────────────────────────────────
+// combo_productos ya existía en el esquema inicial. Un combo se arma con
+// productos componentes (normales, con su propia receta) y cantidades — no
+// duplica insumos ni tiene su propia fila en recetas.
+
+export type ComboComponenteData = {
+  id: number
+  productoId: number
+  nombre: string
+  precio: number
+  cantidad: number
+}
+
+export async function cargarComboComponentes(
+  comboId: number,
+): Promise<{ componentes: ComboComponenteData[] } | Err> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('combo_productos')
+    .select('id, producto_id, cantidad, productos(nombre, precio)')
+    .eq('combo_id', comboId)
+  if (error) return { error: 'Error al cargar los componentes del combo.' }
+  return {
+    componentes: (data ?? []).map((c: any) => ({
+      id: c.id,
+      productoId: c.producto_id,
+      nombre: c.productos?.nombre ?? '',
+      precio: c.productos?.precio ?? 0,
+      cantidad: c.cantidad,
+    })),
+  }
+}
+
+export async function guardarComboComponentes(
+  comboId: number,
+  items: { productoId: number; cantidad: number }[],
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  if (items.some((i) => i.productoId === comboId)) {
+    return { error: 'Un combo no puede incluirse a sí mismo como componente.' }
+  }
+
+  if (items.length > 0) {
+    const { data: candidatos, error: errCandidatos } = await supabase
+      .from('productos')
+      .select('id, es_combo')
+      .in('id', items.map((i) => i.productoId))
+    if (errCandidatos) return { error: 'Error al validar los componentes.' }
+    if ((candidatos ?? []).some((p) => p.es_combo)) {
+      return { error: 'Un combo no puede incluir a otro combo como componente.' }
+    }
+  }
+
+  const { error: errDelete } = await supabase
+    .from('combo_productos')
+    .delete()
+    .eq('combo_id', comboId)
+  if (errDelete) return { error: 'Error al actualizar los componentes del combo.' }
+
+  if (items.length > 0) {
+    const { error: errInsert } = await supabase.from('combo_productos').insert(
+      items.map((i) => ({
+        combo_id: comboId,
+        producto_id: i.productoId,
+        cantidad: i.cantidad,
+      })),
+    )
+    if (errInsert) return { error: 'Error al guardar los componentes del combo.' }
+  }
+
+  revalidatePath('/mas/catalogo')
+  revalidatePath('/mas/recetario')
+  revalidatePath('/dashboard')
+}
+
+// ─── Costeo ───────────────────────────────────────────────────────────────────
+// Envuelven las funciones SQL costo_insumos_actual() y margen_productos()
+// (migración 20260726000005) — el cálculo vive en la BD para que el costo de
+// combo (suma de recetas de sus componentes) sea siempre consistente entre el
+// editor de catálogo y el dashboard.
+
+export async function obtenerCostosInsumos(): Promise<
+  { costos: { insumoId: number; costoUnitario: number }[] } | Err
+> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('costo_insumos_actual')
+  if (error) return { error: 'Error al calcular el costo de los insumos.' }
+  return {
+    costos: (data ?? []).map((r: any) => ({
+      insumoId: r.insumo_id,
+      costoUnitario: r.costo_unitario,
+    })),
+  }
+}
+
+export type MargenProducto = {
+  productoId: number
+  nombre: string
+  esCombo: boolean
+  precio: number
+  costo: number | null
+  costoCompleto: boolean
+  margen: number | null
+  margenPct: number | null
+}
+
+export async function obtenerMargenProductos(): Promise<
+  { margenes: MargenProducto[] } | Err
+> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('margen_productos')
+  if (error) return { error: 'Error al calcular el margen de los productos.' }
+  return {
+    margenes: (data ?? []).map((r: any) => ({
+      productoId: r.producto_id,
+      nombre: r.nombre,
+      esCombo: r.es_combo,
+      precio: r.precio,
+      costo: r.costo,
+      costoCompleto: r.costo_completo,
+      margen: r.margen,
+      margenPct: r.margen_pct,
+    })),
+  }
 }

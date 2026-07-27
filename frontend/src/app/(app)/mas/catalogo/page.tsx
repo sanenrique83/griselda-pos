@@ -40,6 +40,13 @@ export type ProductoCatalogo = {
   modo_captura: 'estandar' | 'rapido'
   categoria_id: number
   categoria_nombre: string
+  es_combo: boolean
+}
+
+export type InsumoCatalogo = {
+  id: number
+  nombre: string
+  unidad_medida: 'kg' | 'g' | 'l' | 'ml' | 'pieza' | 'paquete'
 }
 
 export type OpcionCatalogo = {
@@ -93,12 +100,14 @@ export default async function CatalogoPage() {
     { data: rawCategorias },
     { data: rawProductos },
     { data: rawIngredientes },
+    { data: rawInsumos },
   ] = await Promise.all([
     supabase.from('areas').select('id, nombre, orden, activa').eq('activa', true).order('orden'),
     supabase.from('mesas').select('id, area_id, numero, nombre, capacidad, activa').eq('activa', true).order('numero'),
     supabase.from('categorias').select('id, nombre, orden, activa, modo_captura').eq('activa', true).order('orden'),
-    supabase.from('productos').select('id, nombre, descripcion, precio, emoji, foto_url, disponible, activo, modo_captura, categoria_id').eq('activo', true).order('orden'),
+    supabase.from('productos').select('id, nombre, descripcion, precio, emoji, foto_url, disponible, activo, modo_captura, categoria_id, es_combo').eq('activo', true).order('orden'),
     supabase.from('ingredientes').select('id, nombre, disponible, creado_en').order('nombre'),
+    supabase.from('insumos').select('id, nombre, unidad_medida').eq('activo', true).order('nombre'),
   ])
 
   // Mapa de categorías por id
@@ -141,6 +150,7 @@ export default async function CatalogoPage() {
     modo_captura: p.modo_captura ?? 'estandar',
     categoria_id: p.categoria_id,
     categoria_nombre: catMap.get(p.categoria_id) ?? '',
+    es_combo: p.es_combo ?? false,
   }))
 
   const ingredientes: IngredienteCatalogo[] = (rawIngredientes ?? []).map((i: any) => ({
@@ -150,12 +160,19 @@ export default async function CatalogoPage() {
     creado_en: i.creado_en,
   }))
 
+  const insumos: InsumoCatalogo[] = (rawInsumos ?? []).map((i: any) => ({
+    id: i.id,
+    nombre: i.nombre,
+    unidad_medida: i.unidad_medida,
+  }))
+
   return (
     <CatalogoShell
       areas={areas}
       categorias={categorias}
       productos={productos}
       ingredientes={ingredientes}
+      insumos={insumos}
     />
   )
 }

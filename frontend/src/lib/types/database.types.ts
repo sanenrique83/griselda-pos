@@ -12,7 +12,7 @@ export type TamanoMesa            = 'chico' | 'medio' | 'grande'
 export type AnchoPapel            = '58mm' | '80mm'
 export type ModoCaptura           = 'estandar' | 'rapido'
 export type EstadoTurno           = 'abierto' | 'cerrado'
-export type TipoPedido            = 'mesa' | 'llevar'
+export type TipoPedido            = 'mesa' | 'llevar' | 'mostrador'
 export type EstadoPedido          = 'abierto' | 'cerrado'
 export type EstadoSubpedido       = 'activo' | 'pagado'
 export type EstadoProductoPedido  = 'pendiente' | 'enviado' | 'cancelado'
@@ -162,6 +162,7 @@ export interface Turno {
   estado: EstadoTurno
   abierto_en: string
   cerrado_en: string | null
+  cerrado_por: string | null
   notas: string | null
 }
 

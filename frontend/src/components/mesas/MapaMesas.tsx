@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { TarjetaMesa } from './TarjetaMesa'
 import { SheetParaLlevar } from './SheetParaLlevar'
+import { abrirPedidoMostrador } from '@/app/(app)/mesas/actions'
 import type { GrupoArea, MesaUI } from '@/app/(app)/mesas/page'
 
 interface MapaMesasProps {
@@ -15,6 +16,19 @@ export default function MapaMesas({ grupos, turnoId }: MapaMesasProps) {
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isPendingMostrador, startMostrador] = useTransition()
+
+  function handleVentaRapida() {
+    if (!turnoId) {
+      setError('No hay turno activo. Ve a Más → Turno para abrir uno.')
+      return
+    }
+    setError(null)
+    startMostrador(async () => {
+      const result = await abrirPedidoMostrador()
+      if (result?.error) setError(result.error)
+    })
+  }
 
   function handleMesaClick(mesa: MesaUI) {
     setError(null)
@@ -96,6 +110,26 @@ export default function MapaMesas({ grupos, turnoId }: MapaMesasProps) {
               <div className="text-[15px] font-semibold">Nuevo pedido para llevar</div>
               <div className="mt-0.5 text-[12px] opacity-80">
                 Sin mesa · Datos opcionales
+              </div>
+            </div>
+            <span className="text-xl opacity-70">›</span>
+          </button>
+        </div>
+
+        {/* Botón Venta rápida (mostrador) */}
+        <div className="px-3 pt-2.5">
+          <button
+            onClick={handleVentaRapida}
+            disabled={isPendingMostrador}
+            className="flex w-full cursor-pointer items-center gap-3 rounded-xl bg-emerald-600 px-4 py-4 text-white shadow-[0_4px_14px_rgba(5,150,105,.28)] active:scale-[.98] disabled:opacity-60"
+          >
+            <span className="text-[28px] leading-none">🛍️</span>
+            <div className="flex-1 text-left">
+              <div className="text-[15px] font-semibold">
+                {isPendingMostrador ? 'Creando…' : 'Venta rápida'}
+              </div>
+              <div className="mt-0.5 text-[12px] opacity-80">
+                Sin mesa · Directo al menú
               </div>
             </div>
             <span className="text-xl opacity-70">›</span>

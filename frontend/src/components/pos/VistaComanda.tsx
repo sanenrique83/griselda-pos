@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ItemComandaRow } from './ItemComanda'
-import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem, eliminarProductoPendiente, moverProducto } from '@/app/(app)/pos/[pedidoId]/actions'
+import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem, eliminarProductoPendiente, moverProducto, dividirProducto } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { SubpedidoPOS, ItemComanda } from '@/app/(app)/pos/[pedidoId]/page'
 import { imprimirTicket } from '@/lib/print'
 
@@ -51,6 +51,7 @@ export function VistaComanda({
   const [itemACancelar, setItemACancelar] = useState<ItemComanda | null>(null)
   const [motivoIdx, setMotivoIdx] = useState(0)
   const [itemAMover, setItemAMover] = useState<ItemComanda | null>(null)
+  const [cantidadMover, setCantidadMover] = useState(1)
   const [isPendingReimprimir, setIsPendingReimprimir] = useState(false)
 
   useEffect(() => {
@@ -190,8 +191,11 @@ export function VistaComanda({
   function handleMover(subpedidoDestinoId: number) {
     if (!itemAMover) return
     setError(null)
+    const dividir = cantidadMover < itemAMover.cantidad
     startMover(async () => {
-      const result = await moverProducto(itemAMover.id, subpedidoDestinoId)
+      const result = dividir
+        ? await dividirProducto(itemAMover.id, subpedidoDestinoId, cantidadMover)
+        : await moverProducto(itemAMover.id, subpedidoDestinoId)
       if (result?.error) {
         setError(result.error)
       } else {
@@ -204,13 +208,16 @@ export function VistaComanda({
   function handleMoverANuevoComensal() {
     if (!itemAMover) return
     setError(null)
+    const dividir = cantidadMover < itemAMover.cantidad
     startMover(async () => {
       const nuevo = await agregarComensal(pedidoId)
       if ('error' in nuevo) {
         setError(nuevo.error)
         return
       }
-      const result = await moverProducto(itemAMover.id, nuevo.nuevoId)
+      const result = dividir
+        ? await dividirProducto(itemAMover.id, nuevo.nuevoId, cantidadMover)
+        : await moverProducto(itemAMover.id, nuevo.nuevoId)
       if (result?.error) {
         setError(result.error)
       } else {
@@ -329,7 +336,7 @@ export function VistaComanda({
               }
               onMover={
                 item.estado !== 'cancelado'
-                  ? () => setItemAMover(item)
+                  ? () => { setItemAMover(item); setCantidadMover(item.cantidad) }
                   : undefined
               }
             />
@@ -411,6 +418,33 @@ export function VistaComanda({
                 Mover {itemAMover.emoji ? `${itemAMover.emoji} ` : ''}{itemAMover.nombre}
               </p>
               <p className="mt-0.5 text-xs text-text-3">Selecciona el comensal destino</p>
+
+              {itemAMover.cantidad > 1 && (
+                <div className="mt-3 flex items-center justify-between rounded-xl bg-s2 px-3 py-2.5">
+                  <span className="text-[13px] font-medium text-text-2">
+                    Cuántos mover (de {itemAMover.cantidad})
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setCantidadMover((c) => Math.max(1, c - 1))}
+                      disabled={cantidadMover <= 1}
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-[15px] font-bold text-text-2 shadow-sm active:scale-90 disabled:opacity-30"
+                    >
+                      −
+                    </button>
+                    <span className="w-5 text-center font-mono text-[15px] font-bold">
+                      {cantidadMover}
+                    </span>
+                    <button
+                      onClick={() => setCantidadMover((c) => Math.min(itemAMover.cantidad, c + 1))}
+                      disabled={cantidadMover >= itemAMover.cantidad}
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-[15px] font-bold text-text-2 shadow-sm active:scale-90 disabled:opacity-30"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
               {subpedidos

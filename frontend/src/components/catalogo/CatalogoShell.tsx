@@ -10,6 +10,7 @@ import type {
   CategoriaCatalogo,
   ProductoCatalogo,
   IngredienteCatalogo,
+  InsumoCatalogo,
 } from '@/app/(app)/mas/catalogo/page'
 
 type Tab = 'mesas' | 'categorias' | 'productos' | 'ingredientes'
@@ -26,6 +27,7 @@ interface CatalogoShellProps {
   categorias: CategoriaCatalogo[]
   productos: ProductoCatalogo[]
   ingredientes: IngredienteCatalogo[]
+  insumos: InsumoCatalogo[]
 }
 
 export function CatalogoShell({
@@ -33,6 +35,7 @@ export function CatalogoShell({
   categorias,
   productos,
   ingredientes,
+  insumos,
 }: CatalogoShellProps) {
   const [tab, setTab] = useState<Tab>('mesas')
 
@@ -72,6 +75,7 @@ export function CatalogoShell({
             productos={productos}
             categorias={categorias}
             ingredientes={ingredientes}
+            insumos={insumos}
           />
         )}
         {tab === 'ingredientes' && (

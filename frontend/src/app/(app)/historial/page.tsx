@@ -56,6 +56,8 @@ async function cargarRecibos(supabase: Awaited<ReturnType<typeof import('@/lib/s
       if (pedido.tipo === 'mesa' && pedido.mesas) {
         const mesa = pedido.mesas as { numero: number; nombre: string | null }
         mesaLabel = `Mesa ${mesa.nombre ?? mesa.numero}`
+      } else if (pedido.tipo === 'mostrador') {
+        mesaLabel = 'Mostrador'
       }
     }
 

@@ -41,7 +41,7 @@ export default async function CobroPage({
     .select(`
       id, comensal_numero, nombre, estado,
       pedido_productos(
-        cantidad, precio_unit, estado,
+        cantidad, precio_unit, estado, nombre_libre,
         productos(nombre),
         pedido_producto_opciones(precio_extra, opciones_modificador(nombre))
       )
@@ -88,7 +88,7 @@ export default async function CobroPage({
         .map((o: any) => o.opciones_modificador?.nombre as string | undefined)
         .filter((n): n is string => !!n)
       return {
-        nombre: pp.productos?.nombre ?? '',
+        nombre: pp.nombre_libre || pp.productos?.nombre || '',
         cantidad: pp.cantidad,
         precio: pp.precio_unit + extras, // precio unitario consolidado
         ...(modificadores.length > 0 ? { modificadores } : {}),

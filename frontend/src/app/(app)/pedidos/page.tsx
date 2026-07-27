@@ -6,7 +6,7 @@ import { PedidosShell } from '@/components/pedidos/PedidosShell'
 
 export type PedidoActivo = {
   id: number
-  tipo: 'mesa' | 'llevar'
+  tipo: 'mesa' | 'llevar' | 'mostrador'
   mesaLabel: string
   numComensales: number
   createdAt: string
@@ -59,7 +59,9 @@ export default async function PedidosPage() {
         ? mesa
           ? `Mesa ${mesa.nombre ?? mesa.numero}`
           : `Mesa #${p.mesa_id}`
-        : 'Para llevar'
+        : p.tipo === 'mostrador'
+          ? 'Mostrador'
+          : 'Para llevar'
 
     return {
       id: p.id,

@@ -8,7 +8,7 @@ import {
   type PagoInput,
 } from '@/app/(app)/cobro/[pedidoId]/actions'
 import type { SubpedidoCobro } from '@/app/(app)/cobro/[pedidoId]/page'
-import { imprimirTicket, type TicketConfig } from '@/lib/print'
+import { imprimirTicket, consolidarItemsCliente, type TicketConfig } from '@/lib/print'
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────
 
@@ -347,10 +347,11 @@ export function CobroShell({
             ],
           }, impresionActiva)
         } else {
-          const printItems =
+          const printItems = consolidarItemsCliente(
             escenario === 'varios'
               ? subpedidosACobrar.flatMap((sp) => sp.items)
-              : itemsTicket
+              : itemsTicket,
+          )
 
           const printEscenario =
             escenario === 'general' ? 'global' : escenario
@@ -704,12 +705,13 @@ export function CobroShell({
                 // Pre-cuenta: si es "Uno paga varios", solo los comensales
                 // seleccionados — no toda la mesa. "Cuenta general" y
                 // "Dividir igual" sí muestran todo, porque ahí aplica a todos.
-                const precuentaItems =
+                const precuentaItems = consolidarItemsCliente(
                   escenario === 'varios'
                     ? subpedidos
                         .filter((sp) => subSeleccionados.has(sp.id))
                         .flatMap((sp) => sp.items)
-                    : itemsTicket
+                    : itemsTicket,
+                )
 
                 const propinaPreCuenta = conPropina && propinaPct > 0
                   ? roundPropina(totalConDescuento * propinaPct / 100)

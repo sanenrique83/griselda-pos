@@ -70,6 +70,11 @@ export async function cerrarTurno(data: {
 }): Promise<{ error: string } | void> {
   const supabase = await createClient()
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Sin sesión.' }
+
   // No cerrar si hay pedidos abiertos
   const { count: pedidosAbiertos } = await supabase
     .from('pedidos')
@@ -128,6 +133,7 @@ export async function cerrarTurno(data: {
     .update({
       estado: 'cerrado',
       cerrado_en: new Date().toISOString(),
+      cerrado_por: user.id,
       efectivo_contado: data.efectivoContado,
       diferencia,
       notas: data.notas,

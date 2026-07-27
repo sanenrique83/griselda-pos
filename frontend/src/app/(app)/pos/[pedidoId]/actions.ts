@@ -629,6 +629,70 @@ export async function cancelarItem(
 }
 
 // ─── Mover producto a otro comensal ────────────────────────────────────────────
+// Divide un producto con cantidad > 1: mueve solo `cantidadAMover` unidades a
+// otro comensal, dejando el resto donde estaba. Copia los mismos
+// modificadores a la parte que se mueve.
+export async function dividirProducto(
+  pedidoProductoId: number,
+  subpedidoDestinoId: number,
+  cantidadAMover: number,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { data: pp } = await supabase
+    .from('pedido_productos')
+    .select('subpedido_id, producto_id, cantidad, precio_unit, estado, notas, nombre_libre')
+    .eq('id', pedidoProductoId)
+    .single()
+
+  if (!pp) return { error: 'Producto no encontrado.' }
+  if (pp.estado === 'cancelado') return { error: 'No se puede dividir un producto cancelado.' }
+  if (pp.subpedido_id === subpedidoDestinoId) return { error: 'El producto ya está en ese comensal.' }
+  if (cantidadAMover < 1 || cantidadAMover >= pp.cantidad) {
+    return { error: 'Cantidad a dividir inválida.' }
+  }
+
+  const { data: opciones } = await supabase
+    .from('pedido_producto_opciones')
+    .select('opcion_id, precio_extra')
+    .eq('pedido_producto_id', pedidoProductoId)
+
+  // Fila nueva con la cantidad que se mueve
+  const { data: nuevaFila, error: errorInsert } = await supabase
+    .from('pedido_productos')
+    .insert({
+      subpedido_id: subpedidoDestinoId,
+      producto_id: pp.producto_id,
+      precio_unit: pp.precio_unit,
+      cantidad: cantidadAMover,
+      estado: pp.estado,
+      notas: pp.notas,
+      nombre_libre: pp.nombre_libre,
+    })
+    .select('id')
+    .single()
+
+  if (errorInsert || !nuevaFila) return { error: 'Error al dividir el producto.' }
+
+  if (opciones && opciones.length > 0) {
+    await supabase.from('pedido_producto_opciones').insert(
+      opciones.map((o) => ({
+        pedido_producto_id: nuevaFila.id,
+        opcion_id: o.opcion_id,
+        precio_extra: o.precio_extra,
+      })),
+    )
+  }
+
+  // Reducir la cantidad restante en la fila original
+  const { error: errorUpdate } = await supabase
+    .from('pedido_productos')
+    .update({ cantidad: pp.cantidad - cantidadAMover })
+    .eq('id', pedidoProductoId)
+
+  if (errorUpdate) return { error: 'Error al actualizar la cantidad original.' }
+}
+
 export async function moverProducto(
   pedidoProductoId: number,
   subpedidoDestinoId: number,

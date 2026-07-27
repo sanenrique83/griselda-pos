@@ -18,6 +18,28 @@ export type ItemCliente = {
   modificadores?: string[]
 }
 
+/**
+ * Suma cantidades de items idénticos (mismo nombre + mismos modificadores +
+ * mismo precio unitario) en uno solo. Se usa para "Cuenta general" y "Uno
+ * paga varios" — donde no importa quién pidió cada cosa, solo el total del
+ * platillo. NO se usa en tickets "Individual" (ahí cada comensal debe ver
+ * su propio detalle por separado, sin mezclarse con el de otros).
+ */
+export function consolidarItemsCliente(items: ItemCliente[]): ItemCliente[] {
+  const mapa = new Map<string, ItemCliente>()
+  for (const item of items) {
+    const modsOrdenados = [...(item.modificadores ?? [])].sort()
+    const clave = `${item.nombre}|${item.precio}|${modsOrdenados.join('+')}`
+    const existente = mapa.get(clave)
+    if (existente) {
+      existente.cantidad += item.cantidad
+    } else {
+      mapa.set(clave, { ...item, modificadores: modsOrdenados.length > 0 ? modsOrdenados : undefined })
+    }
+  }
+  return [...mapa.values()]
+}
+
 export type IndividualComensal = {
   comensalNombre: string
   items: ItemCliente[]

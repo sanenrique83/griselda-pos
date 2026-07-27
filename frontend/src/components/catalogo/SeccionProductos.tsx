@@ -15,7 +15,8 @@ import {
   eliminarOpcion,
 } from '@/app/(app)/mas/catalogo/actions'
 import { cargarModificadores } from '@/app/(app)/pos/[pedidoId]/actions'
-import type { ProductoCatalogo, CategoriaCatalogo, IngredienteCatalogo } from '@/app/(app)/mas/catalogo/page'
+import { SeccionReceta } from './SeccionReceta'
+import type { ProductoCatalogo, CategoriaCatalogo, IngredienteCatalogo, InsumoCatalogo } from '@/app/(app)/mas/catalogo/page'
 
 // ─── Tipos locales ────────────────────────────────────────────────────────────
 
@@ -42,12 +43,14 @@ interface SeccionProductosProps {
   productos: ProductoCatalogo[]
   categorias: CategoriaCatalogo[]
   ingredientes: IngredienteCatalogo[]
+  insumos: InsumoCatalogo[]
 }
 
 export function SeccionProductos({
   productos: initial,
   categorias,
   ingredientes,
+  insumos,
 }: SeccionProductosProps) {
   const router = useRouter()
   const [productos, setProductos] = useState(initial)
@@ -70,6 +73,7 @@ export function SeccionProductos({
   const [formEmoji, setFormEmoji] = useState('')
   const [formCat, setFormCat] = useState<number>(categorias[0]?.id ?? 0)
   const [formModo, setFormModo] = useState<'estandar' | 'rapido'>('estandar')
+  const [formEsCombo, setFormEsCombo] = useState(false)
 
   // Imagen
   const [imgFile, setImgFile] = useState<File | null>(null)
@@ -117,6 +121,7 @@ export function SeccionProductos({
       setFormEmoji(mode.prod.emoji ?? '')
       setFormCat(mode.prod.categoria_id)
       setFormModo(mode.prod.modo_captura)
+      setFormEsCombo(mode.prod.es_combo)
       setExistingFotoUrl(mode.prod.foto_url ?? null)
       setImgPreview(mode.prod.foto_url ?? null)
 
@@ -144,6 +149,7 @@ export function SeccionProductos({
       setFormEmoji('')
       setFormCat(filtroCat ?? categorias[0]?.id ?? 0)
       setFormModo('estandar')
+      setFormEsCombo(false)
       setExistingFotoUrl(null)
       setLoadingGrupos(false)
     }
@@ -187,6 +193,7 @@ export function SeccionProductos({
           emoji: formEmoji.trim() || null,
           foto_url: fotoUrl,
           modo_captura: formModo,
+          es_combo: formEsCombo,
         })
         if ('error' in result) { setError(result.error); return }
         router.refresh()
@@ -211,6 +218,7 @@ export function SeccionProductos({
           foto_url: fotoUrl,
           categoria_id: formCat,
           modo_captura: formModo,
+          es_combo: formEsCombo,
         })
         if (result?.error) { setError(result.error); return }
         const catNombre = categorias.find((c) => c.id === formCat)?.nombre ?? ''
@@ -227,6 +235,7 @@ export function SeccionProductos({
                   categoria_id: formCat,
                   categoria_nombre: catNombre,
                   modo_captura: formModo,
+                  es_combo: formEsCombo,
                 }
               : p,
           ),
@@ -673,6 +682,28 @@ export function SeccionProductos({
             </div>
           </div>
 
+          {/* Es un combo */}
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <span className="text-[13px] text-text-2">Es un combo</span>
+              <p className="text-[11px] text-text-4">
+                Se arma con otros productos como componentes, en vez de receta propia
+              </p>
+            </div>
+            <button
+              onClick={() => setFormEsCombo((v) => !v)}
+              className={`relative ml-3 flex-shrink-0 h-[26px] w-[46px] rounded-full transition-colors duration-200 ${
+                formEsCombo ? 'bg-blue-600' : 'bg-[#D1D1D6]'
+              }`}
+            >
+              <span
+                className={`absolute top-[3px] h-[20px] w-[20px] rounded-full bg-white shadow transition-transform duration-200 ${
+                  formEsCombo ? 'translate-x-[22px]' : 'translate-x-[3px]'
+                }`}
+              />
+            </button>
+          </div>
+
           {/* ── Modificadores (solo en editar) ──────────────────────────── */}
           {sheet.tipo === 'editar' && (
             <div className="border-t border-[#E5E5EA] pt-4">
@@ -942,6 +973,16 @@ export function SeccionProductos({
                 </button>
               )}
             </div>
+          )}
+
+          {/* ── Receta / Componentes de combo (solo en editar) ─────────── */}
+          {sheet.tipo === 'editar' && (
+            <SeccionReceta
+              key={sheet.prod.id}
+              producto={sheet.prod}
+              productos={productos}
+              insumos={insumos}
+            />
           )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}

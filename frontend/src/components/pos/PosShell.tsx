@@ -29,7 +29,7 @@ interface PosShellProps {
   puedesCancelar?: boolean
   meseroNombre?: string
   rol?: string
-  tipoMesa?: 'mesa' | 'llevar'
+  tipoMesa?: 'mesa' | 'llevar' | 'mostrador'
 }
 
 export function PosShell({
