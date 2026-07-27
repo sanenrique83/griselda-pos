@@ -82,10 +82,18 @@ export default async function RecetaDetallePage({
   }
 
   // Combo: sus componentes, con la receta de cada uno (sin duplicar insumos).
-  const { data: componentesRaw } = await supabase
+  const { data: componentesRaw, error: componentesError } = await supabase
     .from('combo_productos')
-    .select('cantidad, productos(id, nombre, emoji)')
+    .select('cantidad, productos!combo_productos_producto_id_fkey(id, nombre, emoji)')
     .eq('combo_id', producto.id)
+
+  if (componentesError) {
+    return (
+      <DetalleShell producto={producto}>
+        <ErrorAviso mensaje="No se pudieron cargar los componentes de este combo. Intenta recargar la página." />
+      </DetalleShell>
+    )
+  }
 
   const componentes = await Promise.all(
     (componentesRaw ?? []).map(async (c: any) => {
@@ -162,6 +170,14 @@ function SinDefinir() {
   return (
     <div className="rounded-2xl border border-[#E5E5EA] bg-white px-4 py-8 text-center text-sm text-text-3">
       Aún no se ha definido receta para este producto.
+    </div>
+  )
+}
+
+function ErrorAviso({ mensaje }: { mensaje: string }) {
+  return (
+    <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-4 text-center text-sm text-red-600">
+      {mensaje}
     </div>
   )
 }

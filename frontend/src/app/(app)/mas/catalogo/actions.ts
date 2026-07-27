@@ -585,9 +585,9 @@ export async function cargarComboComponentes(
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('combo_productos')
-    .select('id, producto_id, cantidad, productos(nombre, precio)')
+    .select('id, producto_id, cantidad, productos!combo_productos_producto_id_fkey(nombre, precio)')
     .eq('combo_id', comboId)
-  if (error) return { error: `Error al cargar componentes: ${error.message}` }
+  if (error) return { error: 'Error al cargar los componentes del combo.' }
   return {
     componentes: (data ?? []).map((c: any) => ({
       id: c.id,
