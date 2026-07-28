@@ -157,6 +157,22 @@ export async function cobrarPedido(data: {
     if (cobrosErr) return { error: 'Error al vincular el cobro a los comensales.' }
   }
 
+  // ── 3.5 Descontar inventario de ítems que nunca se enviaron a cocina ───────
+  // Flujo real del negocio: ítems simples se comunican de viva voz y nunca
+  // pasan por "Enviar a cocina" (pedido_productos sigue en 'pendiente'). Sin
+  // este paso, cobrar y cerrar el pedido nunca dispara aplicar_consumo_receta()
+  // para esos ítems — se cobran pero jamás descuentan inventario. Acotado a
+  // los subpedido_id que se están cobrando AHORA (no todo el pedido): "Uno
+  // paga varios" puede cobrar solo una parte de los comensales.
+  const { error: enviarErr } = await supabase.rpc('enviar_pendientes_de_subpedidos', {
+    p_subpedido_ids: data.subpedidos.map((sp) => sp.id),
+  })
+
+  if (enviarErr) {
+    console.error('[cobrarPedido] error enviar_pendientes_de_subpedidos:', enviarErr)
+    return { error: 'Error al descontar el inventario de los ítems del cobro.' }
+  }
+
   // ── 4. Marcar subpedidos cobrados como pagados ────────────────────────────
   const { error: subErr } = await supabase
     .from('subpedidos')
