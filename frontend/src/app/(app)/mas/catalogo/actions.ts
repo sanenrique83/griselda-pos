@@ -296,7 +296,7 @@ export async function crearOpcion(data: {
   nombre: string
   precio_extra?: number
   orden?: number
-  ingredienteId?: number | null
+  insumoId?: number | null
 }): Promise<{ id: number } | Err> {
   const supabase = await createClient()
   const { data: op, error } = await supabase
@@ -306,7 +306,7 @@ export async function crearOpcion(data: {
       nombre: data.nombre,
       precio_extra: data.precio_extra ?? 0,
       orden: data.orden ?? 99,
-      ingrediente_id: data.ingredienteId ?? null,
+      insumo_id: data.insumoId ?? null,
     })
     .select('id')
     .single()
@@ -336,14 +336,26 @@ export async function eliminarOpcion(id: number): Promise<Err | undefined> {
 }
 
 // ─── Ingredientes ─────────────────────────────────────────────────────────────
+// "Ingredientes" ya no es una tabla propia: es una vista simplificada sobre
+// insumos (toggle disponible/agotado + selector para vincular una opción de
+// modificador). Un ingrediente creado aquí es un insumo con valores por
+// defecto ('pieza', sin stock ni costeo); si luego necesita receta propia o
+// costeo real, se edita como cualquier otro insumo desde Inventario.
 
 export async function crearIngrediente(
   nombre: string,
 ): Promise<{ id: number } | Err> {
   const supabase = await createClient()
   const { data, error } = await supabase
-    .from('ingredientes')
-    .insert({ nombre })
+    .from('insumos')
+    .insert({
+      nombre,
+      unidad_medida: 'pieza',
+      stock_actual: 0,
+      stock_minimo: 0,
+      modo_obtencion: 'comprado',
+      disponible: true,
+    })
     .select('id')
     .single()
   if (error || !data) return { error: 'Error al crear el ingrediente.' }
@@ -357,7 +369,7 @@ export async function actualizarIngrediente(
 ): Promise<Err | undefined> {
   const supabase = await createClient()
   const { error } = await supabase
-    .from('ingredientes')
+    .from('insumos')
     .update({ nombre })
     .eq('id', id)
   if (error) return { error: 'Error al actualizar el ingrediente.' }
@@ -369,11 +381,14 @@ export async function eliminarIngrediente(id: number): Promise<Err | undefined> 
   const { count } = await supabase
     .from('opciones_modificador')
     .select('id', { count: 'exact', head: true })
-    .eq('ingrediente_id', id)
+    .eq('insumo_id', id)
     .eq('activa', true)
   if ((count ?? 0) > 0)
     return { error: 'Este ingrediente está en uso en opciones activas.' }
-  const { error } = await supabase.from('ingredientes').delete().eq('id', id)
+  // Soft delete: a diferencia de la vieja tabla ingredientes, un insumo
+  // puede tener compras/receta_insumos/producciones dependientes — un DELETE
+  // físico rompería esas referencias.
+  const { error } = await supabase.from('insumos').update({ activo: false }).eq('id', id)
   if (error) return { error: 'Error al eliminar el ingrediente.' }
   revalidatePath('/mas/catalogo')
 }
@@ -384,7 +399,7 @@ export async function toggleIngredienteDisponible(
 ): Promise<Err | undefined> {
   const supabase = await createClient()
   const { error } = await supabase
-    .from('ingredientes')
+    .from('insumos')
     .update({ disponible })
     .eq('id', id)
   if (error) return { error: 'Error al actualizar el ingrediente.' }
@@ -393,9 +408,9 @@ export async function toggleIngredienteDisponible(
 export async function setTodosIngredientesDisponibles(): Promise<Err | undefined> {
   const supabase = await createClient()
   const { error } = await supabase
-    .from('ingredientes')
+    .from('insumos')
     .update({ disponible: true })
-    .gte('id', 1)
+    .eq('activo', true)
   if (error) return { error: 'Error al actualizar ingredientes.' }
   revalidatePath('/mas/catalogo')
 }

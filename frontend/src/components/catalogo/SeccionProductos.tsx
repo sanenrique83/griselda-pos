@@ -103,7 +103,7 @@ export function SeccionProductos({
   const [opEditandoId, setOpEditandoId] = useState<number | null>(null)
   const [foNombre, setFoNombre] = useState('')
   const [foPrecio, setFoPrecio] = useState('')
-  const [foIngredienteId, setFoIngredienteId] = useState<number | null>(null)
+  const [foInsumoId, setFoInsumoId] = useState<number | null>(null)
 
   // ── Abrir / cerrar sheet ───────────────────────────────────────────────────
 
@@ -333,7 +333,7 @@ export function SeccionProductos({
     setOpEditandoId(null)
     setFoNombre('')
     setFoPrecio('')
-    setFoIngredienteId(null)
+    setFoInsumoId(null)
     setGrupoError(null)
   }
 
@@ -342,7 +342,7 @@ export function SeccionProductos({
     setOpEditandoId(opcion.id)
     setFoNombre(opcion.nombre)
     setFoPrecio(opcion.precio_extra ? opcion.precio_extra.toString() : '')
-    setFoIngredienteId(null)
+    setFoInsumoId(null)
     setGrupoError(null)
   }
 
@@ -369,7 +369,7 @@ export function SeccionProductos({
         )
         setFoNombre('')
         setFoPrecio('')
-        setFoIngredienteId(null)
+        setFoInsumoId(null)
         setOpFormId(null)
         setOpEditandoId(null)
       })
@@ -385,7 +385,7 @@ export function SeccionProductos({
         grupoId,
         nombre: foNombre.trim(),
         precio_extra: parseFloat(foPrecio) || 0,
-        ingredienteId: foIngredienteId,
+        insumoId: foInsumoId,
       })
       if ('error' in result) { setGrupoError(result.error); return }
       setGrupos((prev) =>
@@ -408,7 +408,7 @@ export function SeccionProductos({
       )
       setFoNombre('')
       setFoPrecio('')
-      setFoIngredienteId(null)
+      setFoInsumoId(null)
       setOpFormId(null)
     })
   }
@@ -807,10 +807,10 @@ export function SeccionProductos({
                         {/* Selector de ingrediente (opcional) — solo al crear */}
                         {!opEditandoId && ingredientes.length > 0 && (
                           <select
-                            value={foIngredienteId ?? ''}
+                            value={foInsumoId ?? ''}
                             onChange={(e) => {
                               const id = e.target.value ? Number(e.target.value) : null
-                              setFoIngredienteId(id)
+                              setFoInsumoId(id)
                               if (id) {
                                 const ing = ingredientes.find((i) => i.id === id)
                                 if (ing) setFoNombre(ing.nombre)

@@ -49,6 +49,16 @@ export type InsumoCatalogo = {
   unidad_medida: 'kg' | 'g' | 'l' | 'ml' | 'pieza' | 'paquete'
 }
 
+// Vista simplificada de insumos (toggle disponible/agotado, ligados a
+// opciones de modificador vía opciones_modificador.insumo_id) — ingredientes
+// fue absorbida por insumos, esto ya no es una tabla propia.
+export type IngredienteCatalogo = {
+  id: number
+  nombre: string
+  disponible: boolean
+  creado_en: string
+}
+
 export type OpcionCatalogo = {
   id: number
   grupo_id: number
@@ -56,13 +66,6 @@ export type OpcionCatalogo = {
   precio_extra: number
   orden: number
   activa: boolean
-}
-
-export type IngredienteCatalogo = {
-  id: number
-  nombre: string
-  disponible: boolean
-  creado_en: string
 }
 
 export type GrupoModificadorCatalogo = {
@@ -99,15 +102,15 @@ export default async function CatalogoPage() {
     { data: rawMesas },
     { data: rawCategorias },
     { data: rawProductos },
-    { data: rawIngredientes },
     { data: rawInsumos },
   ] = await Promise.all([
     supabase.from('areas').select('id, nombre, orden, activa').eq('activa', true).order('orden'),
     supabase.from('mesas').select('id, area_id, numero, nombre, capacidad, activa').eq('activa', true).order('numero'),
     supabase.from('categorias').select('id, nombre, orden, activa, modo_captura').eq('activa', true).order('orden'),
     supabase.from('productos').select('id, nombre, descripcion, precio, emoji, foto_url, disponible, activo, modo_captura, categoria_id, es_combo').eq('activo', true).order('orden'),
-    supabase.from('ingredientes').select('id, nombre, disponible, creado_en').order('nombre'),
-    supabase.from('insumos').select('id, nombre, unidad_medida').eq('activo', true).order('nombre'),
+    // Una sola fuente para insumos e "ingredientes" (unificados) — ver
+    // vistas simplificadas más abajo.
+    supabase.from('insumos').select('id, nombre, unidad_medida, disponible, created_at').eq('activo', true).order('nombre'),
   ])
 
   // Mapa de categorías por id
@@ -153,17 +156,19 @@ export default async function CatalogoPage() {
     es_combo: p.es_combo ?? false,
   }))
 
-  const ingredientes: IngredienteCatalogo[] = (rawIngredientes ?? []).map((i: any) => ({
-    id: i.id,
-    nombre: i.nombre,
-    disponible: i.disponible,
-    creado_en: i.creado_en,
-  }))
-
   const insumos: InsumoCatalogo[] = (rawInsumos ?? []).map((i: any) => ({
     id: i.id,
     nombre: i.nombre,
     unidad_medida: i.unidad_medida,
+  }))
+
+  // Vista "ingredientes" = todos los insumos, para el toggle rápido de
+  // disponibilidad y el selector de opción↔insumo en Catálogo → Productos.
+  const ingredientes: IngredienteCatalogo[] = (rawInsumos ?? []).map((i: any) => ({
+    id: i.id,
+    nombre: i.nombre,
+    disponible: i.disponible,
+    creado_en: i.created_at,
   }))
 
   return (
