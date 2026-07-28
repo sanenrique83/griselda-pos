@@ -69,7 +69,30 @@ export type ItemCancelacion = {
   canceladoPor: string
 }
 
+export type CorteZTurnoImpreso = {
+  id: number
+  apertura: string
+  cierre: string | null
+  cajero: string
+  ventas: number
+}
+
 export type PrintPayload =
+  | {
+      tipo: 'corte_z'
+      fecha: string
+      config: TicketConfig
+      ventasTotales: number
+      porMetodo: { efectivo: number; tarjeta: number; transferencia: number; mixto: number }
+      descuentosTotal: number
+      cancelacionesTotal: number
+      propinaEfectivo: number
+      propinaTarjeta: number
+      ticketPromedio: number
+      mesasAtendidas: number
+      pedidosCerrados: number
+      turnos: CorteZTurnoImpreso[]
+    }
   | {
       tipo: 'cocina'
       mesa: string

@@ -388,6 +388,72 @@ def _build_cliente(payload: dict) -> bytes:
     return _build_cliente({**payload, 'escenario': 'global'})
 
 
+# ── Ticket corte Z ─────────────────────────────────────────────────────────────
+# Reporte de un día completo (puede agrupar varios turnos). Es un ticket largo
+# de una sola pieza: a diferencia de _build_cocina (corte por sección) o
+# _build_cliente escenario 'individual' (corte por comensal), aquí NO se emite
+# CMD_CUT entre secciones — solo una vez al final, vía _pie_cliente(con_corte=True),
+# para no cortar el papel a media impresión.
+
+def _build_corte_z(payload: dict) -> bytes:
+    config        = payload.get('config', {})
+    fecha         = payload.get('fecha', '')
+    ventas        = float(payload.get('ventasTotales', 0.0))
+    metodo        = payload.get('porMetodo', {})
+    descuentos    = float(payload.get('descuentosTotal', 0.0))
+    cancelaciones = float(payload.get('cancelacionesTotal', 0.0))
+    propina_ef    = float(payload.get('propinaEfectivo', 0.0))
+    propina_ta    = float(payload.get('propinaTarjeta', 0.0))
+    ticket_prom   = float(payload.get('ticketPromedio', 0.0))
+    mesas         = int(payload.get('mesasAtendidas', 0))
+    pedidos       = int(payload.get('pedidosCerrados', 0))
+    turnos        = payload.get('turnos', [])
+
+    b = CMD_RESET + CMD_ALIGN_CENTER
+    b += _encode('=' * COL) + CMD_LF
+    b += CMD_BOLD_ON + CMD_FONT_DOUBLE
+    b += _encode(config.get('nombre', 'La Menuderia')) + CMD_LF
+    b += CMD_FONT_NORMAL + CMD_BOLD_OFF
+    b += _encode('CORTE Z') + CMD_LF
+    b += _encode(f'{fecha}  -  impreso {_fmt_fecha()}') + CMD_LF
+    b += _encode('=' * COL) + CMD_LF
+    b += CMD_ALIGN_LEFT
+
+    b += _fila('VENTAS TOTALES', f'${ventas:.2f}', bold=True, doble=True)
+    b += _encode('-' * COL) + CMD_LF
+    b += _fila('Efectivo', f'${float(metodo.get("efectivo", 0.0)):.2f}')
+    b += _fila('Tarjeta', f'${float(metodo.get("tarjeta", 0.0)):.2f}')
+    b += _fila('Transferencia', f'${float(metodo.get("transferencia", 0.0)):.2f}')
+    b += _fila('Mixto', f'${float(metodo.get("mixto", 0.0)):.2f}')
+    b += _encode('-' * COL) + CMD_LF
+    b += _fila('Descuentos', f'-${descuentos:.2f}')
+    b += _fila('Cancelaciones', f'-${cancelaciones:.2f}')
+    b += _encode('-' * COL) + CMD_LF
+    b += _fila('Propina efectivo', f'${propina_ef:.2f}')
+    b += _fila('Propina tarjeta', f'${propina_ta:.2f}')
+    b += _encode('-' * COL) + CMD_LF
+    b += _fila('Ticket promedio', f'${ticket_prom:.2f}')
+    b += _fila('Mesas atendidas', str(mesas))
+    b += _fila('Pedidos cerrados', str(pedidos))
+    b += CMD_LF
+
+    b += CMD_ALIGN_CENTER + CMD_BOLD_ON
+    b += _encode('TURNOS DEL DIA') + CMD_LF
+    b += CMD_BOLD_OFF + CMD_ALIGN_LEFT
+    b += _encode('-' * COL) + CMD_LF
+
+    for t in turnos:
+        b += CMD_BOLD_ON + _encode(f'Turno #{t.get("id", "")}') + CMD_BOLD_OFF + CMD_LF
+        b += _encode(f'  Apertura: {t.get("apertura", "")}') + CMD_LF
+        b += _encode(f'  Cierre:   {t.get("cierre") or "En curso"}') + CMD_LF
+        b += _encode(f'  Cajero:   {t.get("cajero", "")}') + CMD_LF
+        b += _fila('  Ventas', f'${float(t.get("ventas", 0.0)):.2f}')
+        b += _encode('-' * COL) + CMD_LF
+
+    b += _pie_cliente(config, con_corte=True)
+    return b
+
+
 # ── Endpoint ───────────────────────────────────────────────────────────────────
 
 @app.route('/print', methods=['POST'])
@@ -397,12 +463,14 @@ def print_ticket():
         return make_response(jsonify({'error': 'JSON invalido'}), 400)
 
     tipo = data.get('tipo')
-    if tipo not in ('cocina', 'cliente'):
+    if tipo not in ('cocina', 'cliente', 'corte_z'):
         return make_response(jsonify({'error': f'tipo desconocido: {tipo}'}), 400)
 
     try:
         if tipo == 'cocina':
             raw = _build_cocina(data)
+        elif tipo == 'corte_z':
+            raw = _build_corte_z(data)
         else:
             raw = _build_cliente(data)
 
