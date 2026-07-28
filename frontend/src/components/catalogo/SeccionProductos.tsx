@@ -25,6 +25,7 @@ type OpcionLocal = {
   nombre: string
   precio_extra: number
   activa: boolean
+  insumo_id: number | null
 }
 
 type GrupoLocal = {
@@ -400,6 +401,7 @@ export function SeccionProductos({
                     nombre: foNombre.trim(),
                     precio_extra: parseFloat(foPrecio) || 0,
                     activa: true,
+                    insumo_id: foInsumoId,
                   },
                 ],
               }

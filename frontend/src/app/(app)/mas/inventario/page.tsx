@@ -45,9 +45,10 @@ export type HistorialPrecioItem = {
 }
 
 // 'sin_receta': producto normal sin fila en recetas, o combo sin componentes.
-// 'incompleta': tiene receta, pero algún grupo de modificadores requerido no
-//   tiene ninguna opción con receta_insumos propia (opcion_id apuntando a
-//   una de sus opciones) — la variante no está definida para esa opción.
+// 'incompleta': tiene receta, pero algún grupo de modificadores requerido
+//   tiene opciones cuyo insumo_id (Paso A) no aparece en ningún insumo_id de
+//   receta_insumos de esa receta — la variante no está definida para esa
+//   opción. Detección automática, sin columna propia (Paso C).
 // 'completa': todo lo demás.
 export type EstadoReceta = 'sin_receta' | 'incompleta' | 'completa'
 
@@ -112,10 +113,10 @@ export default async function InventarioPage() {
       .eq('activo', true)
       .order('nombre'),
     supabase.from('recetas').select('id, producto_id'),
-    supabase.from('receta_insumos').select('receta_id, opcion_id').not('opcion_id', 'is', null),
+    supabase.from('receta_insumos').select('receta_id, insumo_id'),
     supabase.from('combo_productos').select('combo_id'),
     supabase.from('grupos_modificadores').select('id, producto_id, requerido').eq('activo', true),
-    supabase.from('opciones_modificador').select('id, grupo_id').eq('activa', true),
+    supabase.from('opciones_modificador').select('id, grupo_id, insumo_id').eq('activa', true),
   ])
 
   const insumos: InsumoInventario[] = (rawInsumos ?? []).map((i: any) => ({
@@ -143,12 +144,12 @@ export default async function InventarioPage() {
   const recetaPorProducto = new Map<number, number>(
     (rawRecetas ?? []).map((r: any) => [r.producto_id, r.id]),
   )
-  const opcionesConRecetaPorReceta = new Map<number, Set<number>>()
-  for (const ri of (rawRecetaInsumos ?? []) as { receta_id: number; opcion_id: number }[]) {
-    if (!opcionesConRecetaPorReceta.has(ri.receta_id)) {
-      opcionesConRecetaPorReceta.set(ri.receta_id, new Set())
+  const insumosPorReceta = new Map<number, Set<number>>()
+  for (const ri of (rawRecetaInsumos ?? []) as { receta_id: number; insumo_id: number }[]) {
+    if (!insumosPorReceta.has(ri.receta_id)) {
+      insumosPorReceta.set(ri.receta_id, new Set())
     }
-    opcionesConRecetaPorReceta.get(ri.receta_id)!.add(ri.opcion_id)
+    insumosPorReceta.get(ri.receta_id)!.add(ri.insumo_id)
   }
   const combosConComponentes = new Set(
     (rawComboProductos ?? []).map((cp: any) => cp.combo_id as number),
@@ -161,10 +162,13 @@ export default async function InventarioPage() {
     }
     gruposRequeridosPorProducto.get(g.producto_id)!.push(g.id)
   }
-  const opcionesPorGrupo = new Map<number, number[]>()
-  for (const o of (rawOpciones ?? []) as { id: number; grupo_id: number }[]) {
-    if (!opcionesPorGrupo.has(o.grupo_id)) opcionesPorGrupo.set(o.grupo_id, [])
-    opcionesPorGrupo.get(o.grupo_id)!.push(o.id)
+  // Insumos que corresponden a cada grupo de modificadores, vía el insumo_id
+  // de sus opciones (Paso A) — sin columna propia en receta_insumos.
+  const insumosPorGrupo = new Map<number, number[]>()
+  for (const o of (rawOpciones ?? []) as { id: number; grupo_id: number; insumo_id: number | null }[]) {
+    if (o.insumo_id == null) continue
+    if (!insumosPorGrupo.has(o.grupo_id)) insumosPorGrupo.set(o.grupo_id, [])
+    insumosPorGrupo.get(o.grupo_id)!.push(o.insumo_id)
   }
 
   function estadoDeProducto(p: { id: number; es_combo: boolean }): EstadoReceta {
@@ -173,11 +177,11 @@ export default async function InventarioPage() {
     }
     const recetaId = recetaPorProducto.get(p.id)
     if (recetaId === undefined) return 'sin_receta'
-    const opcionesConReceta = opcionesConRecetaPorReceta.get(recetaId) ?? new Set<number>()
+    const insumosDeReceta = insumosPorReceta.get(recetaId) ?? new Set<number>()
     const gruposReq = gruposRequeridosPorProducto.get(p.id) ?? []
     const incompleta = gruposReq.some((grupoId) => {
-      const opciones = opcionesPorGrupo.get(grupoId) ?? []
-      return !opciones.some((oid) => opcionesConReceta.has(oid))
+      const insumosDelGrupo = insumosPorGrupo.get(grupoId) ?? []
+      return !insumosDelGrupo.some((iid) => insumosDeReceta.has(iid))
     })
     return incompleta ? 'incompleta' : 'completa'
   }

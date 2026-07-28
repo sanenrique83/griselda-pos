@@ -12,6 +12,7 @@ export type OpcionMod = {
   nombre: string
   precio_extra: number
   activa: boolean
+  insumo_id: number | null
 }
 
 export type GrupoMod = {
@@ -49,7 +50,7 @@ export async function cargarModificadores(
   const { data, error } = await supabase
     .from('grupos_modificadores')
     .select(
-      'id, nombre, requerido, minimo, maximo, orden, padre_opcion_id, mostrar_en_rapido, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumos!insumo_id(disponible))',
+      'id, nombre, requerido, minimo, maximo, orden, padre_opcion_id, mostrar_en_rapido, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, insumos!insumo_id(disponible))',
     )
     .eq('producto_id', productoId)
     .eq('activo', true)
@@ -84,6 +85,7 @@ export async function cargarModificadores(
         nombre: o.nombre,
         precio_extra: o.precio_extra,
         activa: o.activa,
+        insumo_id: o.insumo_id ?? null,
       })),
   }))
 

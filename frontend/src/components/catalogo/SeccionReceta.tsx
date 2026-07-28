@@ -18,14 +18,12 @@ type LineaInsumo = {
   key: string
   insumoId: number | ''
   cantidad: string
-  // NULL = se consume siempre. Con valor: solo si esa opción fue elegida en
-  // la línea del pedido (ver receta_insumos.opcion_id).
-  opcionId: number | null
 }
 
 type OpcionGrupo = {
   id: number
   nombre: string
+  insumo_id: number | null
 }
 
 type GrupoModificadorReceta = {
@@ -42,7 +40,7 @@ type LineaComponente = {
 }
 
 function nuevaLineaInsumo(): LineaInsumo {
-  return { key: Math.random().toString(36).slice(2), insumoId: '', cantidad: '', opcionId: null }
+  return { key: Math.random().toString(36).slice(2), insumoId: '', cantidad: '' }
 }
 
 function nuevaLineaComponente(): LineaComponente {
@@ -131,7 +129,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
             const primera = recetaRes.receta.insumos[0]
             setLineasInsumo([
               primera
-                ? { key: Math.random().toString(36).slice(2), insumoId: primera.insumoId, cantidad: '1', opcionId: null }
+                ? { key: Math.random().toString(36).slice(2), insumoId: primera.insumoId, cantidad: '1' }
                 : nuevaLineaInsumo(),
             ])
           } else {
@@ -141,7 +139,6 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                     key: Math.random().toString(36).slice(2),
                     insumoId: i.insumoId,
                     cantidad: String(i.cantidad_usada),
-                    opcionId: i.opcionId,
                   }))
                 : [nuevaLineaInsumo()],
             )
@@ -164,7 +161,35 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [producto.id, producto.es_combo])
 
+  // ── Agrupación automática por opción de modificador ─────────────────────────
+  // Una línea de insumo "aplica a" una opción si su insumoId coincide con el
+  // insumo_id de esa opción (Paso A) — no hay nada que elegir a mano: si el
+  // insumo de la línea coincide con el de una opción del producto, la línea
+  // se agrupa bajo esa opción; si no coincide con ninguna, es "de siempre".
+
+  type EtiquetaOpcion = { grupoNombre: string; opcionNombre: string }
+  const opcionesPorInsumo = new Map<number, EtiquetaOpcion[]>()
+  for (const g of grupos) {
+    for (const o of g.opciones) {
+      if (o.insumo_id == null) continue
+      const lista = opcionesPorInsumo.get(o.insumo_id) ?? []
+      lista.push({ grupoNombre: g.nombre, opcionNombre: o.nombre })
+      opcionesPorInsumo.set(o.insumo_id, lista)
+    }
+  }
+
+  function etiquetaDeLinea(l: LineaInsumo): { esVariable: boolean; label: string } {
+    if (l.insumoId === '') return { esVariable: false, label: 'Siempre' }
+    const opciones = opcionesPorInsumo.get(l.insumoId)
+    if (!opciones || opciones.length === 0) return { esVariable: false, label: 'Siempre' }
+    return { esVariable: true, label: opciones.map((o) => o.opcionNombre).join(' / ') }
+  }
+
   // ── Cálculos de costo en vivo ──────────────────────────────────────────────
+  // Las líneas variables (una por cada opción, ej. Adobada/Bistec/Chicharrón)
+  // son alternativas mutuamente excluyentes, no costos que se sumen — el
+  // total en vivo solo suma los insumos "de siempre", igual que
+  // margen_productos() en el servidor.
 
   function costoLineaInsumo(l: LineaInsumo): number | null {
     if (l.insumoId === '') return 0
@@ -174,10 +199,12 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
     return isNaN(cantidad) ? 0 : costo * cantidad
   }
 
+  const hayLineaVariable = lineasInsumo.some((l) => etiquetaDeLinea(l).esVariable)
+
   const costoTotalReceta = (() => {
     let total = 0
     for (const l of lineasInsumo) {
-      if (l.insumoId === '') continue
+      if (l.insumoId === '' || etiquetaDeLinea(l).esVariable) continue
       const c = costoLineaInsumo(l)
       if (c === null) return null
       total += c
@@ -205,12 +232,15 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
   })()
 
   // Aviso no bloqueante: grupos requeridos sin ninguna opción con receta
-  // propia (ninguna línea de insumo apunta a una de sus opciones).
-  const opcionesConReceta = new Set(
-    lineasInsumo.filter((l) => l.insumoId !== '' && l.opcionId !== null).map((l) => l.opcionId),
+  // propia (ninguna línea de insumo tiene un insumoId que coincida con el
+  // insumo_id de alguna de sus opciones).
+  const insumosConLinea = new Set(
+    lineasInsumo.filter((l) => l.insumoId !== '').map((l) => l.insumoId as number),
   )
   const gruposSinRecetaPropia = grupos.filter(
-    (g) => g.requerido && !g.opciones.some((o) => opcionesConReceta.has(o.id)),
+    (g) =>
+      g.requerido &&
+      !g.opciones.some((o) => o.insumo_id != null && insumosConLinea.has(o.insumo_id)),
   )
 
   // ── Handlers ────────────────────────────────────────────────────────────────
@@ -221,7 +251,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
       // Colapsar a un solo insumo, cantidad fija en 1 — el artículo mismo.
       setLineasInsumo((prev) => {
         const primera = prev.find((l) => l.insumoId !== '') ?? prev[0] ?? nuevaLineaInsumo()
-        return [{ ...primera, cantidad: '1', opcionId: null }]
+        return [{ ...primera, cantidad: '1' }]
       })
     }
     setError(null)
@@ -242,7 +272,6 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
           insumoId: l.insumoId as number,
           cantidad_usada: modoPreparacion === 'reventa' ? 1 : parseFloat(l.cantidad) || 0,
           unidad_medida: insumo.unidad_medida,
-          opcionId: modoPreparacion === 'reventa' ? null : l.opcionId,
         }
       })
 
@@ -507,7 +536,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                       value={lineasInsumo[0]?.insumoId ?? ''}
                       onChange={(e) => {
                         const v = e.target.value ? Number(e.target.value) : ''
-                        setLineasInsumo([{ key: lineasInsumo[0]?.key ?? nuevaLineaInsumo().key, insumoId: v, cantidad: '1', opcionId: null }])
+                        setLineasInsumo([{ key: lineasInsumo[0]?.key ?? nuevaLineaInsumo().key, insumoId: v, cantidad: '1' }])
                       }}
                       className="min-w-0 flex-1 rounded-lg border-[1.5px] border-border bg-white px-2.5 py-2 text-[12px] outline-none focus:border-blue-500"
                     >
@@ -530,87 +559,95 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-3">
                     Insumos
                   </p>
-                  <div className="space-y-2">
-                    {lineasInsumo.map((l) => {
-                      const insumo = l.insumoId !== '' ? insumoMap.get(l.insumoId) : undefined
-                      const costoLinea = costoLineaInsumo(l)
-                      return (
-                        <div key={l.key} className="space-y-1.5 rounded-lg border border-[#F2F2F7] p-1.5">
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={l.insumoId}
-                              onChange={(e) => {
-                                const v = e.target.value ? Number(e.target.value) : ''
-                                setLineasInsumo((prev) =>
-                                  prev.map((x) => (x.key === l.key ? { ...x, insumoId: v } : x)),
-                                )
-                              }}
-                              className="min-w-0 flex-[2] rounded-lg border-[1.5px] border-border bg-white px-2.5 py-2 text-[12px] outline-none focus:border-blue-500"
+                  {(() => {
+                    // Agrupación automática: "Siempre" primero, luego un
+                    // grupo por cada etiqueta de opción distinta detectada
+                    // (sin que el usuario elija nada — ver etiquetaDeLinea).
+                    const bloques: { label: string; esVariable: boolean; lineas: LineaInsumo[] }[] = []
+                    const indicePorLabel = new Map<string, number>()
+                    for (const l of lineasInsumo) {
+                      const { label, esVariable } = etiquetaDeLinea(l)
+                      let idx = indicePorLabel.get(label)
+                      if (idx === undefined) {
+                        idx = bloques.length
+                        indicePorLabel.set(label, idx)
+                        bloques.push({ label, esVariable, lineas: [] })
+                      }
+                      bloques[idx].lineas.push(l)
+                    }
+                    bloques.sort((a, b) => Number(a.esVariable) - Number(b.esVariable))
+
+                    return (
+                      <div className="space-y-3">
+                        {bloques.map((grupo) => (
+                          <div key={grupo.label}>
+                            <p
+                              className={`mb-1 text-[10px] font-semibold uppercase tracking-wide ${
+                                grupo.esVariable ? 'text-amber-600' : 'text-text-4'
+                              }`}
                             >
-                              <option value="">Insumo…</option>
-                              {insumos.map((i) => (
-                                <option key={i.id} value={i.id}>{i.nombre}</option>
-                              ))}
-                            </select>
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              step="0.001"
-                              min="0"
-                              value={l.cantidad}
-                              onChange={(e) =>
-                                setLineasInsumo((prev) =>
-                                  prev.map((x) => (x.key === l.key ? { ...x, cantidad: e.target.value } : x)),
+                              {grupo.esVariable ? `Opción: ${grupo.label}` : grupo.label}
+                            </p>
+                            <div className="space-y-2">
+                              {grupo.lineas.map((l) => {
+                                const insumo = l.insumoId !== '' ? insumoMap.get(l.insumoId) : undefined
+                                const costoLinea = costoLineaInsumo(l)
+                                return (
+                                  <div key={l.key} className="flex items-center gap-2">
+                                    <select
+                                      value={l.insumoId}
+                                      onChange={(e) => {
+                                        const v = e.target.value ? Number(e.target.value) : ''
+                                        setLineasInsumo((prev) =>
+                                          prev.map((x) => (x.key === l.key ? { ...x, insumoId: v } : x)),
+                                        )
+                                      }}
+                                      className="min-w-0 flex-[2] rounded-lg border-[1.5px] border-border bg-white px-2.5 py-2 text-[12px] outline-none focus:border-blue-500"
+                                    >
+                                      <option value="">Insumo…</option>
+                                      {insumos.map((i) => (
+                                        <option key={i.id} value={i.id}>{i.nombre}</option>
+                                      ))}
+                                    </select>
+                                    <input
+                                      type="number"
+                                      inputMode="decimal"
+                                      step="0.001"
+                                      min="0"
+                                      value={l.cantidad}
+                                      onChange={(e) =>
+                                        setLineasInsumo((prev) =>
+                                          prev.map((x) => (x.key === l.key ? { ...x, cantidad: e.target.value } : x)),
+                                        )
+                                      }
+                                      placeholder="Cant."
+                                      className="w-16 flex-shrink-0 rounded-lg border-[1.5px] border-border bg-white px-2 py-2 text-[12px] outline-none focus:border-blue-500"
+                                    />
+                                    <span className="w-10 flex-shrink-0 text-[11px] text-text-4">
+                                      {insumo?.unidad_medida ?? ''}
+                                    </span>
+                                    <span className="w-16 flex-shrink-0 text-right font-mono text-[11px] text-text-3">
+                                      {l.insumoId === '' ? '' : costoLinea === null ? '—' : `$${fmtMoney(costoLinea)}`}
+                                    </span>
+                                    <button
+                                      onClick={() =>
+                                        setLineasInsumo((prev) =>
+                                          prev.length > 1 ? prev.filter((x) => x.key !== l.key) : prev,
+                                        )
+                                      }
+                                      className="flex-shrink-0 text-[13px] text-red-500 active:opacity-60"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
                                 )
-                              }
-                              placeholder="Cant."
-                              className="w-16 flex-shrink-0 rounded-lg border-[1.5px] border-border bg-white px-2 py-2 text-[12px] outline-none focus:border-blue-500"
-                            />
-                            <span className="w-10 flex-shrink-0 text-[11px] text-text-4">
-                              {insumo?.unidad_medida ?? ''}
-                            </span>
-                            <span className="w-16 flex-shrink-0 text-right font-mono text-[11px] text-text-3">
-                              {l.insumoId === '' ? '' : costoLinea === null ? '—' : `$${fmtMoney(costoLinea)}`}
-                            </span>
-                            <button
-                              onClick={() =>
-                                setLineasInsumo((prev) =>
-                                  prev.length > 1 ? prev.filter((x) => x.key !== l.key) : prev,
-                                )
-                              }
-                              className="flex-shrink-0 text-[13px] text-red-500 active:opacity-60"
-                            >
-                              ×
-                            </button>
-                          </div>
-                          {grupos.length > 0 && (
-                            <div className="flex items-center gap-2 pl-0.5">
-                              <span className="flex-shrink-0 text-[10px] text-text-4">Aplica a</span>
-                              <select
-                                value={l.opcionId ?? ''}
-                                onChange={(e) => {
-                                  const v = e.target.value ? Number(e.target.value) : null
-                                  setLineasInsumo((prev) =>
-                                    prev.map((x) => (x.key === l.key ? { ...x, opcionId: v } : x)),
-                                  )
-                                }}
-                                className="min-w-0 flex-1 rounded-lg border-[1.5px] border-border bg-white px-2 py-1.5 text-[11px] outline-none focus:border-blue-500"
-                              >
-                                <option value="">Siempre</option>
-                                {grupos.map((g) => (
-                                  <optgroup key={g.id} label={g.nombre}>
-                                    {g.opciones.map((o) => (
-                                      <option key={o.id} value={o.id}>{o.nombre}</option>
-                                    ))}
-                                  </optgroup>
-                                ))}
-                              </select>
+                              })}
                             </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
                   <button
                     onClick={() => setLineasInsumo((prev) => [...prev, nuevaLineaInsumo()])}
                     className="mt-2 w-full rounded-lg border-[1.5px] border-dashed border-[#D1D1D6] py-2 text-[12px] font-semibold text-text-3 active:bg-s2"
@@ -637,9 +674,16 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                     costoTotalReceta === null ? 'text-amber-600' : 'text-text-2'
                   }`}
                 >
-                  {costoTotalReceta === null ? 'Costo incompleto' : `$${fmtMoney(costoTotalReceta)}`}
+                  {costoTotalReceta === null
+                    ? 'Costo incompleto'
+                    : `${hayLineaVariable ? '~' : ''}$${fmtMoney(costoTotalReceta)}`}
                 </span>
               </div>
+              {hayLineaVariable && costoTotalReceta !== null && (
+                <p className="text-right text-[10px] text-amber-600">
+                  ~ Piso con insumos de siempre — el costo real varía según la opción elegida.
+                </p>
+              )}
 
               {saved && <p className="text-[12px] font-medium text-green-600">Receta guardada.</p>}
 
