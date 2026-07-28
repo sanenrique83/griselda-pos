@@ -429,6 +429,9 @@ export type RecetaData = {
     insumoNombre: string
     unidad_medida: UnidadMedidaReceta
     cantidad_usada: number
+    // NULL = el insumo se consume siempre. Con valor: solo si esa opción fue
+    // elegida en la línea del pedido (ver receta_insumos.opcion_id).
+    opcionId: number | null
   }[]
 }
 
@@ -449,7 +452,7 @@ export async function cargarReceta(
 
   const { data: insumosRows, error: errInsumos } = await supabase
     .from('receta_insumos')
-    .select('id, insumo_id, cantidad_usada, unidad_medida, insumos(nombre)')
+    .select('id, insumo_id, cantidad_usada, unidad_medida, opcion_id, insumos(nombre)')
     .eq('receta_id', receta.id)
   if (errInsumos) return { error: 'Error al cargar los insumos de la receta.' }
 
@@ -469,6 +472,7 @@ export async function cargarReceta(
         insumoNombre: r.insumos?.nombre ?? '',
         unidad_medida: r.unidad_medida,
         cantidad_usada: r.cantidad_usada,
+        opcionId: r.opcion_id ?? null,
       })),
     },
   }
@@ -485,7 +489,12 @@ export async function guardarReceta(
     // Solo se envían (y solo se persisten) cuando modo_preparacion='por_lote'.
     porciones_disponibles?: number
     rendimiento_esperado?: number | null
-    insumos: { insumoId: number; cantidad_usada: number; unidad_medida: UnidadMedidaReceta }[]
+    insumos: {
+      insumoId: number
+      cantidad_usada: number
+      unidad_medida: UnidadMedidaReceta
+      opcionId: number | null
+    }[]
   },
 ): Promise<Err | undefined> {
   const supabase = await createClient()
@@ -556,6 +565,7 @@ export async function guardarReceta(
         insumo_id: i.insumoId,
         cantidad_usada: i.cantidad_usada,
         unidad_medida: i.unidad_medida,
+        opcion_id: i.opcionId,
       })),
     )
     if (errInsert) return { error: 'Error al guardar los insumos de la receta.' }
@@ -563,6 +573,7 @@ export async function guardarReceta(
 
   revalidatePath('/mas/catalogo')
   revalidatePath('/mas/recetario')
+  revalidatePath('/mas/inventario')
   revalidatePath('/dashboard')
 }
 
@@ -639,6 +650,7 @@ export async function guardarComboComponentes(
 
   revalidatePath('/mas/catalogo')
   revalidatePath('/mas/recetario')
+  revalidatePath('/mas/inventario')
   revalidatePath('/dashboard')
 }
 
@@ -671,6 +683,10 @@ export type MargenProducto = {
   costoCompleto: boolean
   margen: number | null
   margenPct: number | null
+  // TRUE si algún insumo de la receta (o de algún componente, si es combo)
+  // depende de la opción de modificador elegida — el costo/margen devueltos
+  // son solo el "piso" con los insumos fijos, no un número exacto.
+  margenVariable: boolean
 }
 
 export async function obtenerMargenProductos(): Promise<
@@ -689,6 +705,7 @@ export async function obtenerMargenProductos(): Promise<
       costoCompleto: r.costo_completo,
       margen: r.margen,
       margenPct: r.margen_pct,
+      margenVariable: r.margen_variable ?? false,
     })),
   }
 }

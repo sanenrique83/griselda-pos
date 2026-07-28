@@ -5,24 +5,32 @@ import { useSearchParams } from 'next/navigation'
 import { SeccionInsumos } from './SeccionInsumos'
 import { SeccionProveedores } from './SeccionProveedores'
 import { SeccionCompras } from './SeccionCompras'
-import type { InsumoInventario, ProveedorInventario, HistorialPrecioItem } from '@/app/(app)/mas/inventario/page'
+import { SeccionRecetas } from './SeccionRecetas'
+import type {
+  InsumoInventario,
+  ProveedorInventario,
+  HistorialPrecioItem,
+  CategoriaConRecetas,
+} from '@/app/(app)/mas/inventario/page'
 
-type Tab = 'insumos' | 'proveedores' | 'compras'
+type Tab = 'insumos' | 'proveedores' | 'compras' | 'recetas'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'insumos', label: 'Insumos' },
   { id: 'proveedores', label: 'Proveedores' },
   { id: 'compras', label: 'Compras' },
+  { id: 'recetas', label: 'Recetas' },
 ]
 
 function esTabValida(v: string | null): v is Tab {
-  return v === 'insumos' || v === 'proveedores' || v === 'compras'
+  return v === 'insumos' || v === 'proveedores' || v === 'compras' || v === 'recetas'
 }
 
 interface InventarioShellProps {
   insumos: InsumoInventario[]
   proveedores: ProveedorInventario[]
   historial: HistorialPrecioItem[]
+  categoriasConRecetas: CategoriaConRecetas[]
 }
 
 export function InventarioShell(props: InventarioShellProps) {
@@ -33,7 +41,12 @@ export function InventarioShell(props: InventarioShellProps) {
   )
 }
 
-function InventarioShellInner({ insumos, proveedores, historial }: InventarioShellProps) {
+function InventarioShellInner({
+  insumos,
+  proveedores,
+  historial,
+  categoriasConRecetas,
+}: InventarioShellProps) {
   const searchParams = useSearchParams()
   const tabInicial = searchParams.get('tab')
   const [tab, setTab] = useState<Tab>(esTabValida(tabInicial) ? tabInicial : 'insumos')
@@ -65,6 +78,7 @@ function InventarioShellInner({ insumos, proveedores, historial }: InventarioShe
         {tab === 'insumos' && <SeccionInsumos insumos={insumos} />}
         {tab === 'proveedores' && <SeccionProveedores proveedores={proveedores} />}
         {tab === 'compras' && <SeccionCompras historial={historial} proveedores={proveedores} />}
+        {tab === 'recetas' && <SeccionRecetas categorias={categoriasConRecetas} />}
       </div>
     </div>
   )

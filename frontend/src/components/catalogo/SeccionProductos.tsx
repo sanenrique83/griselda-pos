@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   crearProducto,
@@ -44,6 +44,8 @@ interface SeccionProductosProps {
   categorias: CategoriaCatalogo[]
   ingredientes: IngredienteCatalogo[]
   insumos: InsumoCatalogo[]
+  // Deep-link desde Inventario → Recetas: abre directo el editor de este producto.
+  editarProductoId?: number | null
 }
 
 export function SeccionProductos({
@@ -51,6 +53,7 @@ export function SeccionProductos({
   categorias,
   ingredientes,
   insumos,
+  editarProductoId = null,
 }: SeccionProductosProps) {
   const router = useRouter()
   const [productos, setProductos] = useState(initial)
@@ -156,6 +159,15 @@ export function SeccionProductos({
 
     setSheet(mode)
   }
+
+  // Deep-link desde Inventario → Recetas: abre el editor de ese producto al
+  // montar (una sola vez por id, no en cada render).
+  useEffect(() => {
+    if (editarProductoId == null) return
+    const prod = productos.find((p) => p.id === editarProductoId)
+    if (prod) abrirSheet({ tipo: 'editar', prod })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editarProductoId])
 
   // ── Handlers producto ──────────────────────────────────────────────────────
 
@@ -982,6 +994,7 @@ export function SeccionProductos({
               producto={sheet.prod}
               productos={productos}
               insumos={insumos}
+              grupos={grupos}
             />
           )}
 

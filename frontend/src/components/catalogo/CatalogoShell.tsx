@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { SeccionMesas } from './SeccionMesas'
 import { SeccionCategorias } from './SeccionCategorias'
 import { SeccionProductos } from './SeccionProductos'
@@ -22,6 +23,10 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'ingredientes', label: 'Ingredientes' },
 ]
 
+function esTabValida(v: string | null): v is Tab {
+  return v === 'mesas' || v === 'categorias' || v === 'productos' || v === 'ingredientes'
+}
+
 interface CatalogoShellProps {
   areas: AreaCatalogo[]
   categorias: CategoriaCatalogo[]
@@ -30,14 +35,27 @@ interface CatalogoShellProps {
   insumos: InsumoCatalogo[]
 }
 
-export function CatalogoShell({
+export function CatalogoShell(props: CatalogoShellProps) {
+  return (
+    <Suspense fallback={null}>
+      <CatalogoShellInner {...props} />
+    </Suspense>
+  )
+}
+
+function CatalogoShellInner({
   areas,
   categorias,
   productos,
   ingredientes,
   insumos,
 }: CatalogoShellProps) {
-  const [tab, setTab] = useState<Tab>('mesas')
+  const searchParams = useSearchParams()
+  const tabInicial = searchParams.get('tab')
+  const [tab, setTab] = useState<Tab>(esTabValida(tabInicial) ? tabInicial : 'mesas')
+  // Deep-link desde Inventario → Recetas: abre directo el editor de este producto.
+  const editarParam = searchParams.get('editar')
+  const editarProductoId = editarParam ? Number(editarParam) : null
 
   return (
     <div className="min-h-full bg-s2">
@@ -76,6 +94,7 @@ export function CatalogoShell({
             categorias={categorias}
             ingredientes={ingredientes}
             insumos={insumos}
+            editarProductoId={editarProductoId}
           />
         )}
         {tab === 'ingredientes' && (

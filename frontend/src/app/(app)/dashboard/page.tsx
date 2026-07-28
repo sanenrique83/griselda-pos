@@ -138,6 +138,7 @@ export default async function DashboardPage() {
     costoCompleto: r.costo_completo,
     margen: r.margen,
     margenPct: r.margen_pct,
+    margenVariable: r.margen_variable ?? false,
   }))
 
   // ── Insumos bajo stock mínimo (independiente del turno) ───────────────────
@@ -1034,6 +1035,7 @@ type MargenProducto = {
   costoCompleto: boolean
   margen: number | null
   margenPct: number | null
+  margenVariable: boolean
 }
 
 function MargenProductosCard({ margenes }: { margenes: MargenProducto[] }) {
@@ -1045,6 +1047,8 @@ function MargenProductosCard({ margenes }: { margenes: MargenProducto[] }) {
     if (a.margenPct === null || b.margenPct === null) return 0
     return a.margenPct - b.margenPct
   })
+
+  const hayVariables = margenes.some((m) => m.margenVariable)
 
   return (
     <div className="rounded-2xl bg-white shadow-card overflow-hidden">
@@ -1074,10 +1078,15 @@ function MargenProductosCard({ margenes }: { margenes: MargenProducto[] }) {
                       Combo
                     </span>
                   )}
+                  {m.margenVariable && (
+                    <span className="ml-1.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-600">
+                      Varía
+                    </span>
+                  )}
                 </td>
                 <td className="whitespace-nowrap px-2 py-2 text-right font-mono text-text-3">
                   {m.costoCompleto && m.costo !== null ? (
-                    `$${fmtMoney(m.costo)}`
+                    `${m.margenVariable ? '~' : ''}$${fmtMoney(m.costo)}`
                   ) : (
                     <span className="text-amber-600">incompleto</span>
                   )}
@@ -1090,20 +1099,26 @@ function MargenProductosCard({ margenes }: { margenes: MargenProducto[] }) {
                     m.margen === null ? 'text-text-4' : m.margen >= 0 ? 'text-green-600' : 'text-red-600'
                   }`}
                 >
-                  {m.margen === null ? '—' : `$${fmtMoney(m.margen)}`}
+                  {m.margen === null ? '—' : `${m.margenVariable ? '~' : ''}$${fmtMoney(m.margen)}`}
                 </td>
                 <td
                   className={`whitespace-nowrap px-4 py-2 text-right font-mono font-semibold ${
                     m.margenPct === null ? 'text-text-4' : m.margenPct >= 0 ? 'text-green-600' : 'text-red-600'
                   }`}
                 >
-                  {m.margenPct === null ? '—' : `${m.margenPct.toFixed(1)}%`}
+                  {m.margenPct === null ? '—' : `${m.margenVariable ? '~' : ''}${m.margenPct.toFixed(1)}%`}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {hayVariables && (
+        <p className="border-t border-[#F2F2F7] px-4 py-2.5 text-[11px] text-amber-600">
+          ~ Varía según opción: el costo/margen mostrado es solo el piso con los insumos fijos —
+          el real depende de la opción elegida (ej. tipo de carne, tamaño).
+        </p>
+      )}
     </div>
   )
 }
