@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import type { UnidadMedida, HistorialPrecioItem } from './page'
+import type { UnidadMedida, HistorialPrecioItem, ModoObtencionInsumo } from './page'
 import { mapHistorialRow } from './mappers'
 
 type Err = { error: string }
@@ -15,6 +15,7 @@ export async function crearInsumo(data: {
   nombre: string
   unidadMedida: UnidadMedida
   stockMinimo: number
+  modoObtencion?: ModoObtencionInsumo
 }): Promise<{ id: number } | Err> {
   const supabase = await createClient()
   const { data: insumo, error } = await supabase
@@ -23,6 +24,7 @@ export async function crearInsumo(data: {
       nombre: data.nombre,
       unidad_medida: data.unidadMedida,
       stock_minimo: data.stockMinimo,
+      modo_obtencion: data.modoObtencion ?? 'comprado',
     })
     .select('id')
     .single()
@@ -33,7 +35,7 @@ export async function crearInsumo(data: {
 
 export async function actualizarInsumo(
   id: number,
-  patch: { nombre: string; unidadMedida: UnidadMedida; stockMinimo: number },
+  patch: { nombre: string; unidadMedida: UnidadMedida; stockMinimo: number; modoObtencion: ModoObtencionInsumo },
 ): Promise<Err | undefined> {
   const supabase = await createClient()
   const { error } = await supabase
@@ -42,6 +44,7 @@ export async function actualizarInsumo(
       nombre: patch.nombre,
       unidad_medida: patch.unidadMedida,
       stock_minimo: patch.stockMinimo,
+      modo_obtencion: patch.modoObtencion,
     })
     .eq('id', id)
   if (error) return { error: 'Error al actualizar el insumo.' }
@@ -140,4 +143,115 @@ export async function obtenerHistorialCompras(
   })
   if (error) return { error: 'Error al cargar el historial de compras.' }
   return (data ?? []).map(mapHistorialRow)
+}
+
+// ─── Insumo derivado: receta de componentes (Nivel 1) ──────────────────────
+// insumo_receta: qué insumos componentes (crudos u otros derivados) lleva un
+// insumo derivado y en qué cantidad — mismo patrón que receta_insumos, un
+// nivel abajo (insumo → insumo en vez de producto → insumo).
+
+export type InsumoRecetaLinea = {
+  id: number
+  insumoComponenteId: number
+  insumoComponenteNombre: string
+  cantidad_usada: number
+  unidad_medida: UnidadMedida
+}
+
+export async function cargarInsumoReceta(
+  insumoId: number,
+): Promise<{ lineas: InsumoRecetaLinea[] } | Err> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('insumo_receta')
+    .select(
+      'id, insumo_componente_id, cantidad_usada, unidad_medida, insumos!insumo_receta_insumo_componente_id_fkey(nombre)',
+    )
+    .eq('insumo_id', insumoId)
+  if (error) return { error: 'Error al cargar la receta del insumo.' }
+  return {
+    lineas: (data ?? []).map((r: any) => ({
+      id: r.id,
+      insumoComponenteId: r.insumo_componente_id,
+      insumoComponenteNombre: r.insumos?.nombre ?? '',
+      cantidad_usada: r.cantidad_usada,
+      unidad_medida: r.unidad_medida,
+    })),
+  }
+}
+
+export async function guardarInsumoReceta(
+  insumoId: number,
+  items: { insumoComponenteId: number; cantidad_usada: number; unidad_medida: UnidadMedida }[],
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  if (items.some((i) => i.insumoComponenteId === insumoId)) {
+    return { error: 'Un insumo no puede incluirse a sí mismo como componente.' }
+  }
+
+  const { error: errDelete } = await supabase
+    .from('insumo_receta')
+    .delete()
+    .eq('insumo_id', insumoId)
+  if (errDelete) return { error: 'Error al actualizar la receta del insumo.' }
+
+  if (items.length > 0) {
+    const { error: errInsert } = await supabase.from('insumo_receta').insert(
+      items.map((i) => ({
+        insumo_id: insumoId,
+        insumo_componente_id: i.insumoComponenteId,
+        cantidad_usada: i.cantidad_usada,
+        unidad_medida: i.unidad_medida,
+      })),
+    )
+    if (errInsert) return { error: 'Error al guardar la receta del insumo.' }
+  }
+
+  revalidatePath('/mas/inventario')
+}
+
+// ─── Registrar producción de un insumo derivado ────────────────────────────
+
+export type ResultadoProduccion = {
+  produccionId: number
+  rendimientoReal: number | null
+  rendimientoEsperado: number | null
+  diferenciaPct: number | null
+}
+
+export async function registrarProduccionInsumo(data: {
+  insumoId: number
+  cantidadLote: number
+  cantidadObtenida: number
+  notas: string | null
+}): Promise<{ resultado: ResultadoProduccion } | Err> {
+  const supabase = await createClient()
+  const { data: rows, error } = await supabase.rpc('registrar_produccion', {
+    p_insumo_id: data.insumoId,
+    p_cantidad_lote: data.cantidadLote,
+    p_cantidad_obtenida: data.cantidadObtenida,
+    p_notas: data.notas,
+  })
+  if (error) return { error: error.message || 'Error al registrar la producción.' }
+  const r = (rows ?? [])[0] as
+    | {
+        produccion_id: number
+        rendimiento_real: number | null
+        rendimiento_esperado: number | null
+        diferencia_pct: number | null
+      }
+    | undefined
+  if (!r) return { error: 'No se pudo registrar la producción.' }
+
+  revalidatePath('/mas/inventario')
+  revalidatePath('/dashboard')
+  return {
+    resultado: {
+      produccionId: r.produccion_id,
+      rendimientoReal: r.rendimiento_real,
+      rendimientoEsperado: r.rendimiento_esperado,
+      diferenciaPct: r.diferencia_pct,
+    },
+  }
 }

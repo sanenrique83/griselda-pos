@@ -6,6 +6,7 @@ import { SeccionInsumos } from './SeccionInsumos'
 import { SeccionProveedores } from './SeccionProveedores'
 import { SeccionCompras } from './SeccionCompras'
 import { SeccionRecetas } from './SeccionRecetas'
+import { SeccionInsumosDerivados } from './SeccionInsumosDerivados'
 import type {
   InsumoInventario,
   ProveedorInventario,
@@ -78,7 +79,12 @@ function InventarioShellInner({
         {tab === 'insumos' && <SeccionInsumos insumos={insumos} />}
         {tab === 'proveedores' && <SeccionProveedores proveedores={proveedores} />}
         {tab === 'compras' && <SeccionCompras historial={historial} proveedores={proveedores} />}
-        {tab === 'recetas' && <SeccionRecetas categorias={categoriasConRecetas} />}
+        {tab === 'recetas' && (
+          <div className="space-y-4">
+            <SeccionRecetas categorias={categoriasConRecetas} />
+            <SeccionInsumosDerivados insumos={insumos} />
+          </div>
+        )}
       </div>
     </div>
   )

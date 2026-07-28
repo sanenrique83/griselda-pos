@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { crearInsumo, actualizarInsumo, eliminarInsumo } from '@/app/(app)/mas/inventario/actions'
-import type { InsumoInventario, UnidadMedida } from '@/app/(app)/mas/inventario/page'
+import type { InsumoInventario, UnidadMedida, ModoObtencionInsumo } from '@/app/(app)/mas/inventario/page'
 
 const UNIDADES: UnidadMedida[] = ['kg', 'g', 'l', 'ml', 'pieza', 'paquete']
 
@@ -25,6 +25,7 @@ export function SeccionInsumos({ insumos: initial }: SeccionInsumosProps) {
   const [formNombre, setFormNombre] = useState('')
   const [formUnidad, setFormUnidad] = useState<UnidadMedida>('kg')
   const [formStockMinimo, setFormStockMinimo] = useState('')
+  const [formModoObtencion, setFormModoObtencion] = useState<ModoObtencionInsumo>('comprado')
 
   function abrirSheet(mode: SheetMode) {
     setFormError(null)
@@ -32,10 +33,12 @@ export function SeccionInsumos({ insumos: initial }: SeccionInsumosProps) {
       setFormNombre(mode.ins.nombre)
       setFormUnidad(mode.ins.unidad_medida)
       setFormStockMinimo(mode.ins.stock_minimo.toString())
+      setFormModoObtencion(mode.ins.modo_obtencion)
     } else {
       setFormNombre('')
       setFormUnidad('kg')
       setFormStockMinimo('')
+      setFormModoObtencion('comprado')
     }
     setSheet(mode)
   }
@@ -52,6 +55,7 @@ export function SeccionInsumos({ insumos: initial }: SeccionInsumosProps) {
           nombre: formNombre.trim(),
           unidadMedida: formUnidad,
           stockMinimo,
+          modoObtencion: formModoObtencion,
         })
         if ('error' in result) { setFormError(result.error); return }
         setInsumos((prev) => [
@@ -63,6 +67,7 @@ export function SeccionInsumos({ insumos: initial }: SeccionInsumosProps) {
             stock_actual: 0,
             stock_minimo: stockMinimo,
             activo: true,
+            modo_obtencion: formModoObtencion,
           },
         ].sort((a, b) => a.nombre.localeCompare(b.nombre)))
         setSheet({ tipo: 'none' })
@@ -74,11 +79,12 @@ export function SeccionInsumos({ insumos: initial }: SeccionInsumosProps) {
           nombre: formNombre.trim(),
           unidadMedida: formUnidad,
           stockMinimo,
+          modoObtencion: formModoObtencion,
         })
         if (result?.error) { setFormError(result.error); return }
         setInsumos((prev) =>
           prev.map((i) => i.id === insId
-            ? { ...i, nombre: formNombre.trim(), unidad_medida: formUnidad, stock_minimo: stockMinimo }
+            ? { ...i, nombre: formNombre.trim(), unidad_medida: formUnidad, stock_minimo: stockMinimo, modo_obtencion: formModoObtencion }
             : i)
         )
         setSheet({ tipo: 'none' })
@@ -208,6 +214,31 @@ export function SeccionInsumos({ insumos: initial }: SeccionInsumosProps) {
                 <option key={u} value={u}>{u}</option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-3">
+              Modo de obtención
+            </label>
+            <div className="flex gap-2">
+              {(['comprado', 'derivado'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setFormModoObtencion(m)}
+                  className={`flex-1 rounded-lg py-2 text-[12px] font-semibold transition-all ${
+                    formModoObtencion === m ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+                  }`}
+                >
+                  {m === 'comprado' ? 'Comprado' : 'Derivado'}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] text-text-4">
+              {formModoObtencion === 'comprado'
+                ? 'Se adquiere ya listo para usar (vía compras).'
+                : 'Tiene su propia receta de componentes y se repone por producción en lote — edítala desde Inventario → Recetas.'}
+            </p>
           </div>
 
           <div>

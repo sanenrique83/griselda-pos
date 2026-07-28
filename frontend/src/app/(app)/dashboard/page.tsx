@@ -664,18 +664,19 @@ export default async function DashboardPage() {
     supabase.from('recetas').select('id, nombre, rendimiento_esperado').eq('modo_preparacion', 'por_lote'),
     supabase
       .from('producciones')
-      .select('receta_id, fecha, cantidad_insumo_usado, porciones_obtenidas')
+      .select('receta_id, fecha, cantidad_lote, cantidad_obtenida')
+      .not('receta_id', 'is', null)
       .gte('fecha', noventaDiasAtras)
       .order('fecha', { ascending: true }),
   ])
 
   const produccionesPorReceta = new Map<number, RendimientoPunto[]>()
   for (const p of produccionesRaw ?? []) {
-    if (!p.cantidad_insumo_usado || p.cantidad_insumo_usado <= 0) continue
+    if (!p.cantidad_lote || p.cantidad_lote <= 0) continue
     const arr = produccionesPorReceta.get(p.receta_id) ?? []
     arr.push({
       fecha: fmtFechaCorta(p.fecha),
-      rendimientoReal: p.porciones_obtenidas / p.cantidad_insumo_usado,
+      rendimientoReal: p.cantidad_obtenida / p.cantidad_lote,
     })
     produccionesPorReceta.set(p.receta_id, arr)
   }

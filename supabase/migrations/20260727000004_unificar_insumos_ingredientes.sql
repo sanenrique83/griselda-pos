@@ -68,13 +68,33 @@ CREATE INDEX idx_opciones_modificador_insumo ON opciones_modificador(insumo_id);
 --             huevo suelto (todo lo no listado en los dos CASE de abajo)
 --
 -- Se usa una columna puente temporal (ingrediente_id_legado) para poder
--- relacionar cada insumo nuevo con su ingrediente de origen sin depender de
--- que los nombres sean únicos ni de que la tabla insumos esté vacía — se
--- elimina al final de este mismo bloque.
+-- relacionar cada insumo (nuevo o reutilizado) con su ingrediente de origen
+-- sin depender de que los nombres sean únicos — se elimina al final de este
+-- mismo bloque.
+--
+-- Deduplicación (LOWER(TRIM(nombre))): si ya existe un insumo con el mismo
+-- nombre (ej. alguien lo dio de alta a mano en Inventario antes de correr
+-- esto), NO se inserta una fila duplicada — se reutiliza esa fila:
+--   - unidad_medida / stock_actual / stock_minimo / activo / modo_obtencion
+--     del insumo existente NO se tocan: son datos reales (pueden tener
+--     compras/stock ya registrado) y siempre ganan sobre el valor por
+--     defecto que traería un ingrediente.
+--   - disponible SÍ se copia desde el ingrediente — insumos.disponible es
+--     una columna nueva agregada arriba en esta misma migración (default
+--     TRUE para toda la tabla, incluidas las filas ya existentes), así que
+--     no hay ningún valor "real" previo con el que pueda chocar.
 -- ========================
 
 ALTER TABLE insumos ADD COLUMN ingrediente_id_legado INTEGER;
 
+-- 1) Reutilizar insumos ya existentes con el mismo nombre.
+UPDATE insumos i
+SET ingrediente_id_legado = ing.id,
+    disponible = ing.disponible
+FROM ingredientes ing
+WHERE LOWER(TRIM(i.nombre)) = LOWER(TRIM(ing.nombre));
+
+-- 2) Insertar como insumo nuevo solo lo que no coincidió arriba.
 INSERT INTO insumos (nombre, unidad_medida, stock_actual, stock_minimo, activo, modo_obtencion, disponible, ingrediente_id_legado)
 SELECT
     ing.nombre,
@@ -96,7 +116,10 @@ SELECT
         ELSE 'pieza'
     END::unidad_medida,
     0, 0, TRUE, 'comprado', ing.disponible, ing.id
-FROM ingredientes ing;
+FROM ingredientes ing
+WHERE NOT EXISTS (
+    SELECT 1 FROM insumos i2 WHERE LOWER(TRIM(i2.nombre)) = LOWER(TRIM(ing.nombre))
+);
 
 UPDATE opciones_modificador om
 SET insumo_id = i.id

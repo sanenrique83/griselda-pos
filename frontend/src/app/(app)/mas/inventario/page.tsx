@@ -7,6 +7,8 @@ import { mapHistorialRow } from './mappers'
 
 export type UnidadMedida = 'kg' | 'g' | 'l' | 'ml' | 'pieza' | 'paquete'
 
+export type ModoObtencionInsumo = 'comprado' | 'derivado'
+
 export type InsumoInventario = {
   id: number
   nombre: string
@@ -14,6 +16,7 @@ export type InsumoInventario = {
   stock_actual: number
   stock_minimo: number
   activo: boolean
+  modo_obtencion: ModoObtencionInsumo
 }
 
 export type ProveedorInventario = {
@@ -91,7 +94,7 @@ export default async function InventarioPage() {
   ] = await Promise.all([
     supabase
       .from('insumos')
-      .select('id, nombre, unidad_medida, stock_actual, stock_minimo, activo')
+      .select('id, nombre, unidad_medida, stock_actual, stock_minimo, activo, modo_obtencion')
       .eq('activo', true)
       .order('nombre'),
     supabase
@@ -122,6 +125,7 @@ export default async function InventarioPage() {
     stock_actual: i.stock_actual,
     stock_minimo: i.stock_minimo,
     activo: i.activo,
+    modo_obtencion: i.modo_obtencion ?? 'comprado',
   }))
 
   const proveedores: ProveedorInventario[] = (rawProveedores ?? []).map((p: any) => ({
