@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  const mensaje = searchParams.get('mensaje')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -38,6 +41,12 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold text-text">Griselda POS</h1>
           <p className="mt-1 text-sm text-text-3">La Menudería — El Arenal, Jalisco</p>
         </div>
+
+        {mensaje && (
+          <p className="mb-4 rounded-card bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            {mensaje}
+          </p>
+        )}
 
         {/* Formulario */}
         <form onSubmit={handleLogin} className="space-y-4">
@@ -85,5 +94,13 @@ export default function LoginPage() {
         </form>
       </div>
     </main>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   )
 }

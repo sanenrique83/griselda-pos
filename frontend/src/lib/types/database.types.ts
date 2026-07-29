@@ -55,6 +55,7 @@ export interface ConfigSistema {
   transferencia_titular: string | null
   cancelar_pedido_mesero: boolean
   ver_dashboard_mesero: boolean
+  timeout_inactividad_minutos: number
 }
 
 export interface Area {
