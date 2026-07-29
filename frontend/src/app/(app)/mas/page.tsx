@@ -108,6 +108,7 @@ export default async function MasPage() {
             <MenuRow label="Impresoras" href="/mas/config" isLast={false} />
             <MenuRow label="Ticket" href="/mas/configuracion" isLast={false} />
             <MenuRow label="Catálogo" href="/mas/catalogo" isLast={false} />
+            <MenuRow label="Mapa de mesas" href="/mas/mapa-mesas" isLast={false} />
             <MenuRow label="Inventario" href="/mas/inventario" isLast={false} />
             <MenuRow label="Corte Z" href="/mas/corte-z" isLast={false} />
             <MenuRow label="Cancelaciones" href="/mas/cancelaciones" isLast={false} />

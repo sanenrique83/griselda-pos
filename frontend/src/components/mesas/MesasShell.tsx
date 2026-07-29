@@ -3,20 +3,26 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { TarjetaMesa } from './TarjetaMesa'
+import { PlanoMesas } from './PlanoMesas'
 import { SheetParaLlevar } from './SheetParaLlevar'
 import { abrirPedidoMostrador } from '@/app/(app)/mesas/actions'
 import type { GrupoArea, MesaUI } from '@/app/(app)/mesas/page'
 
-interface MapaMesasProps {
+interface MesasShellProps {
   grupos: GrupoArea[]
+  mesas: MesaUI[]
+  hayMapa: boolean
   turnoId: number | null
 }
 
-export default function MapaMesas({ grupos, turnoId }: MapaMesasProps) {
+export function MesasShell({ grupos, mesas, hayMapa, turnoId }: MesasShellProps) {
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPendingMostrador, startMostrador] = useTransition()
+  // Si hay al menos una mesa posicionada, el mapa es la vista por default;
+  // si no, no tiene caso mostrarlo (estaría vacío) y se arranca en lista.
+  const [vista, setVista] = useState<'mapa' | 'lista'>(hayMapa ? 'mapa' : 'lista')
 
   function handleVentaRapida() {
     if (!turnoId) {
@@ -145,27 +151,57 @@ export default function MapaMesas({ grupos, turnoId }: MapaMesasProps) {
           </div>
         )}
 
-        {/* Grupos por área */}
-        {grupos.map((grupo) => (
-          <div key={grupo.area_nombre}>
-            {/* Sección header */}
-            <p className="px-4 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-[.05em] text-text-3">
-              Mesas — {grupo.area_nombre}
-            </p>
-
-            {/* Grid 2 columnas */}
-            <div className="grid grid-cols-2 gap-2.5 px-3">
-              {grupo.mesas.map((mesa) => (
-                <TarjetaMesa
-                  key={mesa.id}
-                  mesa={mesa}
-                  onClick={() => handleMesaClick(mesa)}
-                  isPending={false}
-                />
-              ))}
+        {/* Toggle mapa / lista */}
+        {grupos.length > 0 && hayMapa && (
+          <div className="flex justify-center px-3 pt-4">
+            <div className="inline-flex rounded-xl bg-s2 p-1">
+              <button
+                onClick={() => setVista('mapa')}
+                className={`rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+                  vista === 'mapa' ? 'bg-white text-text-1 shadow-card' : 'text-text-3'
+                }`}
+              >
+                🗺️ Mapa
+              </button>
+              <button
+                onClick={() => setVista('lista')}
+                className={`rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+                  vista === 'lista' ? 'bg-white text-text-1 shadow-card' : 'text-text-3'
+                }`}
+              >
+                ☰ Lista
+              </button>
             </div>
           </div>
-        ))}
+        )}
+
+        {/* Vista de mapa */}
+        {grupos.length > 0 && vista === 'mapa' && hayMapa && (
+          <PlanoMesas mesas={mesas} onMesaClick={handleMesaClick} />
+        )}
+
+        {/* Vista de lista: grupos por área */}
+        {grupos.length > 0 && (vista === 'lista' || !hayMapa) &&
+          grupos.map((grupo) => (
+            <div key={grupo.area_nombre}>
+              {/* Sección header */}
+              <p className="px-4 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-[.05em] text-text-3">
+                Mesas — {grupo.area_nombre}
+              </p>
+
+              {/* Grid 2 columnas */}
+              <div className="grid grid-cols-2 gap-2.5 px-3">
+                {grupo.mesas.map((mesa) => (
+                  <TarjetaMesa
+                    key={mesa.id}
+                    mesa={mesa}
+                    onClick={() => handleMesaClick(mesa)}
+                    isPending={false}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
 
         <div className="h-4" />
       </div>

@@ -59,7 +59,13 @@ function inicioDiaMxUtc(fecha: string): string {
 export default async function CancelacionesPage({
   searchParams,
 }: {
-  searchParams: { desde?: string; hasta?: string; mesero?: string; motivo?: string; producto?: string }
+  searchParams: Promise<{
+    desde?: string
+    hasta?: string
+    mesero?: string
+    motivo?: string
+    producto?: string
+  }>
 }) {
   const supabase = await createClient()
 
@@ -76,13 +82,14 @@ export default async function CancelacionesPage({
 
   if (perfil?.rol !== 'admin') redirect('/mas')
 
+  const sp = await searchParams
   const hoy = fechaHoyMX()
   const filtros: CancelacionesFiltros = {
-    desde: searchParams.desde ?? sumarDiasFecha(hoy, -30),
-    hasta: searchParams.hasta ?? hoy,
-    meseroId: searchParams.mesero ?? null,
-    motivo: searchParams.motivo ?? null,
-    productoId: searchParams.producto ?? null,
+    desde: sp.desde ?? sumarDiasFecha(hoy, -30),
+    hasta: sp.hasta ?? hoy,
+    meseroId: sp.mesero ?? null,
+    motivo: sp.motivo ?? null,
+    productoId: sp.producto ?? null,
   }
 
   // ── Opciones de los filtros (meseros y productos, catálogos acotados) ────

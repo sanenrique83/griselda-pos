@@ -62,7 +62,7 @@ function rangoUtcParaFechaMX(fecha: string): { desde: string; hasta: string } {
 export default async function CorteZPage({
   searchParams,
 }: {
-  searchParams: { fecha?: string }
+  searchParams: Promise<{ fecha?: string }>
 }) {
   const supabase = await createClient()
 
@@ -79,7 +79,8 @@ export default async function CorteZPage({
 
   if (perfil?.rol !== 'admin') redirect('/mas')
 
-  const fecha = searchParams.fecha ?? fechaHoyMX()
+  const { fecha: fechaParam } = await searchParams
+  const fecha = fechaParam ?? fechaHoyMX()
   const { desde, hasta } = rangoUtcParaFechaMX(fecha)
 
   const [{ data: turnosDia }, { data: config }] = await Promise.all([

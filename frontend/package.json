@@ -10,6 +10,7 @@
     "types": "supabase gen types typescript --local > src/lib/types/database.types.ts"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
     "autoprefixer": "^10.4.24",

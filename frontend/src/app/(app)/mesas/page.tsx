@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import MapaMesas from '@/components/mesas/MapaMesas'
+import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
+import { MesasShell } from '@/components/mesas/MesasShell'
 
 // Tipos exportados para que los componentes cliente los importen
 export type MesaUI = {
@@ -9,6 +10,11 @@ export type MesaUI = {
   nombre: string | null
   capacidad: number | null
   area_nombre: string
+  pos_x: number | null
+  pos_y: number | null
+  rotacion: number
+  forma: FormaMesa
+  tamano: TamanoMesa
   pedido_activo: {
     id: number
     created_at: string
@@ -38,7 +44,7 @@ export default async function MesasPage() {
   // Mesas activas con su área
   const { data: mesasRaw } = await supabase
     .from('mesas')
-    .select('id, numero, nombre, capacidad, area_id, areas(nombre)')
+    .select('id, numero, nombre, capacidad, area_id, pos_x, pos_y, rotacion, forma, tamano, areas(nombre)')
     .eq('activa', true)
     .order('numero')
 
@@ -63,8 +69,9 @@ export default async function MesasPage() {
     ...new Map((mesasRaw ?? []).map((m) => [m.id, m])).values(),
   ]
 
-  // Agrupar mesas por área
+  // Agrupar mesas por área (vista de lista) y armar lista plana (vista de mapa)
   const gruposMap = new Map<string, MesaUI[]>()
+  const mesas: MesaUI[] = []
 
   for (const mesa of mesasUnicas) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,6 +84,11 @@ export default async function MesasPage() {
       nombre: mesa.nombre,
       capacidad: mesa.capacidad,
       area_nombre,
+      pos_x: mesa.pos_x,
+      pos_y: mesa.pos_y,
+      rotacion: mesa.rotacion ?? 0,
+      forma: (mesa.forma as FormaMesa) ?? 'rectangulo',
+      tamano: (mesa.tamano as TamanoMesa) ?? 'medio',
       pedido_activo: pedido
         ? {
             id: pedido.id,
@@ -89,11 +101,14 @@ export default async function MesasPage() {
 
     if (!gruposMap.has(area_nombre)) gruposMap.set(area_nombre, [])
     gruposMap.get(area_nombre)!.push(mesaUI)
+    mesas.push(mesaUI)
   }
 
   const grupos: GrupoArea[] = Array.from(gruposMap.entries()).map(
     ([area_nombre, mesas]) => ({ area_nombre, mesas }),
   )
 
-  return <MapaMesas grupos={grupos} turnoId={turno?.id ?? null} />
+  const hayMapa = mesas.some((m) => m.pos_x !== null && m.pos_y !== null)
+
+  return <MesasShell grupos={grupos} mesas={mesas} hayMapa={hayMapa} turnoId={turno?.id ?? null} />
 }
