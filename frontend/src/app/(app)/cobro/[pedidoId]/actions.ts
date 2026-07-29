@@ -3,6 +3,41 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+// ─── Liberar mesas satélite (pedido_mesas) de un pedido que se cierra ────────
+// Mesas unidas vía unirMesas() se quedan 'ocupada' hasta que el pedido al que
+// se unieron se cobra por completo o se anula. Se usa tanto en cobrarPedido
+// (pago completo) como en anularPedido — mismo criterio que la mesa principal:
+// temporal → se borra (nuleando también la fila de pedido_mesas y cualquier
+// pedido histórico que aún la referencie como mesa_id, p. ej. el pedido
+// original de "Compartir mesa" antes de unirse, para no violar el FK).
+//
+// Para mesas normales NO se borra la fila de pedido_mesas — queda como
+// registro histórico de qué pedido la ocupó, igual que pedidos.mesa_id nunca
+// se limpia al cerrar una mesa normal. reabrir_pedido() la necesita: si este
+// pedido se reabre después, así sabe qué mesas satélite debe volver a ocupar.
+async function liberarMesasSatelite(supabase: SupabaseClient, pedidoId: number): Promise<void> {
+  const { data: satelites } = await supabase
+    .from('pedido_mesas')
+    .select('mesa_id')
+    .eq('pedido_id', pedidoId)
+
+  const mesaIds = (satelites ?? []).map((s) => s.mesa_id)
+  if (mesaIds.length === 0) return
+
+  const { data: mesasInfo } = await supabase.from('mesas').select('id, temporal').in('id', mesaIds)
+
+  for (const mesa of mesasInfo ?? []) {
+    if (mesa.temporal) {
+      await supabase.from('pedido_mesas').delete().eq('mesa_id', mesa.id)
+      await supabase.from('pedidos').update({ mesa_id: null }).eq('mesa_id', mesa.id)
+      await supabase.from('mesas').delete().eq('id', mesa.id)
+    } else {
+      await supabase.from('mesas').update({ estado: 'libre' }).eq('id', mesa.id)
+    }
+  }
+}
 
 // ─── Anular pedido (sin movimiento de caja) ───────────────────────────────────
 export async function anularPedido(
@@ -33,6 +68,8 @@ export async function anularPedido(
       await supabase.from('mesas').update({ estado: 'libre' }).eq('id', mesaId)
     }
   }
+
+  await liberarMesasSatelite(supabase, pedidoId)
 
   redirect('/mesas')
 }
@@ -228,6 +265,9 @@ export async function cobrarPedido(data: {
       await supabase.from('mesas').update({ estado: 'libre' }).eq('id', data.mesaId)
     }
   }
+
+  // ── 8. Liberar las mesas satélite unidas a este pedido (pedido_mesas) ─────
+  await liberarMesasSatelite(supabase, data.pedidoId)
 
   revalidatePath('/mesas')
   revalidatePath('/pedidos')

@@ -260,6 +260,13 @@ export interface CobroSubpedido {
   monto_aplicado: number
 }
 
+export interface PedidoMesa {
+  id: number
+  pedido_id: number
+  mesa_id: number
+  created_at: string
+}
+
 export interface Ingrediente {
   id: number
   nombre: string

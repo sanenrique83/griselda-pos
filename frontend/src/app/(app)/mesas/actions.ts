@@ -22,7 +22,7 @@ export async function abrirPedidoMesa(mesaId: number): Promise<ActionResult> {
     return { error: 'No hay turno activo. Ve a Más → Turno para abrir uno.' }
   }
 
-  // Si ya hay pedido abierto en esa mesa, ir directo a él
+  // Si ya hay pedido abierto en esa mesa (como mesa principal), ir directo a él
   const { data: pedidoExistente } = await supabase
     .from('pedidos')
     .select('id')
@@ -32,6 +32,20 @@ export async function abrirPedidoMesa(mesaId: number): Promise<ActionResult> {
 
   if (pedidoExistente) {
     redirect(`/pos/${pedidoExistente.id}`)
+  }
+
+  // O si esta mesa está unida como satélite a otro pedido abierto (unir
+  // mesas persistente, ver pedido_mesas) — sin este chequeo se podría crear
+  // un pedido duplicado sobre una mesa que ya forma parte de otro pedido.
+  const { data: satelites } = await supabase
+    .from('pedido_mesas')
+    .select('pedido_id, pedidos!inner(estado)')
+    .eq('mesa_id', mesaId)
+    .eq('pedidos.estado', 'abierto')
+    .limit(1)
+
+  if (satelites && satelites.length > 0) {
+    redirect(`/pos/${satelites[0].pedido_id}`)
   }
 
   // Crear pedido

@@ -10,16 +10,24 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core'
-import { MesaShape } from '@/components/mesas/MesaShape'
+import { MesaShape, dimensionesMesa, colorParaGrupo } from '@/components/mesas/MesaShape'
 import { guardarDisposicion } from '@/app/(app)/mas/mapa-mesas/actions'
 import type { MesaEditable } from '@/app/(app)/mas/mapa-mesas/page'
+import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
 
 const CANVAS_W = 900
 const CANVAS_H = 1100
 const PASO_AUTO = 90 // separación al auto-acomodar mesas sin posición
 const COLUMNAS_AUTO = 6
+const CUADRICULA_PX = 40 // tamaño de la cuadrícula de fondo, solo visual
 
-type Posicion = { x: number; y: number; rotacion: number }
+type Posicion = {
+  x: number
+  y: number
+  rotacion: number
+  forma: FormaMesa
+  tamano: TamanoMesa
+}
 
 // Mesas sin pos_x/pos_y (nunca se han colocado en el mapa) se acomodan en
 // una cuadrícula temporal para que aparezcan en el lienzo desde el primer
@@ -30,7 +38,13 @@ function posicionesIniciales(mesas: MesaEditable[]): Record<number, Posicion> {
   let indiceSinPosicion = 0
   for (const mesa of mesas) {
     if (mesa.posX !== null && mesa.posY !== null) {
-      posiciones[mesa.id] = { x: mesa.posX, y: mesa.posY, rotacion: mesa.rotacion }
+      posiciones[mesa.id] = {
+        x: mesa.posX,
+        y: mesa.posY,
+        rotacion: mesa.rotacion,
+        forma: mesa.forma,
+        tamano: mesa.tamano,
+      }
     } else {
       const col = indiceSinPosicion % COLUMNAS_AUTO
       const fila = Math.floor(indiceSinPosicion / COLUMNAS_AUTO)
@@ -38,6 +52,8 @@ function posicionesIniciales(mesas: MesaEditable[]): Record<number, Posicion> {
         x: 30 + col * PASO_AUTO,
         y: 30 + fila * PASO_AUTO,
         rotacion: mesa.rotacion,
+        forma: mesa.forma,
+        tamano: mesa.tamano,
       }
       indiceSinPosicion++
     }
@@ -52,6 +68,7 @@ export function LienzoMesasEditor({ mesas }: { mesas: MesaEditable[] }) {
   const [dirty, setDirty] = useState<Set<number>>(
     () => new Set(mesas.filter((m) => m.posX === null || m.posY === null).map((m) => m.id)),
   )
+  const [seleccionId, setSeleccionId] = useState<number | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
 
@@ -60,28 +77,31 @@ export function LienzoMesasEditor({ mesas }: { mesas: MesaEditable[] }) {
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
   )
 
+  function actualizarMesa(id: number, patch: Partial<Posicion>) {
+    setPosiciones((prev) => {
+      const actual = prev[id]
+      if (!actual) return prev
+      return { ...prev, [id]: { ...actual, ...patch } }
+    })
+    setDirty((prev) => new Set(prev).add(id))
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const id = Number(event.active.id)
     const { delta } = event
     if (delta.x === 0 && delta.y === 0) return
 
-    setPosiciones((prev) => {
-      const actual = prev[id]
-      if (!actual) return prev
-      const x = Math.min(Math.max(0, Math.round(actual.x + delta.x)), CANVAS_W - 20)
-      const y = Math.min(Math.max(0, Math.round(actual.y + delta.y)), CANVAS_H - 20)
-      return { ...prev, [id]: { ...actual, x, y } }
-    })
-    setDirty((prev) => new Set(prev).add(id))
+    const actual = posiciones[id]
+    if (!actual) return
+    const x = Math.min(Math.max(0, Math.round(actual.x + delta.x)), CANVAS_W - 20)
+    const y = Math.min(Math.max(0, Math.round(actual.y + delta.y)), CANVAS_H - 20)
+    actualizarMesa(id, { x, y })
   }
 
   function handleRotar(id: number) {
-    setPosiciones((prev) => {
-      const actual = prev[id]
-      if (!actual) return prev
-      return { ...prev, [id]: { ...actual, rotacion: (actual.rotacion + 90) % 360 } }
-    })
-    setDirty((prev) => new Set(prev).add(id))
+    const actual = posiciones[id]
+    if (!actual) return
+    actualizarMesa(id, { rotacion: (actual.rotacion + 90) % 360 })
   }
 
   async function handleGuardar() {
@@ -93,6 +113,8 @@ export function LienzoMesasEditor({ mesas }: { mesas: MesaEditable[] }) {
       posX: posiciones[id].x,
       posY: posiciones[id].y,
       rotacion: posiciones[id].rotacion,
+      forma: posiciones[id].forma,
+      tamano: posiciones[id].tamano,
     }))
     const res = await guardarDisposicion(cambios)
     setGuardando(false)
@@ -104,12 +126,55 @@ export function LienzoMesasEditor({ mesas }: { mesas: MesaEditable[] }) {
     }
   }
 
+  // Mesas unidas (mismo pedidoActivoId, vía unirMesas persistente) — conector
+  // visual igual que en /mesas, calculado sobre la posición/forma EN VIVO
+  // (aunque todavía no se haya guardado) para que se sienta consistente
+  // mientras se edita.
+  const gruposMap = new Map<number, MesaEditable[]>()
+  for (const mesa of mesas) {
+    if (!mesa.pedidoActivoId) continue
+    const arr = gruposMap.get(mesa.pedidoActivoId) ?? []
+    arr.push(mesa)
+    gruposMap.set(mesa.pedidoActivoId, arr)
+  }
+  const grupos = [...gruposMap.entries()]
+    .filter(([, ms]) => ms.length >= 2)
+    .sort((a, b) => a[0] - b[0])
+
+  const colorPorMesa = new Map<number, string>()
+  const lineas: { x1: number; y1: number; x2: number; y2: number; color: string }[] = []
+
+  grupos.forEach(([, ms], idx) => {
+    const color = colorParaGrupo(idx)
+    const ordenadas = [...ms].sort((a, b) => a.id - b.id)
+    const centros = ordenadas
+      .map((m) => posiciones[m.id] && { id: m.id, pos: posiciones[m.id] })
+      .filter((v): v is { id: number; pos: Posicion } => !!v)
+      .map(({ id, pos }) => {
+        const { width, height } = dimensionesMesa(pos.forma, pos.tamano)
+        colorPorMesa.set(id, color)
+        return { x: pos.x + width / 2, y: pos.y + height / 2 }
+      })
+    for (let i = 0; i < centros.length - 1; i++) {
+      lineas.push({
+        x1: centros[i].x,
+        y1: centros[i].y,
+        x2: centros[i + 1].x,
+        y2: centros[i + 1].y,
+        color,
+      })
+    }
+  })
+
+  const mesaSeleccionada = seleccionId !== null ? mesas.find((m) => m.id === seleccionId) : undefined
+  const posicionSeleccionada = seleccionId !== null ? posiciones[seleccionId] : undefined
+
   return (
     <div className="min-h-full bg-s2">
       <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
         <h1 className="text-[20px] font-bold leading-tight">Mapa de mesas</h1>
         <p className="mt-0.5 text-[13px] text-text-3">
-          Arrastra cada mesa a su lugar · toca ⟳ para rotarla
+          Arrastra cada mesa a su lugar · tócala para editar forma, tamaño y rotación
         </p>
       </div>
 
@@ -137,18 +202,90 @@ export function LienzoMesasEditor({ mesas }: { mesas: MesaEditable[] }) {
               style={{ maxHeight: '65vh' }}
             >
               <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-                <div className="relative" style={{ width: CANVAS_W, height: CANVAS_H }}>
+                <div
+                  className="relative"
+                  style={{
+                    width: CANVAS_W,
+                    height: CANVAS_H,
+                    backgroundImage:
+                      'linear-gradient(to right, #E5E5EA 1px, transparent 1px), linear-gradient(to bottom, #E5E5EA 1px, transparent 1px)',
+                    backgroundSize: `${CUADRICULA_PX}px ${CUADRICULA_PX}px`,
+                  }}
+                >
+                  {lineas.length > 0 && (
+                    <svg className="pointer-events-none absolute inset-0" width={CANVAS_W} height={CANVAS_H}>
+                      {lineas.map((l, i) => (
+                        <line
+                          key={i}
+                          x1={l.x1}
+                          y1={l.y1}
+                          x2={l.x2}
+                          y2={l.y2}
+                          stroke={l.color}
+                          strokeWidth={3}
+                          strokeDasharray="6 4"
+                          strokeLinecap="round"
+                        />
+                      ))}
+                    </svg>
+                  )}
+
                   {mesas.map((mesa) => (
                     <MesaDraggable
                       key={mesa.id}
                       mesa={mesa}
                       posicion={posiciones[mesa.id]}
-                      onRotar={() => handleRotar(mesa.id)}
+                      seleccionada={seleccionId === mesa.id}
+                      anilloColor={colorPorMesa.get(mesa.id)}
+                      onSelect={() => setSeleccionId(mesa.id)}
                     />
                   ))}
                 </div>
               </DndContext>
             </div>
+
+            {mesaSeleccionada && posicionSeleccionada && (
+              <div className="rounded-2xl bg-white shadow-card px-4 py-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[14px] font-bold">
+                    {mesaSeleccionada.nombre ?? `Mesa ${mesaSeleccionada.numero}`}
+                  </p>
+                  <button
+                    onClick={() => setSeleccionId(null)}
+                    className="text-[12px] font-semibold text-text-3 active:opacity-60"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+
+                <div>
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                    Forma
+                  </p>
+                  <SelectorForma
+                    value={posicionSeleccionada.forma}
+                    onChange={(forma) => actualizarMesa(mesaSeleccionada.id, { forma })}
+                  />
+                </div>
+
+                <div>
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                    Tamaño
+                  </p>
+                  <SelectorTamano
+                    value={posicionSeleccionada.tamano}
+                    onChange={(tamano) => actualizarMesa(mesaSeleccionada.id, { tamano })}
+                  />
+                </div>
+
+                <button
+                  onClick={() => handleRotar(mesaSeleccionada.id)}
+                  className="w-full rounded-lg bg-s2 py-2.5 text-[13px] font-semibold text-text-2 active:opacity-70"
+                >
+                  ⟳ Rotar 90° ({posicionSeleccionada.rotacion}°)
+                </button>
+              </div>
+            )}
 
             <button
               onClick={handleGuardar}
@@ -171,11 +308,15 @@ export function LienzoMesasEditor({ mesas }: { mesas: MesaEditable[] }) {
 function MesaDraggable({
   mesa,
   posicion,
-  onRotar,
+  seleccionada,
+  anilloColor,
+  onSelect,
 }: {
   mesa: MesaEditable
   posicion: Posicion
-  onRotar: () => void
+  seleccionada: boolean
+  anilloColor?: string
+  onSelect: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(mesa.id),
@@ -189,21 +330,80 @@ function MesaDraggable({
   }
 
   return (
-    <div ref={setNodeRef} className="absolute" style={style}>
-      <div {...listeners} {...attributes} className="cursor-grab touch-none active:cursor-grabbing">
-        <MesaShape forma={mesa.forma} tamano={mesa.tamano} rotacion={posicion.rotacion}>
-          <span className="text-[12px] font-bold leading-none">{mesa.nombre ?? mesa.numero}</span>
-        </MesaShape>
-      </div>
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          onRotar()
-        }}
-        className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-[12px] text-white shadow-card active:opacity-70"
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={onSelect}
+      className="absolute cursor-grab touch-none active:cursor-grabbing"
+      style={style}
+    >
+      <MesaShape
+        forma={posicion.forma}
+        tamano={posicion.tamano}
+        rotacion={posicion.rotacion}
+        anilloColor={seleccionada ? '#2563eb' : anilloColor}
       >
-        ⟳
-      </button>
+        <span className="text-[12px] font-bold leading-none">{mesa.nombre ?? mesa.numero}</span>
+      </MesaShape>
+    </div>
+  )
+}
+
+function SelectorForma({
+  value,
+  onChange,
+}: {
+  value: FormaMesa
+  onChange: (forma: FormaMesa) => void
+}) {
+  const opciones: { value: FormaMesa; label: string }[] = [
+    { value: 'cuadrado', label: 'Cuadrada' },
+    { value: 'rectangulo', label: 'Rectangular' },
+    { value: 'circulo', label: 'Circular' },
+  ]
+  return (
+    <div className="flex gap-1.5">
+      {opciones.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={`flex-1 rounded-lg px-2 py-2 text-[12px] font-semibold transition-colors ${
+            value === o.value ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function SelectorTamano({
+  value,
+  onChange,
+}: {
+  value: TamanoMesa
+  onChange: (tamano: TamanoMesa) => void
+}) {
+  const opciones: { value: TamanoMesa; label: string }[] = [
+    { value: 'chico', label: 'Chico' },
+    { value: 'medio', label: 'Medio' },
+    { value: 'grande', label: 'Grande' },
+  ]
+  return (
+    <div className="flex gap-1.5">
+      {opciones.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={`flex-1 rounded-lg px-2 py-2 text-[12px] font-semibold transition-colors ${
+            value === o.value ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   )
 }

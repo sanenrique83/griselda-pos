@@ -48,12 +48,22 @@ export default async function MesasPage() {
     .eq('activa', true)
     .order('numero')
 
-  // Pedidos abiertos en mesa (no llevar)
+  // Pedidos abiertos en mesa (no llevar) — mesa "principal" de cada uno
   const { data: pedidosAbiertos } = await supabase
     .from('pedidos')
     .select('id, mesa_id, created_at, num_comensales, mesero_id')
     .eq('estado', 'abierto')
     .not('mesa_id', 'is', null)
+
+  // Mesas satélite unidas de forma persistente (unirMesas) a esos mismos
+  // pedidos abiertos — una mesa satélite ya no tiene su propio pedidos.mesa_id
+  // (su pedido original se cerró al unirse), así que sin esto se vería como
+  // libre pese a seguir ocupada como parte del pedido destino.
+  const pedidoIdsAbiertos = (pedidosAbiertos ?? []).map((p) => p.id)
+  const { data: pedidoMesasRaw } =
+    pedidoIdsAbiertos.length > 0
+      ? await supabase.from('pedido_mesas').select('mesa_id, pedido_id').in('pedido_id', pedidoIdsAbiertos)
+      : { data: [] as { mesa_id: number; pedido_id: number }[] }
 
   // Nombres de los meseros en esos pedidos
   const meseroIds = [...new Set((pedidosAbiertos ?? []).map((p) => p.mesero_id))]
@@ -62,7 +72,16 @@ export default async function MesasPage() {
     : { data: [] }
 
   const perfilMap = new Map((perfiles ?? []).map((p) => [p.id, p.nombre as string]))
+  const pedidoPorId = new Map((pedidosAbiertos ?? []).map((p) => [p.id, p]))
+
+  // mesa_id → pedido que la ocupa, ya sea como principal o como satélite.
+  // Dos mesas comparten el mismo pedido_activo.id cuando están unidas — esa
+  // es la clave de agrupación que usa el conector visual en PlanoMesas.
   const pedidoMap = new Map((pedidosAbiertos ?? []).map((p) => [p.mesa_id as number, p]))
+  for (const pm of pedidoMesasRaw ?? []) {
+    const pedido = pedidoPorId.get(pm.pedido_id)
+    if (pedido) pedidoMap.set(pm.mesa_id, pedido)
+  }
 
   // Deduplicar por id (PostgREST puede devolver la misma fila dos veces con embeds)
   const mesasUnicas = [

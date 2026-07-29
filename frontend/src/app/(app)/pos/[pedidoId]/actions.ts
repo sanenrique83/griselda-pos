@@ -281,18 +281,27 @@ export async function enviarACocina(pedidoId: number): Promise<Err | undefined> 
 }
 
 // ─── Unir mesas ───────────────────────────────────────────────────────────────
+// Persistente: la mesa origen no se libera — se queda 'ocupada' como mesa
+// satélite del pedido destino, registrada en pedido_mesas, hasta que ese
+// pedido se cobre por completo (ver cobrarPedido) o se anule. Si el origen ya
+// traía sus propias mesas satélite (unión encadenada, A→B y luego B→C), esas
+// también se transfieren a C — nunca deben quedar "huérfanas" apuntando a un
+// pedido que ya cerró.
 export async function unirMesas(
   pedidoOrigenId: number,
   pedidoDestinoId: number,
 ): Promise<Err | undefined> {
   const supabase = await createClient()
 
-  // Obtener mesa origen para liberarla después
-  const { data: pedidoOrigen } = await supabase
-    .from('pedidos')
-    .select('mesa_id')
-    .eq('id', pedidoOrigenId)
-    .single()
+  const [{ data: pedidoOrigen }, { data: satelitesOrigen }] = await Promise.all([
+    supabase.from('pedidos').select('mesa_id').eq('id', pedidoOrigenId).single(),
+    supabase.from('pedido_mesas').select('mesa_id').eq('pedido_id', pedidoOrigenId),
+  ])
+
+  const mesasAAbsorber = [
+    ...(pedidoOrigen?.mesa_id ? [pedidoOrigen.mesa_id] : []),
+    ...(satelitesOrigen ?? []).map((s) => s.mesa_id),
+  ]
 
   // Máximo comensal_numero del destino
   const { data: maxSub } = await supabase
@@ -338,12 +347,18 @@ export async function unirMesas(
     .update({ estado: 'cerrado', cerrado_en: new Date().toISOString() })
     .eq('id', pedidoOrigenId)
 
-  // Liberar mesa origen
-  if (pedidoOrigen?.mesa_id) {
-    await supabase
-      .from('mesas')
-      .update({ estado: 'libre' })
-      .eq('id', pedidoOrigen.mesa_id)
+  // Transferir la propiedad de sus mesas (principal + satélites previos) al
+  // destino como mesas satélite — quedan 'ocupada', nunca se liberan aquí.
+  if (mesasAAbsorber.length > 0) {
+    await supabase.from('pedido_mesas').delete().eq('pedido_id', pedidoOrigenId)
+
+    const { error: pmError } = await supabase.from('pedido_mesas').upsert(
+      mesasAAbsorber.map((mesaId) => ({ pedido_id: pedidoDestinoId, mesa_id: mesaId })),
+      { onConflict: 'pedido_id,mesa_id' },
+    )
+    if (pmError) return { error: 'Error al unir las mesas.' }
+
+    await supabase.from('mesas').update({ estado: 'ocupada' }).in('id', mesasAAbsorber)
   }
 }
 

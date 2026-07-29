@@ -1,6 +1,6 @@
 'use client'
 
-import { MesaShape } from './MesaShape'
+import { MesaShape, dimensionesMesa, colorParaGrupo } from './MesaShape'
 import { TarjetaMesa } from './TarjetaMesa'
 import type { MesaUI } from '@/app/(app)/mesas/page'
 
@@ -26,10 +26,63 @@ export function PlanoMesas({
   const maxX = Math.max(400, ...posicionadas.map((m) => m.pos_x! + MARGEN))
   const maxY = Math.max(300, ...posicionadas.map((m) => m.pos_y! + MARGEN))
 
+  // Mesas unidas (mismo pedido_activo.id, vía unirMesas persistente) — solo
+  // interesa para el conector cuando el grupo tiene 2 o más mesas.
+  const gruposMap = new Map<number, MesaUI[]>()
+  for (const mesa of posicionadas) {
+    if (!mesa.pedido_activo) continue
+    const arr = gruposMap.get(mesa.pedido_activo.id) ?? []
+    arr.push(mesa)
+    gruposMap.set(mesa.pedido_activo.id, arr)
+  }
+  const grupos = [...gruposMap.entries()]
+    .filter(([, ms]) => ms.length >= 2)
+    .sort((a, b) => a[0] - b[0])
+
+  const colorPorMesa = new Map<number, string>()
+  const lineas: { x1: number; y1: number; x2: number; y2: number; color: string }[] = []
+
+  grupos.forEach(([, ms], idx) => {
+    const color = colorParaGrupo(idx)
+    const ordenadas = [...ms].sort((a, b) => a.id - b.id)
+    const centros = ordenadas.map((m) => {
+      const { width, height } = dimensionesMesa(m.forma, m.tamano)
+      colorPorMesa.set(m.id, color)
+      return { x: m.pos_x! + width / 2, y: m.pos_y! + height / 2 }
+    })
+    for (let i = 0; i < centros.length - 1; i++) {
+      lineas.push({
+        x1: centros[i].x,
+        y1: centros[i].y,
+        x2: centros[i + 1].x,
+        y2: centros[i + 1].y,
+        color,
+      })
+    }
+  })
+
   return (
     <div>
       <div className="overflow-auto px-3 pt-3">
         <div className="relative" style={{ width: maxX, height: maxY }}>
+          {lineas.length > 0 && (
+            <svg className="pointer-events-none absolute inset-0" width={maxX} height={maxY}>
+              {lineas.map((l, i) => (
+                <line
+                  key={i}
+                  x1={l.x1}
+                  y1={l.y1}
+                  x2={l.x2}
+                  y2={l.y2}
+                  stroke={l.color}
+                  strokeWidth={3}
+                  strokeDasharray="6 4"
+                  strokeLinecap="round"
+                />
+              ))}
+            </svg>
+          )}
+
           {posicionadas.map((mesa) => (
             <button
               key={mesa.id}
@@ -42,6 +95,7 @@ export function PlanoMesas({
                 tamano={mesa.tamano}
                 rotacion={mesa.rotacion}
                 ocupada={mesa.pedido_activo !== null}
+                anilloColor={colorPorMesa.get(mesa.id)}
               >
                 <span className="text-[13px] font-bold leading-none">
                   {mesa.nombre ?? mesa.numero}

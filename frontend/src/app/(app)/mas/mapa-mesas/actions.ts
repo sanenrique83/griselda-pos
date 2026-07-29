@@ -2,12 +2,15 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
 
 export type CambioMesa = {
   id: number
   posX: number
   posY: number
   rotacion: number
+  forma: FormaMesa
+  tamano: TamanoMesa
 }
 
 export async function guardarDisposicion(
@@ -26,7 +29,13 @@ export async function guardarDisposicion(
     cambios.map((c) =>
       supabase
         .from('mesas')
-        .update({ pos_x: c.posX, pos_y: c.posY, rotacion: c.rotacion })
+        .update({
+          pos_x: c.posX,
+          pos_y: c.posY,
+          rotacion: c.rotacion,
+          forma: c.forma,
+          tamano: c.tamano,
+        })
         .eq('id', c.id),
     ),
   )
