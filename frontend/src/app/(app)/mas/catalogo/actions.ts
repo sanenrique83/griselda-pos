@@ -289,6 +289,29 @@ export async function eliminarGrupoModificador(
   if (error) return { error: 'Error al eliminar el grupo.' }
 }
 
+// ─── Opciones que activan un grupo condicional (grupo_modificador_padres) ─────
+// "Set" completo: borra lo que hubiera para este grupo y guarda la lista
+// nueva — idempotente, sin importar si el grupo ya tenía padres o no.
+export async function guardarGrupoPadres(
+  grupoId: number,
+  opcionIds: number[],
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { error: delError } = await supabase
+    .from('grupo_modificador_padres')
+    .delete()
+    .eq('grupo_id', grupoId)
+  if (delError) return { error: 'Error al guardar las opciones que activan el grupo.' }
+
+  if (opcionIds.length === 0) return
+
+  const { error } = await supabase
+    .from('grupo_modificador_padres')
+    .insert(opcionIds.map((opcionId) => ({ grupo_id: grupoId, opcion_id: opcionId })))
+  if (error) return { error: 'Error al guardar las opciones que activan el grupo.' }
+}
+
 // ─── Opciones modificadores ───────────────────────────────────────────────────
 
 export async function crearOpcion(data: {

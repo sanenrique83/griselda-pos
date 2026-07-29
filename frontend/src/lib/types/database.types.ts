@@ -141,8 +141,15 @@ export interface GrupoModificador {
   minimo: number
   maximo: number
   orden: number
+  /** @deprecated Sin usar desde grupo_modificador_padres (columna aún viva en BD, no eliminada). */
   padre_opcion_id: number | null
   mostrar_en_rapido: boolean
+}
+
+export interface GrupoModificadorPadre {
+  id: number
+  grupo_id: number
+  opcion_id: number
 }
 
 export interface OpcionModificador {

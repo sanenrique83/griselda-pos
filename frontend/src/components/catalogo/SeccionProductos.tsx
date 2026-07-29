@@ -10,6 +10,7 @@ import {
   subirImagenProducto,
   crearGrupoModificador,
   eliminarGrupoModificador,
+  guardarGrupoPadres,
   crearOpcion,
   actualizarOpcion,
   eliminarOpcion,
@@ -36,6 +37,9 @@ type GrupoLocal = {
   maximo: number
   mostrar_en_rapido: boolean
   opciones: OpcionLocal[]
+  // Opciones (de otros grupos ya guardados de este producto) que activan
+  // este grupo condicional. Vacío = grupo siempre visible.
+  opciones_padre: number[]
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -98,6 +102,7 @@ export function SeccionProductos({
   const [fgMin, setFgMin] = useState('1')
   const [fgMax, setFgMax] = useState('1')
   const [fgRapido, setFgRapido] = useState(false)
+  const [fgOpcionesPadre, setFgOpcionesPadre] = useState<number[]>([])
 
   // Form nueva opción (qué grupoId tiene el form abierto)
   const [opFormId, setOpFormId] = useState<number | null>(null)
@@ -142,6 +147,7 @@ export function SeccionProductos({
             maximo: g.maximo,
             mostrar_en_rapido: g.mostrar_en_rapido,
             opciones: g.opciones,
+            opciones_padre: g.opciones_padre,
           })),
         )
         setLoadingGrupos(false)
@@ -299,6 +305,17 @@ export function SeccionProductos({
         mostrar_en_rapido: fgRapido,
       })
       if ('error' in result) { setGrupoError(result.error); return }
+
+      let opcionesPadreGuardadas = fgOpcionesPadre
+      if (fgOpcionesPadre.length > 0) {
+        const padresResult = await guardarGrupoPadres(result.id, fgOpcionesPadre)
+        if (padresResult?.error) {
+          // El grupo sí se creó — se avisa pero no se pierde, queda sin condición.
+          setGrupoError(padresResult.error)
+          opcionesPadreGuardadas = []
+        }
+      }
+
       setGrupos((prev) => [
         ...prev,
         {
@@ -309,6 +326,7 @@ export function SeccionProductos({
           maximo,
           mostrar_en_rapido: fgRapido,
           opciones: [],
+          opciones_padre: opcionesPadreGuardadas,
         },
       ])
       setFgNombre('')
@@ -316,8 +334,22 @@ export function SeccionProductos({
       setFgMin('1')
       setFgMax('1')
       setFgRapido(false)
+      setFgOpcionesPadre([])
       setShowFormGrupo(false)
     })
+  }
+
+  function toggleFgOpcionPadre(opcionId: number) {
+    setFgOpcionesPadre((prev) =>
+      prev.includes(opcionId) ? prev.filter((id) => id !== opcionId) : [...prev, opcionId],
+    )
+  }
+
+  // Nombres de opciones (de cualquier grupo del producto) a partir de sus ids
+  // — para el resumen "Se activa si eligen: X, Y" y la lista del selector.
+  function nombresOpciones(ids: number[]): string[] {
+    const todas = grupos.flatMap((g) => g.opciones)
+    return ids.map((id) => todas.find((o) => o.id === id)?.nombre).filter((n): n is string => !!n)
   }
 
   function handleEliminarGrupo(grupoId: number) {
@@ -762,6 +794,11 @@ export function SeccionProductos({
                             : `Opcional · máx. ${grupo.maximo}`}
                           {grupo.mostrar_en_rapido && ' · Modo rápido'}
                         </p>
+                        {grupo.opciones_padre.length > 0 && (
+                          <p className="mt-0.5 text-[11px] font-medium text-purple-600">
+                            Se activa si eligen: {nombresOpciones(grupo.opciones_padre).join(', ')}
+                          </p>
+                        )}
                       </div>
                       <button
                         onClick={() => handleEliminarGrupo(grupo.id)}
@@ -939,6 +976,46 @@ export function SeccionProductos({
                       />
                     </div>
                   </div>
+
+                  {/* Depende de opciones de otro grupo (condicional) */}
+                  {grupos.some((g) => g.opciones.some((o) => o.activa)) && (
+                    <div>
+                      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                        ¿Este grupo depende de alguna opción elegida antes?
+                      </label>
+                      <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border-[1.5px] border-border bg-s2 p-2">
+                        {grupos.map((g) =>
+                          g.opciones
+                            .filter((o) => o.activa)
+                            .map((o) => (
+                              <label
+                                key={o.id}
+                                className="flex items-center gap-2 px-1 py-1 text-[12px]"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={fgOpcionesPadre.includes(o.id)}
+                                  onChange={() => toggleFgOpcionPadre(o.id)}
+                                  className="h-4 w-4 rounded border-border"
+                                />
+                                <span className="text-text-2">
+                                  {g.nombre}: {o.nombre}
+                                </span>
+                              </label>
+                            )),
+                        )}
+                      </div>
+                      {fgOpcionesPadre.length > 0 ? (
+                        <p className="mt-1 text-[11px] text-purple-600">
+                          Se activa si eligen: {nombresOpciones(fgOpcionesPadre).join(', ')}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-[11px] text-text-4">
+                          Sin elegir nada, este grupo siempre se muestra.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Modo rápido toggle */}
                   <div className="flex items-center justify-between">

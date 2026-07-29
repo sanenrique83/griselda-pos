@@ -27,9 +27,11 @@ function grupoVisible(
   grupo: GrupoMod,
   seleccion: Map<number, Set<number>>,
 ): boolean {
-  if (grupo.padre_opcion_id === null) return true
+  if (grupo.opciones_padre.length === 0) return true
   for (const opciones of seleccion.values()) {
-    if (opciones.has(grupo.padre_opcion_id)) return true
+    for (const padreId of grupo.opciones_padre) {
+      if (opciones.has(padreId)) return true
+    }
   }
   return false
 }
@@ -266,7 +268,7 @@ export function SheetModificadores({
 
             const esMulti = grupo.maximo !== 1
             const selGrupo = seleccion.get(grupo.id) ?? new Set<number>()
-            const esCondicional = grupo.padre_opcion_id !== null
+            const esCondicional = grupo.opciones_padre.length > 0
             const cumplido = grupoCumplido(grupo, seleccion)
 
             return (

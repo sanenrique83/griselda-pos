@@ -22,7 +22,10 @@ export type GrupoMod = {
   minimo: number
   maximo: number
   orden: number
-  padre_opcion_id: number | null
+  // Opciones (de otros grupos del mismo producto) que activan este grupo
+  // condicional — se muestra si el cliente eligió CUALQUIERA de ellas.
+  // Vacío = grupo siempre visible (no condicional).
+  opciones_padre: number[]
   mostrar_en_rapido: boolean
   opciones: OpcionMod[]
 }
@@ -50,7 +53,7 @@ export async function cargarModificadores(
   const { data, error } = await supabase
     .from('grupos_modificadores')
     .select(
-      'id, nombre, requerido, minimo, maximo, orden, padre_opcion_id, mostrar_en_rapido, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, insumos!insumo_id(disponible))',
+      'id, nombre, requerido, minimo, maximo, orden, mostrar_en_rapido, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, insumos!insumo_id(disponible)), grupo_modificador_padres!grupo_id(opcion_id)',
     )
     .eq('producto_id', productoId)
     .eq('activo', true)
@@ -76,7 +79,7 @@ export async function cargarModificadores(
     minimo: gr.minimo,
     maximo: gr.maximo,
     orden: gr.orden,
-    padre_opcion_id: gr.padre_opcion_id ?? null,
+    opciones_padre: (gr.grupo_modificador_padres ?? []).map((p: any) => p.opcion_id),
     mostrar_en_rapido: gr.mostrar_en_rapido ?? false,
     opciones: (gr.opciones_modificador ?? [])
       .filter((o: any) => o.activa && (o.insumos == null || o.insumos.disponible !== false))
