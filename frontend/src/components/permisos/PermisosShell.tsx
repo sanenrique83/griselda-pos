@@ -5,6 +5,7 @@ import {
   actualizarPermiso,
   actualizarBanco,
   actualizarPropina,
+  actualizarTimeoutInactividad,
 } from '@/app/(app)/mas/permisos/actions'
 import type { ConfigPermisos } from '@/app/(app)/mas/permisos/page'
 
@@ -92,6 +93,11 @@ export function PermisosShell({ config }: PermisosShellProps) {
   const [savingPropina, setSavingPropina] = useState(false)
   const [propinaBanner, setPropinaBanner] = useState<string | null>(null)
 
+  // Cierre de sesión por inactividad
+  const [timeoutMin, setTimeoutMin] = useState(config.timeout_inactividad_minutos.toString())
+  const [savingTimeout, setSavingTimeout] = useState(false)
+  const [timeoutBanner, setTimeoutBanner] = useState<string | null>(null)
+
   function handleToggle(campo: keyof ConfigPermisos, valor: boolean) {
     // Optimistic update
     setPermisos((prev) => ({ ...prev, [campo]: valor }))
@@ -138,6 +144,24 @@ export function PermisosShell({ config }: PermisosShellProps) {
     } else {
       setPropinaBanner('Guardado ✓')
       setTimeout(() => setPropinaBanner(null), 3000)
+    }
+  }
+
+  async function handleGuardarTimeout() {
+    const minutos = parseInt(timeoutMin, 10)
+    if (isNaN(minutos) || minutos < 0) {
+      setTimeoutBanner('Ingresa un número de minutos válido (0 o más).')
+      return
+    }
+    setSavingTimeout(true)
+    setTimeoutBanner(null)
+    const result = await actualizarTimeoutInactividad(minutos)
+    setSavingTimeout(false)
+    if (result?.error) {
+      setTimeoutBanner(result.error)
+    } else {
+      setTimeoutBanner('Guardado ✓')
+      setTimeout(() => setTimeoutBanner(null), 3000)
     }
   }
 
@@ -271,6 +295,47 @@ export function PermisosShell({ config }: PermisosShellProps) {
               className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
             >
               {savingPropina ? 'Guardando…' : 'Guardar propina'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Cierre de sesión por inactividad ─────────────────────────────── */}
+        <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+          <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+              Sesión
+            </p>
+          </div>
+          <div className="px-4 py-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-3">
+                Cerrar sesión por inactividad (minutos)
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={timeoutMin}
+                onChange={(e) => setTimeoutMin(e.target.value)}
+                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-blue-500"
+              />
+            </div>
+            <p className="text-xs text-text-3">
+              Sin actividad (clics, toques o teclas) durante este tiempo, la sesión se cierra
+              automáticamente. Usa 0 para desactivarlo.
+            </p>
+            {timeoutBanner && (
+              <p className={`text-xs font-semibold ${timeoutBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+                {timeoutBanner}
+              </p>
+            )}
+            <button
+              onClick={handleGuardarTimeout}
+              disabled={savingTimeout}
+              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+            >
+              {savingTimeout ? 'Guardando…' : 'Guardar tiempo de inactividad'}
             </button>
           </div>
         </div>
