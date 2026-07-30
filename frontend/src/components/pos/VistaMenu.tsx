@@ -10,6 +10,8 @@ interface VistaMenuProps {
   onVerComanda: () => void
   onAgregarProducto: (producto: ProductoCatalogo) => void
   onAgregarLibre?: () => void
+  onAgregarComensal?: () => void
+  isPendingAgregarComensal?: boolean
 }
 
 export function VistaMenu({
@@ -19,6 +21,8 @@ export function VistaMenu({
   onVerComanda,
   onAgregarProducto,
   onAgregarLibre,
+  onAgregarComensal,
+  isPendingAgregarComensal = false,
 }: VistaMenuProps) {
   const [categoriaActiva, setCategoriaActiva] = useState<number | null>(null)
 
@@ -130,15 +134,26 @@ export function VistaMenu({
         })}
       </div>
 
-      {/* Footer fijo: Ver comanda */}
+      {/* Footer fijo: + Nuevo comensal / Ver comanda */}
       <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 border-t border-[#E5E5EA] bg-white px-3 py-3">
-        <button
-          onClick={onVerComanda}
-          className="w-full rounded-xl bg-blue-600 py-[18px] text-base font-bold text-white shadow-[0_4px_14px_rgba(37,99,235,.28)] active:scale-[.98]"
-        >
-          Ver comanda
-          {totalPedido > 0 && ` — $${totalPedido.toFixed(2)}`} →
-        </button>
+        <div className="flex gap-2">
+          {onAgregarComensal && (
+            <button
+              onClick={onAgregarComensal}
+              disabled={isPendingAgregarComensal}
+              className="flex-1 rounded-xl bg-green-600 py-[18px] text-base font-bold text-white shadow-[0_4px_14px_rgba(22,163,74,.28)] active:scale-[.98] disabled:opacity-40"
+            >
+              {isPendingAgregarComensal ? '…' : '+ Nuevo comensal'}
+            </button>
+          )}
+          <button
+            onClick={onVerComanda}
+            className="flex-1 rounded-xl bg-blue-600 py-[18px] text-base font-bold text-white shadow-[0_4px_14px_rgba(37,99,235,.28)] active:scale-[.98]"
+          >
+            Ver comanda
+            {totalPedido > 0 && ` — $${totalPedido.toFixed(2)}`} →
+          </button>
+        </div>
       </div>
     </div>
   )

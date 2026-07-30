@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { MesaShape, dimensionesMesa } from '@/components/mesas/MesaShape'
-import { calcularPosicionesSillas } from '@/lib/asientos'
+import { DiagramaSillas } from './DiagramaSillas'
 import { asignarSilla } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { SubpedidoPOS, MesaSillas } from '@/app/(app)/pos/[pedidoId]/page'
 
@@ -12,18 +11,17 @@ interface SheetAsientosProps {
   onClose: () => void
   subpedidos: SubpedidoPOS[]
   mesaSillas: MesaSillas
-  // Comensal a preseleccionar al abrir (ej. justo se agregó y aún no tiene
-  // silla) — así el primer toque del usuario ya asigna, sin tener que
-  // elegirlo de la lista primero.
-  comensalPreseleccionadoId?: number | null
 }
 
+// Reasignación manual — agregar un comensal nuevo ya no pasa por aquí (se
+// asigna la siguiente silla libre en automático, sin picker), así que este
+// sheet solo se abre desde el botón "🪑 Sillas" para corregir a mano si
+// alguien terminó sentado distinto al orden automático.
 export function SheetAsientos({
   open,
   onClose,
   subpedidos,
   mesaSillas,
-  comensalPreseleccionadoId = null,
 }: SheetAsientosProps) {
   const router = useRouter()
   const [comensalSeleccionadoId, setComensalSeleccionadoId] = useState<number | null>(null)
@@ -32,10 +30,10 @@ export function SheetAsientos({
 
   useEffect(() => {
     if (open) {
-      setComensalSeleccionadoId(comensalPreseleccionadoId)
+      setComensalSeleccionadoId(null)
       setError(null)
     }
-  }, [open, comensalPreseleccionadoId])
+  }, [open])
 
   function handleClose() {
     setComensalSeleccionadoId(null)
@@ -64,13 +62,6 @@ export function SheetAsientos({
   const numSillas = mesaSillas
     ? Math.max(mesaSillas.capacidad ?? 0, subpedidos.length, 1)
     : 0
-  const posiciones = mesaSillas
-    ? calcularPosicionesSillas(numSillas, mesaSillas.forma, mesaSillas.tamano, mesaSillas.asientosHorario)
-    : []
-  const { width, height } = mesaSillas
-    ? dimensionesMesa(mesaSillas.forma, mesaSillas.tamano)
-    : { width: 0, height: 0 }
-  const boxSize = Math.sqrt(width * width + height * height) + 90
 
   return (
     <>
@@ -103,55 +94,42 @@ export function SheetAsientos({
           ) : (
             <>
               {/* ── Diagrama de la mesa con marcadores de silla ─────────────── */}
-              <div className="flex justify-center py-2">
-                <div className="relative" style={{ width: boxSize, height: boxSize }}>
-                  <div
-                    className="absolute left-1/2 top-1/2"
-                    style={{ transform: `translate(-50%, -50%) rotate(${mesaSillas.rotacion}deg)` }}
-                  >
-                    <div style={{ position: 'absolute', left: -width / 2, top: -height / 2 }}>
-                      <MesaShape forma={mesaSillas.forma} tamano={mesaSillas.tamano} rotacion={0} />
-                    </div>
+              <DiagramaSillas
+                forma={mesaSillas.forma}
+                tamano={mesaSillas.tamano}
+                rotacion={mesaSillas.rotacion}
+                asientosHorario={mesaSillas.asientosHorario}
+                numSillas={numSillas}
+                renderSilla={(sillaNum) => {
+                  const ocupante = subpedidos.find((s) => s.silla_numero === sillaNum)
+                  const esPropia = ocupante?.id === comensalSeleccionadoId
+                  const asignable = comensalSeleccionadoId !== null && !ocupante
+                  const tappable = asignable || esPropia
 
-                    {posiciones.map((p, idx) => {
-                      const sillaNum = idx + 1
-                      const ocupante = subpedidos.find((s) => s.silla_numero === sillaNum)
-                      const esPropia = ocupante?.id === comensalSeleccionadoId
-                      const asignable = comensalSeleccionadoId !== null && !ocupante
-                      const tappable = asignable || esPropia
-
-                      return (
-                        <button
-                          key={sillaNum}
-                          onClick={() => handleTapSilla(sillaNum, ocupante)}
-                          disabled={!tappable || isPending}
-                          title={
-                            ocupante
-                              ? `Silla ${sillaNum} — ${ocupante.nombre ?? `Comensal ${ocupante.comensal_numero}`}`
-                              : `Silla ${sillaNum} — vacía`
-                          }
-                          className={`absolute flex h-8 w-8 items-center justify-center rounded-full border-2 text-[12px] font-bold transition-transform ${
-                            esPropia
-                              ? 'border-amber-500 bg-amber-50 text-amber-700 active:scale-90'
-                              : ocupante
-                                ? 'border-[#D1D1D6] bg-s2 text-text-3'
-                                : asignable
-                                  ? 'border-blue-500 bg-blue-50 text-blue-700 active:scale-90'
-                                  : 'border-[#E5E5EA] bg-white text-text-4'
-                          } ${!tappable ? 'cursor-default' : ''}`}
-                          style={{
-                            left: p.x,
-                            top: p.y,
-                            transform: 'translate(-50%, -50%)',
-                          }}
-                        >
-                          {sillaNum}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
+                  return (
+                    <button
+                      onClick={() => handleTapSilla(sillaNum, ocupante)}
+                      disabled={!tappable || isPending}
+                      title={
+                        ocupante
+                          ? `Silla ${sillaNum} — ${ocupante.nombre ?? `Comensal ${ocupante.comensal_numero}`}`
+                          : `Silla ${sillaNum} — vacía`
+                      }
+                      className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-[12px] font-bold transition-transform ${
+                        esPropia
+                          ? 'border-amber-500 bg-amber-50 text-amber-700 active:scale-90'
+                          : ocupante
+                            ? 'border-[#D1D1D6] bg-s2 text-text-3'
+                            : asignable
+                              ? 'border-blue-500 bg-blue-50 text-blue-700 active:scale-90'
+                              : 'border-[#E5E5EA] bg-white text-text-4'
+                      } ${!tappable ? 'cursor-default' : ''}`}
+                    >
+                      {sillaNum}
+                    </button>
+                  )
+                }}
+              />
 
               {/* ── Lista de comensales ──────────────────────────────────────── */}
               <div className="space-y-2">

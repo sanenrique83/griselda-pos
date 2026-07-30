@@ -4,7 +4,61 @@ import { createClient } from '@/lib/supabase/server'
 
 type Err = { error: string }
 
+// ─── Abrir mesa con silla del comensal 1 ya elegida ────────────────────────────
+// Reemplaza al flujo "draft" (agregar producto antes de que exista pedido):
+// ahora la única decisión manual de todo el flujo de sillas —en qué silla se
+// sienta el comensal 1— se hace ANTES de crear nada, en la pantalla de
+// elegir silla (ver ElegirSillaInicialShell). Al confirmar, esto crea el
+// pedido + el primer comensal con esa silla ya asignada, y el mesero
+// aterriza directo en Menú (pedido ya real, no draft).
+export async function abrirPedidoMesa(
+  mesaId: number,
+  turnoId: number,
+  sillaElegida: number,
+): Promise<{ pedidoId: number } | Err> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Sin sesión.' }
+
+  const { data: pedido, error: pedidoErr } = await supabase
+    .from('pedidos')
+    .insert({
+      turno_id: turnoId,
+      mesa_id: mesaId,
+      mesero_id: user.id,
+      tipo: 'mesa',
+    })
+    .select('id')
+    .single()
+
+  if (pedidoErr || !pedido) return { error: 'Error al crear el pedido.' }
+
+  const { error: subErr } = await supabase
+    .from('subpedidos')
+    .insert({
+      pedido_id: pedido.id,
+      mesero_id: user.id,
+      comensal_numero: 1,
+      silla_numero: sillaElegida,
+    })
+
+  if (subErr) return { error: 'Error al crear el comensal.' }
+
+  await supabase.rpc('set_estado_mesa', {
+    p_mesa_id: mesaId,
+    p_estado: 'ocupada',
+  })
+
+  return { pedidoId: pedido.id }
+}
+
 // ─── Crear pedido + agregar producto (modo estándar) ──────────────────────────
+// NOTA: sin llamadores tras el cambio de flujo de arriba — pos/nueva/[mesaId]
+// ya no muestra el catálogo en modo draft antes de que exista pedido, así
+// que ninguna de estas dos funciones se invoca hoy. Se dejan tal cual (no se
+// borran en este cambio) porque PosShell.tsx todavía las referencia en sus
+// ramas de modo draft, que también quedaron sin usar — limpiar ambas cosas
+// juntas es una tarea aparte.
 export async function crearPedidoYAgregarProducto(data: {
   mesaId: number
   turnoId: number

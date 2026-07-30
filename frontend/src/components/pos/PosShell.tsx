@@ -8,7 +8,8 @@ import { SheetModificadores, type ConfirmarModPayload } from './SheetModificador
 import { SheetCapturaPida, type ConfirmarRapidoPayload } from './SheetCapturaPida'
 import { SheetUnirMesa, type MesaOcupada } from './SheetUnirMesa'
 import { SheetProductoLibre } from './SheetProductoLibre'
-import { agregarProducto, agregarProductoRapido, agregarProductoLibre, compartirMesa, agregarComensal } from '@/app/(app)/pos/[pedidoId]/actions'
+import { agregarProducto, agregarProductoRapido, agregarProductoLibre, compartirMesa, agregarComensal, asignarSilla } from '@/app/(app)/pos/[pedidoId]/actions'
+import { siguienteSillaLibre } from '@/lib/asientos'
 import type {
   SubpedidoPOS,
   ProductoCatalogo,
@@ -179,19 +180,38 @@ export function PosShell({
     router.push(`/pos/${result.nuevoPedidoId}`)
   }
 
-  // Acceso directo desde Menú: agrega un comensal y lo activa sin navegar a
-  // la vista de Comanda — el mesero sigue en Menú y puede tocar un producto
-  // de inmediato, ya asignado al comensal nuevo, sin pasos intermedios.
+  // Acceso directo desde el footer de Menú ("+ Nuevo comensal"): agrega un
+  // comensal y lo activa sin navegar a la vista de Comanda — el mesero sigue
+  // en Menú y puede tocar un producto de inmediato, ya asignado al comensal
+  // nuevo, sin pasos intermedios.
+  //
+  // Si la mesa tiene geometría de sillas, se asigna automáticamente la
+  // siguiente silla libre en secuencia (1, 2, 3…) — SIN mostrar ningún
+  // picker ni pedir confirmación (eso rompería el "sin pasos intermedios").
+  // El botón manual "🪑 Sillas" en Comanda sigue disponible para corregir a
+  // mano si alguien terminó sentado distinto al orden automático.
   async function handleAgregarComensalMenu() {
     if (pedidoId === null) return
     setErrorAccion(null)
     setIsPendingComensalMenu(true)
     const result = await agregarComensal(pedidoId)
-    setIsPendingComensalMenu(false)
     if ('error' in result) {
+      setIsPendingComensalMenu(false)
       setErrorAccion(result.error)
       return
     }
+
+    if (mesaSillas) {
+      const siguienteSilla = siguienteSillaLibre(subpedidos.map((s) => s.silla_numero))
+      const asignarResult = await asignarSilla(result.nuevoId, siguienteSilla)
+      if (asignarResult?.error) {
+        // No bloqueamos la creación del comensal por esto — queda sin
+        // silla y se corrige después con el botón "🪑 Sillas".
+        setErrorAccion(asignarResult.error)
+      }
+    }
+
+    setIsPendingComensalMenu(false)
     setSubpedidoActivoId(result.nuevoId)
     router.refresh()
   }
@@ -269,7 +289,7 @@ export function PosShell({
         </div>
 
         {/* Tabs Menú / Comanda */}
-        <div className="flex items-stretch">
+        <div className="flex">
           <button
             onClick={() => setVista('menu')}
             className={`flex-1 py-2.5 text-[13px] font-semibold border-b-2 transition-colors ${
@@ -280,15 +300,6 @@ export function PosShell({
           >
             Menú
           </button>
-          {!isDraft && (
-            <button
-              onClick={handleAgregarComensalMenu}
-              disabled={isPendingComensalMenu}
-              className="flex-shrink-0 self-center px-3 py-1.5 text-[12px] font-semibold text-blue-600 active:opacity-60 disabled:opacity-40"
-            >
-              {isPendingComensalMenu ? '…' : '+ Nuevo comensal'}
-            </button>
-          )}
           <button
             onClick={() => setVista('comanda')}
             disabled={isDraft}
@@ -328,6 +339,8 @@ export function PosShell({
             onVerComanda={() => !isDraft && setVista('comanda')}
             onAgregarProducto={handleAgregarProducto}
             onAgregarLibre={isDraft ? undefined : () => setSheetLibreOpen(true)}
+            onAgregarComensal={isDraft ? undefined : handleAgregarComensalMenu}
+            isPendingAgregarComensal={isPendingComensalMenu}
           />
         ) : (
           <VistaComanda

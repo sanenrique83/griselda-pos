@@ -171,3 +171,17 @@ export function calcularPosicionesSillas(
   }
   return puntos
 }
+
+/**
+ * Siguiente silla libre en secuencia (1, 2, 3…) dada la lista de números de
+ * silla ya ocupados del pedido — usada al agregar un comensal nuevo para
+ * asignarle silla automáticamente, sin picker ni confirmación. Ignora
+ * `capacidad`: si la mesa ya está sobre-ocupada, sigue contando hacia
+ * arriba en vez de bloquear la asignación.
+ */
+export function siguienteSillaLibre(sillasOcupadas: (number | null)[]): number {
+  const ocupadas = new Set(sillasOcupadas.filter((n): n is number => n !== null))
+  let n = 1
+  while (ocupadas.has(n)) n++
+  return n
+}

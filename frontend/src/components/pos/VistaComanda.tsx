@@ -3,10 +3,11 @@
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ItemComandaRow } from './ItemComanda'
-import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem, eliminarProductoPendiente, moverProducto, dividirProducto, anularPedidoCompleto } from '@/app/(app)/pos/[pedidoId]/actions'
+import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem, eliminarProductoPendiente, moverProducto, dividirProducto, anularPedidoCompleto, asignarSilla } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { SubpedidoPOS, ItemComanda, MesaSillas } from '@/app/(app)/pos/[pedidoId]/page'
 import { imprimirTicket } from '@/lib/print'
 import { SheetAsientos } from './SheetAsientos'
+import { siguienteSillaLibre } from '@/lib/asientos'
 
 const MOTIVOS_CANCELACION = [
   'Error de captura',
@@ -64,7 +65,6 @@ export function VistaComanda({
   const [motivoAnularIdx, setMotivoAnularIdx] = useState(0)
   const [isPendingAnular, startAnular] = useTransition()
   const [sheetAsientosOpen, setSheetAsientosOpen] = useState(false)
-  const [comensalParaAsiento, setComensalParaAsiento] = useState<number | null>(null)
 
   useEffect(() => {
     if (printError) {
@@ -227,6 +227,9 @@ export function VistaComanda({
         setError(nuevo.error)
         return
       }
+      if (mesaSillas) {
+        await asignarSilla(nuevo.nuevoId, siguienteSillaLibre(subpedidos.map((s) => s.silla_numero)))
+      }
       const result = dividir
         ? await dividirProducto(itemAMover.id, nuevo.nuevoId, cantidadMover)
         : await moverProducto(itemAMover.id, nuevo.nuevoId)
@@ -236,10 +239,6 @@ export function VistaComanda({
         setItemAMover(null)
         router.refresh()
         onCambiarSubpedido(nuevo.nuevoId)
-        if (mesaSillas) {
-          setComensalParaAsiento(nuevo.nuevoId)
-          setSheetAsientosOpen(true)
-        }
       }
     })
   }
@@ -257,20 +256,21 @@ export function VistaComanda({
     })
   }
 
+  // Silla automática (1, 2, 3… en secuencia, sin picker ni confirmación) —
+  // el botón manual "🪑 Sillas" sigue disponible para corregir a mano.
   function handleAgregarComensal() {
     setError(null)
     startComensal(async () => {
       const result = await agregarComensal(pedidoId)
       if ('error' in result) {
         setError(result.error)
-      } else {
-        router.refresh()
-        onCambiarSubpedido(result.nuevoId)
-        if (mesaSillas) {
-          setComensalParaAsiento(result.nuevoId)
-          setSheetAsientosOpen(true)
-        }
+        return
       }
+      if (mesaSillas) {
+        await asignarSilla(result.nuevoId, siguienteSillaLibre(subpedidos.map((s) => s.silla_numero)))
+      }
+      router.refresh()
+      onCambiarSubpedido(result.nuevoId)
     })
   }
 
@@ -280,7 +280,6 @@ export function VistaComanda({
       <div className="flex overflow-x-auto border-b border-[#E5E5EA] bg-white scrollbar-none">
         {subpedidos.map((sub) => {
           const label = sub.nombre ?? `Comensal ${sub.comensal_numero}`
-          const labelConSilla = sub.silla_numero ? `${label} — Silla ${sub.silla_numero}` : label
           const activo = sub.id === subpedidoActivoId
           const tienePendientes = sub.items.some((i) => i.estado === 'pendiente')
           const vacio = sub.items.length === 0
@@ -290,7 +289,7 @@ export function VistaComanda({
             <div key={sub.id} className="relative flex-shrink-0 flex items-center">
               <button
                 onClick={() => onCambiarSubpedido(sub.id)}
-                className={`relative border-b-2 px-4 py-2.5 text-[13px] font-medium whitespace-nowrap transition-colors ${
+                className={`relative flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-[13px] font-medium whitespace-nowrap transition-colors ${
                   puedeEliminar ? 'pr-6' : ''
                 } ${
                   activo
@@ -298,7 +297,12 @@ export function VistaComanda({
                     : 'border-transparent text-text-3'
                 }`}
               >
-                {labelConSilla}
+                {label}
+                {sub.silla_numero && (
+                  <span className="inline-flex items-center rounded-full bg-s3 px-1.5 py-0.5 text-[10px] font-bold leading-none text-text-2">
+                    🪑{sub.silla_numero}
+                  </span>
+                )}
                 {tienePendientes && (
                   <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-blue-600" />
                 )}
@@ -340,7 +344,7 @@ export function VistaComanda({
         {/* Ver/asignar sillas */}
         {mesaSillas && (
           <button
-            onClick={() => { setComensalParaAsiento(null); setSheetAsientosOpen(true) }}
+            onClick={() => setSheetAsientosOpen(true)}
             className="flex-shrink-0 px-3 py-2.5 text-[13px] font-medium text-text-3 active:opacity-60"
           >
             🪑 Sillas
@@ -607,7 +611,6 @@ export function VistaComanda({
         onClose={() => setSheetAsientosOpen(false)}
         subpedidos={subpedidos}
         mesaSillas={mesaSillas}
-        comensalPreseleccionadoId={comensalParaAsiento}
       />
 
       {/* Footer fijo */}
