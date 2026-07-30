@@ -14,10 +14,14 @@ import {
   crearOpcion,
   actualizarOpcion,
   eliminarOpcion,
+  reordenarProductos,
+  reordenarOpciones,
 } from '@/app/(app)/mas/catalogo/actions'
 import { cargarModificadores } from '@/app/(app)/pos/[pedidoId]/actions'
 import { SeccionReceta } from './SeccionReceta'
+import { ListaArrastrable } from './ListaArrastrable'
 import type { ProductoCatalogo, CategoriaCatalogo, IngredienteCatalogo, InsumoCatalogo } from '@/app/(app)/mas/catalogo/page'
+import type { ModoOrden } from '@/lib/ordenCatalogo'
 
 // ─── Tipos locales ────────────────────────────────────────────────────────────
 
@@ -51,6 +55,8 @@ interface SeccionProductosProps {
   insumos: InsumoCatalogo[]
   // Deep-link desde Inventario → Recetas: abre directo el editor de este producto.
   editarProductoId?: number | null
+  modoOrdenProductos: ModoOrden
+  modoOrdenModificadores: ModoOrden
 }
 
 export function SeccionProductos({
@@ -59,6 +65,8 @@ export function SeccionProductos({
   ingredientes,
   insumos,
   editarProductoId = null,
+  modoOrdenProductos,
+  modoOrdenModificadores,
 }: SeccionProductosProps) {
   const router = useRouter()
   const [productos, setProductos] = useState(initial)
@@ -287,6 +295,20 @@ export function SeccionProductos({
     })
   }
 
+  // Arrastre solo tiene sentido dentro de una categoría a la vez (el orden es
+  // por categoría) y solo persiste algo visible en modo 'personalizado'.
+  function handleReordenarProductos(nuevoOrden: ProductoCatalogo[]) {
+    if (filtroCat === null) return
+    setProductos((prev) => {
+      let idx = 0
+      return prev.map((p) => (p.categoria_id === filtroCat ? nuevoOrden[idx++] : p))
+    })
+    startTransition(async () => {
+      const result = await reordenarProductos(nuevoOrden.map((p) => p.id))
+      if (result?.error) setError(result.error)
+    })
+  }
+
   // ── Handlers modificadores ─────────────────────────────────────────────────
 
   function handleCrearGrupo() {
@@ -462,6 +484,20 @@ export function SeccionProductos({
     })
   }
 
+  function handleReordenarOpciones(grupoId: number, nuevoOrden: OpcionLocal[]) {
+    setGrupos((prev) =>
+      prev.map((g) => {
+        if (g.id !== grupoId) return g
+        let idx = 0
+        return { ...g, opciones: g.opciones.map((o) => (o.activa ? nuevoOrden[idx++] : o)) }
+      }),
+    )
+    startGrupoTransition(async () => {
+      const result = await reordenarOpciones(nuevoOrden.map((o) => o.id))
+      if (result?.error) setGrupoError(result.error)
+    })
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const productosFiltrados = filtroCat
@@ -469,6 +505,62 @@ export function SeccionProductos({
     : productos
 
   const sheetOpen = sheet.tipo !== 'none'
+
+  function renderFilaProducto(prod: ProductoCatalogo, dragHandleProps?: Record<string, unknown>) {
+    return (
+      <div key={prod.id} className="flex items-center gap-3 px-4 py-3">
+        {dragHandleProps && (
+          <span
+            {...dragHandleProps}
+            className="flex-shrink-0 cursor-grab touch-none px-0.5 text-[15px] text-text-4 active:cursor-grabbing"
+            title="Arrastra para reordenar"
+          >
+            ⠿
+          </span>
+        )}
+        {prod.foto_url ? (
+          <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-s2">
+            <img src={prod.foto_url} alt={prod.nombre} className="h-full w-full object-cover" />
+          </div>
+        ) : prod.emoji ? (
+          <span className="text-[22px] leading-none flex-shrink-0">{prod.emoji}</span>
+        ) : null}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium leading-tight">{prod.nombre}</p>
+          <p className="text-xs text-text-3 mt-0.5">
+            ${prod.precio.toFixed(2)} · {prod.categoria_nombre}
+          </p>
+        </div>
+        {/* Toggle disponible */}
+        <button
+          onClick={() => handleToggleDisponible(prod.id, prod.disponible)}
+          disabled={isPending}
+          className={`relative flex-shrink-0 h-[24px] w-[42px] rounded-full transition-colors duration-200 disabled:opacity-40 ${
+            prod.disponible ? 'bg-green-500' : 'bg-[#D1D1D6]'
+          }`}
+        >
+          <span
+            className={`absolute top-[2px] h-[20px] w-[20px] rounded-full bg-white shadow transition-transform duration-200 ${
+              prod.disponible ? 'translate-x-[20px]' : 'translate-x-[2px]'
+            }`}
+          />
+        </button>
+        <button
+          onClick={() => abrirSheet({ tipo: 'editar', prod })}
+          className="text-[12px] font-medium text-blue-600 active:opacity-60"
+        >
+          Editar
+        </button>
+        <button
+          onClick={() => handleEliminar(prod.id)}
+          disabled={isPending}
+          className="text-[12px] font-medium text-red-500 active:opacity-60 disabled:opacity-40"
+        >
+          ×
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -502,52 +594,22 @@ export function SeccionProductos({
       </div>
 
       {/* Lista de productos */}
+      {filtroCat !== null && modoOrdenProductos !== 'personalizado' && (
+        <p className="text-[11px] text-text-4">
+          Orden alfabético activo — para reordenar a mano cambia a &quot;Personalizado&quot; en Más → Permisos.
+        </p>
+      )}
       <div className="rounded-2xl bg-white shadow-card overflow-hidden">
         <div className="divide-y divide-[#F2F2F7]">
-          {productosFiltrados.map((prod) => (
-            <div key={prod.id} className="flex items-center gap-3 px-4 py-3">
-              {prod.foto_url ? (
-                <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-s2">
-                  <img src={prod.foto_url} alt={prod.nombre} className="h-full w-full object-cover" />
-                </div>
-              ) : prod.emoji ? (
-                <span className="text-[22px] leading-none flex-shrink-0">{prod.emoji}</span>
-              ) : null}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium leading-tight">{prod.nombre}</p>
-                <p className="text-xs text-text-3 mt-0.5">
-                  ${prod.precio.toFixed(2)} · {prod.categoria_nombre}
-                </p>
-              </div>
-              {/* Toggle disponible */}
-              <button
-                onClick={() => handleToggleDisponible(prod.id, prod.disponible)}
-                disabled={isPending}
-                className={`relative flex-shrink-0 h-[24px] w-[42px] rounded-full transition-colors duration-200 disabled:opacity-40 ${
-                  prod.disponible ? 'bg-green-500' : 'bg-[#D1D1D6]'
-                }`}
-              >
-                <span
-                  className={`absolute top-[2px] h-[20px] w-[20px] rounded-full bg-white shadow transition-transform duration-200 ${
-                    prod.disponible ? 'translate-x-[20px]' : 'translate-x-[2px]'
-                  }`}
-                />
-              </button>
-              <button
-                onClick={() => abrirSheet({ tipo: 'editar', prod })}
-                className="text-[12px] font-medium text-blue-600 active:opacity-60"
-              >
-                Editar
-              </button>
-              <button
-                onClick={() => handleEliminar(prod.id)}
-                disabled={isPending}
-                className="text-[12px] font-medium text-red-500 active:opacity-60 disabled:opacity-40"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+          {filtroCat !== null && modoOrdenProductos === 'personalizado' ? (
+            <ListaArrastrable
+              items={productosFiltrados}
+              onReorder={handleReordenarProductos}
+              renderItem={(prod, dragHandleProps) => renderFilaProducto(prod, dragHandleProps)}
+            />
+          ) : (
+            productosFiltrados.map((prod) => renderFilaProducto(prod))
+          )}
           {productosFiltrados.length === 0 && (
             <div className="py-8 text-center text-sm text-text-3">
               Sin productos en esta categoría.
@@ -810,32 +872,53 @@ export function SeccionProductos({
                     </div>
 
                     {/* Opciones del grupo */}
-                    {grupo.opciones.filter((o) => o.activa).map((opcion) => (
-                      <div
-                        key={opcion.id}
-                        className="flex items-center gap-2 border-t border-[#F2F2F7] px-3 py-2"
-                      >
-                        <span className="flex-1 text-[13px]">{opcion.nombre}</span>
-                        {opcion.precio_extra > 0 && (
-                          <span className="font-mono text-[11px] text-amber-600">
-                            +${opcion.precio_extra.toFixed(2)}
-                          </span>
-                        )}
-                        <button
-                          onClick={() => abrirEditarOpcion(grupo.id, opcion)}
-                          className="text-[12px] text-blue-600 active:opacity-60"
-                          title="Editar opción"
+                    {(() => {
+                      const opcionesActivas = grupo.opciones.filter((o) => o.activa)
+                      const renderOpcion = (opcion: OpcionLocal, dragHandleProps?: Record<string, unknown>) => (
+                        <div
+                          key={opcion.id}
+                          className="flex items-center gap-2 border-t border-[#F2F2F7] px-3 py-2"
                         >
-                          ✎
-                        </button>
-                        <button
-                          onClick={() => handleEliminarOpcion(grupo.id, opcion.id)}
-                          className="text-[12px] text-red-500 active:opacity-60"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
+                          {dragHandleProps && (
+                            <span
+                              {...dragHandleProps}
+                              className="flex-shrink-0 cursor-grab touch-none text-text-4 active:cursor-grabbing"
+                              title="Arrastra para reordenar"
+                            >
+                              ⠿
+                            </span>
+                          )}
+                          <span className="flex-1 text-[13px]">{opcion.nombre}</span>
+                          {opcion.precio_extra > 0 && (
+                            <span className="font-mono text-[11px] text-amber-600">
+                              +${opcion.precio_extra.toFixed(2)}
+                            </span>
+                          )}
+                          <button
+                            onClick={() => abrirEditarOpcion(grupo.id, opcion)}
+                            className="text-[12px] text-blue-600 active:opacity-60"
+                            title="Editar opción"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            onClick={() => handleEliminarOpcion(grupo.id, opcion.id)}
+                            className="text-[12px] text-red-500 active:opacity-60"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )
+                      return modoOrdenModificadores === 'personalizado' ? (
+                        <ListaArrastrable
+                          items={opcionesActivas}
+                          onReorder={(nuevoOrden) => handleReordenarOpciones(grupo.id, nuevoOrden)}
+                          renderItem={(opcion, dragHandleProps) => renderOpcion(opcion, dragHandleProps)}
+                        />
+                      ) : (
+                        opcionesActivas.map((opcion) => renderOpcion(opcion))
+                      )
+                    })()}
 
                     {/* Form o botón nueva opción */}
                     {opFormId === grupo.id ? (

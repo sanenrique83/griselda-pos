@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PosShell } from '@/components/pos/PosShell'
 import type { ProductoCatalogo, CategoriaPOS } from '@/app/(app)/pos/[pedidoId]/page'
+import { columnaOrden } from '@/lib/ordenCatalogo'
 
 export default async function NuevaPosPage({
   params,
@@ -49,6 +50,13 @@ export default async function NuevaPosPage({
   }
 
   // ── Catálogo ──────────────────────────────────────────────────────────────
+  const { data: configOrden } = await supabase
+    .from('config_sistema')
+    .select('orden_productos')
+    .eq('id', 1)
+    .single()
+  const ordenProductos = columnaOrden((configOrden as any)?.orden_productos)
+
   const [{ data: rawCategorias }, { data: rawProductos }] = await Promise.all([
     supabase
       .from('categorias')
@@ -61,7 +69,7 @@ export default async function NuevaPosPage({
         'id, nombre, descripcion, precio, emoji, disponible, modo_captura, categoria_id',
       )
       .eq('activo', true)
-      .order('orden'),
+      .order(ordenProductos.column, { ascending: ordenProductos.ascending }),
   ])
 
   const mesaLabel = mesa.nombre ?? `Mesa ${mesa.numero}`

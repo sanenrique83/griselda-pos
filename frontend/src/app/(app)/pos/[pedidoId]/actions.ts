@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { imprimirTicket, type ItemCancelacion } from '@/lib/print'
 import { anularPedido } from '@/app/(app)/cobro/[pedidoId]/actions'
+import { columnaOrden } from '@/lib/ordenCatalogo'
 
 type Err = { error: string }
 
@@ -14,6 +15,7 @@ export type OpcionMod = {
   precio_extra: number
   activa: boolean
   insumo_id: number | null
+  orden: number
 }
 
 export type GrupoMod = {
@@ -51,14 +53,22 @@ export async function cargarModificadores(
   console.log('[cargarModificadores] start → productoId:', productoId, typeof productoId)
   const supabase = await createClient()
 
+  const { data: configOrden } = await supabase
+    .from('config_sistema')
+    .select('orden_modificadores')
+    .eq('id', 1)
+    .single()
+  const ordenOpciones = columnaOrden((configOrden as any)?.orden_modificadores)
+
   const { data, error } = await supabase
     .from('grupos_modificadores')
     .select(
-      'id, nombre, requerido, minimo, maximo, orden, mostrar_en_rapido, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, insumos!insumo_id(disponible)), grupo_modificador_padres!grupo_id(opcion_id)',
+      'id, nombre, requerido, minimo, maximo, orden, mostrar_en_rapido, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, orden, insumos!insumo_id(disponible)), grupo_modificador_padres!grupo_id(opcion_id)',
     )
     .eq('producto_id', productoId)
     .eq('activo', true)
     .order('orden')
+    .order(ordenOpciones.column, { referencedTable: 'opciones_modificador', ascending: ordenOpciones.ascending })
 
   console.log('[cargarModificadores] raw data:', JSON.stringify(data))
 
@@ -90,6 +100,7 @@ export async function cargarModificadores(
         precio_extra: o.precio_extra,
         activa: o.activa,
         insumo_id: o.insumo_id ?? null,
+        orden: o.orden ?? 0,
       })),
   }))
 
@@ -103,6 +114,13 @@ export async function cargarGuisados(
 ): Promise<{ grupos: GrupoRapido[] } | Err> {
   console.log('[cargarGuisados] start → productoId:', productoId, typeof productoId)
   const supabase = await createClient()
+
+  const { data: configOrden } = await supabase
+    .from('config_sistema')
+    .select('orden_modificadores')
+    .eq('id', 1)
+    .single()
+  const ordenOpciones = columnaOrden((configOrden as any)?.orden_modificadores)
 
   // Query 1: grupos con mostrar_en_rapido=true para este producto
   const { data: gruposData, error: gruposErr } = await supabase
@@ -132,7 +150,7 @@ export async function cargarGuisados(
     .select('id, grupo_id, nombre, precio_extra, activa, insumos!insumo_id(disponible)')
     .in('grupo_id', grupoIds)
     .is('activa', true)
-    .order('orden')
+    .order(ordenOpciones.column, { ascending: ordenOpciones.ascending })
 
   if (opcionesErr) {
     console.error('[cargarGuisados] error opciones:', opcionesErr.message)

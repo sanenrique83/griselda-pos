@@ -14,6 +14,8 @@ export type ConfigPermisos = Pick<
   | 'transferencia_clabe'
   | 'transferencia_titular'
   | 'timeout_inactividad_minutos'
+  | 'orden_productos'
+  | 'orden_modificadores'
 >
 
 export default async function PermisosPage() {
@@ -34,7 +36,7 @@ export default async function PermisosPage() {
   const { data: config } = await supabase
     .from('config_sistema')
     .select(
-      'cancelaciones_mesero, descuentos_mesero, cancelar_pedido_mesero, ver_dashboard_mesero, propina_sugerida_pct, transferencia_banco, transferencia_clabe, transferencia_titular, timeout_inactividad_minutos',
+      'cancelaciones_mesero, descuentos_mesero, cancelar_pedido_mesero, ver_dashboard_mesero, propina_sugerida_pct, transferencia_banco, transferencia_clabe, transferencia_titular, timeout_inactividad_minutos, orden_productos, orden_modificadores',
     )
     .eq('id', 1)
     .single()

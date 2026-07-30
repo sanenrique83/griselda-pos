@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { CatalogoShell } from '@/components/catalogo/CatalogoShell'
+import { columnaOrden } from '@/lib/ordenCatalogo'
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ export type ProductoCatalogo = {
   categoria_id: number
   categoria_nombre: string
   es_combo: boolean
+  orden: number
 }
 
 export type InsumoCatalogo = {
@@ -96,6 +98,16 @@ export default async function CatalogoPage() {
 
   if (perfil?.rol !== 'admin') redirect('/mesas')
 
+  // ── Modo de orden del catálogo ─────────────────────────────────────────────
+  const { data: configOrden } = await supabase
+    .from('config_sistema')
+    .select('orden_productos, orden_modificadores')
+    .eq('id', 1)
+    .single()
+  const ordenProductos = columnaOrden((configOrden as any)?.orden_productos)
+  const modoOrdenProductos = (configOrden as any)?.orden_productos ?? 'personalizado'
+  const modoOrdenModificadores = (configOrden as any)?.orden_modificadores ?? 'personalizado'
+
   // ── Áreas y mesas ──────────────────────────────────────────────────────────
   const [
     { data: rawAreas },
@@ -107,7 +119,11 @@ export default async function CatalogoPage() {
     supabase.from('areas').select('id, nombre, orden, activa').eq('activa', true).order('orden'),
     supabase.from('mesas').select('id, area_id, numero, nombre, capacidad, activa').eq('activa', true).order('numero'),
     supabase.from('categorias').select('id, nombre, orden, activa, modo_captura').eq('activa', true).order('orden'),
-    supabase.from('productos').select('id, nombre, descripcion, precio, emoji, foto_url, disponible, activo, modo_captura, categoria_id, es_combo').eq('activo', true).order('orden'),
+    supabase
+      .from('productos')
+      .select('id, nombre, descripcion, precio, emoji, foto_url, disponible, activo, modo_captura, categoria_id, es_combo, orden')
+      .eq('activo', true)
+      .order(ordenProductos.column, { ascending: ordenProductos.ascending }),
     // Una sola fuente para insumos e "ingredientes" (unificados) — ver
     // vistas simplificadas más abajo.
     supabase.from('insumos').select('id, nombre, unidad_medida, disponible, created_at').eq('activo', true).order('nombre'),
@@ -154,6 +170,7 @@ export default async function CatalogoPage() {
     categoria_id: p.categoria_id,
     categoria_nombre: catMap.get(p.categoria_id) ?? '',
     es_combo: p.es_combo ?? false,
+    orden: p.orden ?? 0,
   }))
 
   const insumos: InsumoCatalogo[] = (rawInsumos ?? []).map((i: any) => ({
@@ -178,6 +195,8 @@ export default async function CatalogoPage() {
       productos={productos}
       ingredientes={ingredientes}
       insumos={insumos}
+      modoOrdenProductos={modoOrdenProductos}
+      modoOrdenModificadores={modoOrdenModificadores}
     />
   )
 }

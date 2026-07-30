@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Perfil } from '@/lib/types/database.types'
 import { MenuDelDiaShell } from '@/components/menu-del-dia/MenuDelDiaShell'
+import { columnaOrden } from '@/lib/ordenCatalogo'
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -35,6 +36,13 @@ export default async function MenuDelDiaPage() {
 
   if (perfil?.rol !== 'admin') redirect('/mas')
 
+  const { data: configOrden } = await supabase
+    .from('config_sistema')
+    .select('orden_productos')
+    .eq('id', 1)
+    .single()
+  const ordenProductos = columnaOrden((configOrden as any)?.orden_productos)
+
   const [{ data: rawCategorias }, { data: rawProductos }] = await Promise.all([
     supabase
       .from('categorias')
@@ -45,7 +53,7 @@ export default async function MenuDelDiaPage() {
       .from('productos')
       .select('id, nombre, emoji, disponible, categoria_id')
       .eq('activo', true)
-      .order('orden'),
+      .order(ordenProductos.column, { ascending: ordenProductos.ascending }),
   ])
 
   // Agrupar productos por categoría

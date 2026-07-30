@@ -13,6 +13,7 @@ import type {
   IngredienteCatalogo,
   InsumoCatalogo,
 } from '@/app/(app)/mas/catalogo/page'
+import type { ModoOrden } from '@/lib/ordenCatalogo'
 
 type Tab = 'mesas' | 'categorias' | 'productos' | 'ingredientes'
 
@@ -33,6 +34,8 @@ interface CatalogoShellProps {
   productos: ProductoCatalogo[]
   ingredientes: IngredienteCatalogo[]
   insumos: InsumoCatalogo[]
+  modoOrdenProductos: ModoOrden
+  modoOrdenModificadores: ModoOrden
 }
 
 export function CatalogoShell(props: CatalogoShellProps) {
@@ -49,6 +52,8 @@ function CatalogoShellInner({
   productos,
   ingredientes,
   insumos,
+  modoOrdenProductos,
+  modoOrdenModificadores,
 }: CatalogoShellProps) {
   const searchParams = useSearchParams()
   const tabInicial = searchParams.get('tab')
@@ -95,6 +100,8 @@ function CatalogoShellInner({
             ingredientes={ingredientes}
             insumos={insumos}
             editarProductoId={editarProductoId}
+            modoOrdenProductos={modoOrdenProductos}
+            modoOrdenModificadores={modoOrdenModificadores}
           />
         )}
         {tab === 'ingredientes' && (

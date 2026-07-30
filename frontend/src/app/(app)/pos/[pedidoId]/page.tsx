@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PosShell } from '@/components/pos/PosShell'
 import type { MesaOcupada } from '@/components/pos/SheetUnirMesa'
+import { columnaOrden } from '@/lib/ordenCatalogo'
 
 // ─── Tipos exportados (usados por PosShell y sub-componentes) ─────────────────
 
@@ -101,7 +102,7 @@ export default async function PosPage({
   // ── Permiso de cancelación ────────────────────────────────────────────────
   const { data: { user } } = await supabase.auth.getUser()
   const [{ data: config }, { data: perfil }] = await Promise.all([
-    supabase.from('config_sistema').select('cancelaciones_mesero, cancelar_pedido_mesero').eq('id', 1).single(),
+    supabase.from('config_sistema').select('cancelaciones_mesero, cancelar_pedido_mesero, orden_productos').eq('id', 1).single(),
     user ? supabase.from('perfiles').select('rol, nombre').eq('id', user.id).single() : Promise.resolve({ data: null }),
   ])
   const esAdmin = (perfil as any)?.rol === 'admin'
@@ -109,6 +110,7 @@ export default async function PosPage({
     esAdmin || (config as any)?.cancelaciones_mesero === true
   const puedeAnularPedido =
     esAdmin || (config as any)?.cancelar_pedido_mesero === true
+  const ordenProductos = columnaOrden((config as any)?.orden_productos)
   const meseroNombre: string =
     (perfil as any)?.nombre ?? user?.email?.split('@')[0] ?? 'Mesero'
   const rol: 'admin' | 'mesero' = (perfil as any)?.rol === 'admin' ? 'admin' : 'mesero'
@@ -128,7 +130,7 @@ export default async function PosPage({
         'id, nombre, descripcion, precio, emoji, disponible, modo_captura, categoria_id',
       )
       .eq('activo', true)
-      .order('orden'),
+      .order(ordenProductos.column, { ascending: ordenProductos.ascending }),
   ])
 
   // ── Transformar subpedidos ─────────────────────────────────────────────────

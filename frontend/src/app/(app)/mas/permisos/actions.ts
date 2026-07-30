@@ -58,3 +58,31 @@ export async function actualizarTimeoutInactividad(
 
   if (error) return { error: 'Error al actualizar el tiempo de inactividad.' }
 }
+
+type ModoOrden = 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
+
+export async function actualizarOrdenProductos(
+  modo: ModoOrden,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('config_sistema')
+    .update({ orden_productos: modo })
+    .eq('id', 1)
+
+  if (error) return { error: 'Error al actualizar el orden de productos.' }
+}
+
+export async function actualizarOrdenModificadores(
+  modo: ModoOrden,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('config_sistema')
+    .update({ orden_modificadores: modo })
+    .eq('id', 1)
+
+  if (error) return { error: 'Error al actualizar el orden de modificadores.' }
+}

@@ -6,8 +6,18 @@ import {
   actualizarBanco,
   actualizarPropina,
   actualizarTimeoutInactividad,
+  actualizarOrdenProductos,
+  actualizarOrdenModificadores,
 } from '@/app/(app)/mas/permisos/actions'
 import type { ConfigPermisos } from '@/app/(app)/mas/permisos/page'
+
+type ModoOrden = 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
+
+const OPCIONES_ORDEN: { value: ModoOrden; label: string }[] = [
+  { value: 'personalizado', label: 'Personalizado' },
+  { value: 'alfabetico_asc', label: 'A → Z' },
+  { value: 'alfabetico_desc', label: 'Z → A' },
+]
 
 const PERMISOS_MESERO: { campo: keyof ConfigPermisos; label: string; desc: string }[] = [
   {
@@ -98,6 +108,11 @@ export function PermisosShell({ config }: PermisosShellProps) {
   const [savingTimeout, setSavingTimeout] = useState(false)
   const [timeoutBanner, setTimeoutBanner] = useState<string | null>(null)
 
+  // Orden del catálogo
+  const [ordenProductos, setOrdenProductos] = useState<ModoOrden>(config.orden_productos)
+  const [ordenModificadores, setOrdenModificadores] = useState<ModoOrden>(config.orden_modificadores)
+  const [ordenBanner, setOrdenBanner] = useState<string | null>(null)
+
   function handleToggle(campo: keyof ConfigPermisos, valor: boolean) {
     // Optimistic update
     setPermisos((prev) => ({ ...prev, [campo]: valor }))
@@ -162,6 +177,34 @@ export function PermisosShell({ config }: PermisosShellProps) {
     } else {
       setTimeoutBanner('Guardado ✓')
       setTimeout(() => setTimeoutBanner(null), 3000)
+    }
+  }
+
+  async function handleCambiarOrdenProductos(modo: ModoOrden) {
+    const anterior = ordenProductos
+    setOrdenProductos(modo)
+    setOrdenBanner(null)
+    const result = await actualizarOrdenProductos(modo)
+    if (result?.error) {
+      setOrdenProductos(anterior)
+      setOrdenBanner(result.error)
+    } else {
+      setOrdenBanner('Guardado ✓')
+      setTimeout(() => setOrdenBanner(null), 3000)
+    }
+  }
+
+  async function handleCambiarOrdenModificadores(modo: ModoOrden) {
+    const anterior = ordenModificadores
+    setOrdenModificadores(modo)
+    setOrdenBanner(null)
+    const result = await actualizarOrdenModificadores(modo)
+    if (result?.error) {
+      setOrdenModificadores(anterior)
+      setOrdenBanner(result.error)
+    } else {
+      setOrdenBanner('Guardado ✓')
+      setTimeout(() => setOrdenBanner(null), 3000)
     }
   }
 
@@ -337,6 +380,62 @@ export function PermisosShell({ config }: PermisosShellProps) {
             >
               {savingTimeout ? 'Guardando…' : 'Guardar tiempo de inactividad'}
             </button>
+          </div>
+        </div>
+
+        {/* ── Orden del catálogo ────────────────────────────────────────────── */}
+        <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+          <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+              Orden del catálogo
+            </p>
+          </div>
+          <div className="px-4 py-4 space-y-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-3">
+                Productos (menú del POS y Catálogo)
+              </label>
+              <div className="flex gap-1.5">
+                {OPCIONES_ORDEN.map((o) => (
+                  <button
+                    key={o.value}
+                    onClick={() => handleCambiarOrdenProductos(o.value)}
+                    className={`flex-1 rounded-lg px-2 py-2.5 text-[12px] font-semibold transition-colors ${
+                      ordenProductos === o.value ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-3">
+                Opciones de modificadores
+              </label>
+              <div className="flex gap-1.5">
+                {OPCIONES_ORDEN.map((o) => (
+                  <button
+                    key={o.value}
+                    onClick={() => handleCambiarOrdenModificadores(o.value)}
+                    className={`flex-1 rounded-lg px-2 py-2.5 text-[12px] font-semibold transition-colors ${
+                      ordenModificadores === o.value ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-xs text-text-3">
+              &quot;Personalizado&quot; usa el orden que arrastras a mano en Catálogo. Los modos
+              alfabéticos lo ignoran.
+            </p>
+            {ordenBanner && (
+              <p className={`text-xs font-semibold ${ordenBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+                {ordenBanner}
+              </p>
+            )}
           </div>
         </div>
 

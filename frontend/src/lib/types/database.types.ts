@@ -56,6 +56,8 @@ export interface ConfigSistema {
   cancelar_pedido_mesero: boolean
   ver_dashboard_mesero: boolean
   timeout_inactividad_minutos: number
+  orden_productos: 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
+  orden_modificadores: 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
 }
 
 export interface Area {
@@ -122,6 +124,7 @@ export interface Producto {
   disponible: boolean
   disponible_actualizado_en: string | null
   activo: boolean
+  orden: number
   created_at: string
 }
 

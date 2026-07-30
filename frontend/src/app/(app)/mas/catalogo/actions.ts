@@ -180,11 +180,37 @@ export async function crearProducto(data: {
       es_combo: data.es_combo ?? false,
       activo: true,
       disponible: true,
+      orden: 99,
     })
     .select('id')
     .single()
   if (error || !prod) return { error: 'Error al crear el producto.' }
   return { id: prod.id }
+}
+
+// ─── Reordenamiento (drag-and-drop en Catálogo) ────────────────────────────────
+// Recibe la lista de ids en su nuevo orden visual y persiste orden=índice.
+// Solo tiene efecto visible cuando el modo correspondiente (orden_productos /
+// orden_modificadores en config_sistema) está en 'personalizado' — en modo
+// alfabético las queries ignoran esta columna.
+export async function reordenarProductos(ids: number[]): Promise<Err | undefined> {
+  const supabase = await createClient()
+  const resultados = await Promise.all(
+    ids.map((id, idx) => supabase.from('productos').update({ orden: idx }).eq('id', id)),
+  )
+  if (resultados.some((r) => r.error)) {
+    return { error: 'Error al guardar el nuevo orden de los productos.' }
+  }
+}
+
+export async function reordenarOpciones(ids: number[]): Promise<Err | undefined> {
+  const supabase = await createClient()
+  const resultados = await Promise.all(
+    ids.map((id, idx) => supabase.from('opciones_modificador').update({ orden: idx }).eq('id', id)),
+  )
+  if (resultados.some((r) => r.error)) {
+    return { error: 'Error al guardar el nuevo orden de las opciones.' }
+  }
 }
 
 export async function actualizarProducto(
