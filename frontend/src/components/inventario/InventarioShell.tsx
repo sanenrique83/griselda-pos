@@ -12,6 +12,7 @@ import type {
   ProveedorInventario,
   HistorialPrecioItem,
   CategoriaConRecetas,
+  TipoInsumo,
 } from '@/app/(app)/mas/inventario/page'
 
 type Tab = 'insumos' | 'proveedores' | 'compras' | 'recetas'
@@ -32,6 +33,7 @@ interface InventarioShellProps {
   proveedores: ProveedorInventario[]
   historial: HistorialPrecioItem[]
   categoriasConRecetas: CategoriaConRecetas[]
+  tiposInsumo: TipoInsumo[]
 }
 
 export function InventarioShell(props: InventarioShellProps) {
@@ -47,6 +49,7 @@ function InventarioShellInner({
   proveedores,
   historial,
   categoriasConRecetas,
+  tiposInsumo,
 }: InventarioShellProps) {
   const searchParams = useSearchParams()
   const tabInicial = searchParams.get('tab')
@@ -76,7 +79,7 @@ function InventarioShellInner({
 
       {/* Contenido del tab */}
       <div className="px-4 py-4">
-        {tab === 'insumos' && <SeccionInsumos insumos={insumos} />}
+        {tab === 'insumos' && <SeccionInsumos insumos={insumos} tiposInsumo={tiposInsumo} />}
         {tab === 'proveedores' && <SeccionProveedores proveedores={proveedores} />}
         {tab === 'compras' && <SeccionCompras historial={historial} proveedores={proveedores} />}
         {tab === 'recetas' && (

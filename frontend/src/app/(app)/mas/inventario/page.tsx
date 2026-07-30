@@ -17,6 +17,13 @@ export type InsumoInventario = {
   stock_minimo: number
   activo: boolean
   modo_obtencion: ModoObtencionInsumo
+  tipo_insumo_id: number | null
+}
+
+export type TipoInsumo = {
+  id: number
+  nombre: string
+  orden: number
 }
 
 export type ProveedorInventario = {
@@ -92,10 +99,11 @@ export default async function InventarioPage() {
     { data: rawComboProductos },
     { data: rawGrupos },
     { data: rawOpciones },
+    { data: rawTiposInsumo },
   ] = await Promise.all([
     supabase
       .from('insumos')
-      .select('id, nombre, unidad_medida, stock_actual, stock_minimo, activo, modo_obtencion')
+      .select('id, nombre, unidad_medida, stock_actual, stock_minimo, activo, modo_obtencion, tipo_insumo_id')
       .eq('activo', true)
       .order('nombre'),
     supabase
@@ -117,6 +125,7 @@ export default async function InventarioPage() {
     supabase.from('combo_productos').select('combo_id'),
     supabase.from('grupos_modificadores').select('id, producto_id, requerido').eq('activo', true),
     supabase.from('opciones_modificador').select('id, grupo_id, insumo_id').eq('activa', true),
+    supabase.from('tipos_insumo').select('id, nombre, orden').order('orden'),
   ])
 
   const insumos: InsumoInventario[] = (rawInsumos ?? []).map((i: any) => ({
@@ -127,6 +136,13 @@ export default async function InventarioPage() {
     stock_minimo: i.stock_minimo,
     activo: i.activo,
     modo_obtencion: i.modo_obtencion ?? 'comprado',
+    tipo_insumo_id: i.tipo_insumo_id ?? null,
+  }))
+
+  const tiposInsumo: TipoInsumo[] = (rawTiposInsumo ?? []).map((t: any) => ({
+    id: t.id,
+    nombre: t.nombre,
+    orden: t.orden ?? 0,
   }))
 
   const proveedores: ProveedorInventario[] = (rawProveedores ?? []).map((p: any) => ({
@@ -214,6 +230,7 @@ export default async function InventarioPage() {
       proveedores={proveedores}
       historial={historial}
       categoriasConRecetas={categoriasConRecetas}
+      tiposInsumo={tiposInsumo}
     />
   )
 }

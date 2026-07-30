@@ -16,6 +16,7 @@ export async function crearInsumo(data: {
   unidadMedida: UnidadMedida
   stockMinimo: number
   modoObtencion?: ModoObtencionInsumo
+  tipoInsumoId?: number | null
 }): Promise<{ id: number } | Err> {
   const supabase = await createClient()
   const { data: insumo, error } = await supabase
@@ -25,6 +26,7 @@ export async function crearInsumo(data: {
       unidad_medida: data.unidadMedida,
       stock_minimo: data.stockMinimo,
       modo_obtencion: data.modoObtencion ?? 'comprado',
+      tipo_insumo_id: data.tipoInsumoId ?? null,
     })
     .select('id')
     .single()
@@ -35,7 +37,13 @@ export async function crearInsumo(data: {
 
 export async function actualizarInsumo(
   id: number,
-  patch: { nombre: string; unidadMedida: UnidadMedida; stockMinimo: number; modoObtencion: ModoObtencionInsumo },
+  patch: {
+    nombre: string
+    unidadMedida: UnidadMedida
+    stockMinimo: number
+    modoObtencion: ModoObtencionInsumo
+    tipoInsumoId: number | null
+  },
 ): Promise<Err | undefined> {
   const supabase = await createClient()
   const { error } = await supabase
@@ -45,6 +53,7 @@ export async function actualizarInsumo(
       unidad_medida: patch.unidadMedida,
       stock_minimo: patch.stockMinimo,
       modo_obtencion: patch.modoObtencion,
+      tipo_insumo_id: patch.tipoInsumoId,
     })
     .eq('id', id)
   if (error) return { error: 'Error al actualizar el insumo.' }
@@ -56,6 +65,51 @@ export async function eliminarInsumo(id: number): Promise<Err | undefined> {
   const { error } = await supabase.from('insumos').update({ activo: false }).eq('id', id)
   if (error) return { error: 'Error al eliminar el insumo.' }
   revalidatePath('/mas/inventario')
+}
+
+// ─── Tipos de insumo (sub-pestañas de Inventario → Insumos) ────────────────
+// Sin soft-delete (a diferencia de categorias): tipos_insumo no tiene columna
+// `activo` — eliminar aquí es un DELETE real. La FK insumos.tipo_insumo_id
+// tiene ON DELETE SET NULL, así que los insumos que tenían este tipo caen
+// automáticamente a "Sin clasificar", nunca se bloquea ni se arrastran.
+
+export async function crearTipoInsumo(nombre: string): Promise<{ id: number } | Err> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('tipos_insumo')
+    .insert({ nombre, orden: 99 })
+    .select('id')
+    .single()
+  if (error || !data) return { error: 'Error al crear el tipo.' }
+  revalidatePath('/mas/inventario')
+  return { id: data.id }
+}
+
+export async function actualizarTipoInsumo(
+  id: number,
+  nombre: string,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+  const { error } = await supabase.from('tipos_insumo').update({ nombre }).eq('id', id)
+  if (error) return { error: 'Error al actualizar el tipo.' }
+  revalidatePath('/mas/inventario')
+}
+
+export async function eliminarTipoInsumo(id: number): Promise<Err | undefined> {
+  const supabase = await createClient()
+  const { error } = await supabase.from('tipos_insumo').delete().eq('id', id)
+  if (error) return { error: 'Error al eliminar el tipo.' }
+  revalidatePath('/mas/inventario')
+}
+
+export async function reordenarTiposInsumo(ids: number[]): Promise<Err | undefined> {
+  const supabase = await createClient()
+  const resultados = await Promise.all(
+    ids.map((id, idx) => supabase.from('tipos_insumo').update({ orden: idx }).eq('id', id)),
+  )
+  if (resultados.some((r) => r.error)) {
+    return { error: 'Error al guardar el nuevo orden de los tipos.' }
+  }
 }
 
 // ─── Proveedores ────────────────────────────────────────────────────────────
