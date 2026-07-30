@@ -9,6 +9,7 @@ import {
   toggleDisponible,
   subirImagenProducto,
   crearGrupoModificador,
+  actualizarGrupoModificador,
   eliminarGrupoModificador,
   guardarGrupoPadres,
   crearOpcion,
@@ -103,8 +104,9 @@ export function SeccionProductos({
   const [grupoError, setGrupoError] = useState<string | null>(null)
   const [, startGrupoTransition] = useTransition()
 
-  // Form nuevo grupo
+  // Form grupo (nuevo o editar — grupoEditandoId null = creando)
   const [showFormGrupo, setShowFormGrupo] = useState(false)
+  const [grupoEditandoId, setGrupoEditandoId] = useState<number | null>(null)
   const [fgNombre, setFgNombre] = useState('')
   const [fgRequerido, setFgRequerido] = useState(false)
   const [fgMin, setFgMin] = useState('1')
@@ -128,6 +130,7 @@ export function SeccionProductos({
     setGrupos([])
     setGrupoError(null)
     setShowFormGrupo(false)
+    setGrupoEditandoId(null)
     setOpFormId(null)
     setOpEditandoId(null)
 
@@ -311,12 +314,88 @@ export function SeccionProductos({
 
   // ── Handlers modificadores ─────────────────────────────────────────────────
 
-  function handleCrearGrupo() {
+  function resetFormGrupo() {
+    setFgNombre('')
+    setFgRequerido(false)
+    setFgMin('1')
+    setFgMax('1')
+    setFgRapido(false)
+    setFgOpcionesPadre([])
+    setGrupoEditandoId(null)
+    setShowFormGrupo(false)
+  }
+
+  function abrirFormGrupo(grupo?: GrupoLocal) {
+    setGrupoError(null)
+    if (grupo) {
+      setGrupoEditandoId(grupo.id)
+      setFgNombre(grupo.nombre)
+      setFgRequerido(grupo.requerido)
+      setFgMin(grupo.minimo.toString())
+      setFgMax(grupo.maximo.toString())
+      setFgRapido(grupo.mostrar_en_rapido)
+      setFgOpcionesPadre(grupo.opciones_padre)
+    } else {
+      setGrupoEditandoId(null)
+      setFgNombre('')
+      setFgRequerido(false)
+      setFgMin('1')
+      setFgMax('1')
+      setFgRapido(false)
+      setFgOpcionesPadre([])
+    }
+    setShowFormGrupo(true)
+  }
+
+  function handleGuardarGrupo() {
     if (!fgNombre.trim() || sheet.tipo !== 'editar') return
-    const prodId = sheet.prod.id
     const minimo = fgRequerido ? (parseInt(fgMin) || 1) : 0
     const maximo = parseInt(fgMax) || 1
 
+    if (grupoEditandoId !== null) {
+      const grupoId = grupoEditandoId
+      startGrupoTransition(async () => {
+        const result = await actualizarGrupoModificador(grupoId, {
+          nombre: fgNombre.trim(),
+          requerido: fgRequerido,
+          minimo,
+          maximo,
+          mostrar_en_rapido: fgRapido,
+        })
+        if (result?.error) { setGrupoError(result.error); return }
+
+        // A diferencia de crear (donde un grupo nuevo nunca tiene padres que
+        // limpiar), aquí SIEMPRE se llama — así, si el usuario quitó todos
+        // los checks, guardarGrupoPadres borra los que ya existían en vez
+        // de dejarlos como estaban.
+        let opcionesPadreGuardadas = fgOpcionesPadre
+        const padresResult = await guardarGrupoPadres(grupoId, fgOpcionesPadre)
+        if (padresResult?.error) {
+          setGrupoError(padresResult.error)
+          opcionesPadreGuardadas = grupos.find((g) => g.id === grupoId)?.opciones_padre ?? []
+        }
+
+        setGrupos((prev) =>
+          prev.map((g) =>
+            g.id === grupoId
+              ? {
+                  ...g,
+                  nombre: fgNombre.trim(),
+                  requerido: fgRequerido,
+                  minimo,
+                  maximo,
+                  mostrar_en_rapido: fgRapido,
+                  opciones_padre: opcionesPadreGuardadas,
+                }
+              : g,
+          ),
+        )
+        resetFormGrupo()
+      })
+      return
+    }
+
+    const prodId = sheet.prod.id
     startGrupoTransition(async () => {
       const result = await crearGrupoModificador({
         productoId: prodId,
@@ -351,13 +430,7 @@ export function SeccionProductos({
           opciones_padre: opcionesPadreGuardadas,
         },
       ])
-      setFgNombre('')
-      setFgRequerido(false)
-      setFgMin('1')
-      setFgMax('1')
-      setFgRapido(false)
-      setFgOpcionesPadre([])
-      setShowFormGrupo(false)
+      resetFormGrupo()
     })
   }
 
@@ -863,6 +936,13 @@ export function SeccionProductos({
                         )}
                       </div>
                       <button
+                        onClick={() => abrirFormGrupo(grupo)}
+                        className="flex-shrink-0 rounded-full p-1 text-blue-600 active:opacity-60"
+                        title="Editar grupo"
+                      >
+                        ✎
+                      </button>
+                      <button
                         onClick={() => handleEliminarGrupo(grupo.id)}
                         className="flex-shrink-0 rounded-full p-1 text-red-500 active:opacity-60"
                         title="Eliminar grupo"
@@ -997,9 +1077,12 @@ export function SeccionProductos({
                 ))}
               </div>
 
-              {/* Form nuevo grupo */}
+              {/* Form nuevo grupo / editar grupo */}
               {showFormGrupo ? (
                 <div className="mt-3 space-y-2.5 rounded-xl border border-[#D1D1D6] p-3">
+                  <p className="text-[12px] font-bold text-text-2">
+                    {grupoEditandoId !== null ? 'Editar grupo' : 'Nuevo grupo'}
+                  </p>
                   <div>
                     <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-3">
                       Nombre del grupo *
@@ -1060,14 +1143,18 @@ export function SeccionProductos({
                     </div>
                   </div>
 
-                  {/* Depende de opciones de otro grupo (condicional) */}
-                  {grupos.some((g) => g.opciones.some((o) => o.activa)) && (
+                  {/* Depende de opciones de otro grupo (condicional) — un
+                      grupo no puede depender de sus propias opciones, así
+                      que al editar se excluye de la lista de candidatos. */}
+                  {grupos.some((g) => g.id !== grupoEditandoId && g.opciones.some((o) => o.activa)) && (
                     <div>
                       <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-3">
                         ¿Este grupo depende de alguna opción elegida antes?
                       </label>
                       <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border-[1.5px] border-border bg-s2 p-2">
-                        {grupos.map((g) =>
+                        {grupos
+                          .filter((g) => g.id !== grupoEditandoId)
+                          .map((g) =>
                           g.opciones
                             .filter((o) => o.activa)
                             .map((o) => (
@@ -1125,13 +1212,13 @@ export function SeccionProductos({
                   {/* Botones */}
                   <div className="flex gap-2 pt-1">
                     <button
-                      onClick={handleCrearGrupo}
+                      onClick={handleGuardarGrupo}
                       className="flex-[2] rounded-xl bg-blue-600 py-2.5 text-[13px] font-bold text-white active:opacity-80"
                     >
-                      Crear grupo
+                      {grupoEditandoId !== null ? 'Guardar cambios' : 'Crear grupo'}
                     </button>
                     <button
-                      onClick={() => setShowFormGrupo(false)}
+                      onClick={resetFormGrupo}
                       className="flex-1 rounded-xl bg-s2 py-2.5 text-[13px] font-semibold text-text-3 active:opacity-80"
                     >
                       Cancelar
@@ -1140,7 +1227,7 @@ export function SeccionProductos({
                 </div>
               ) : (
                 <button
-                  onClick={() => setShowFormGrupo(true)}
+                  onClick={() => abrirFormGrupo()}
                   className="mt-3 w-full rounded-xl border-[1.5px] border-dashed border-[#D1D1D6] py-3 text-[13px] font-semibold text-text-3 active:bg-s2"
                 >
                   + Agregar grupo
