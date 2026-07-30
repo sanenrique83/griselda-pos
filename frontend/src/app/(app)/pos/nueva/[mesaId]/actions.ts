@@ -20,6 +20,30 @@ export async function abrirPedidoMesa(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Sin sesión.' }
 
+  // Protección contra condición de carrera (dos meseros tocando la misma
+  // mesa casi simultáneo, ej. en ElegirSillaInicialShell antes de que la
+  // pantalla del segundo se haya refrescado): si ya hay un pedido abierto en
+  // esta mesa —como mesa principal o como satélite unida vía pedido_mesas—
+  // se usa ese en vez de crear uno duplicado. La silla elegida por el
+  // segundo mesero se descarta en ese caso (la mesa ya tiene su comensal 1).
+  const { data: pedidoExistente } = await supabase
+    .from('pedidos')
+    .select('id')
+    .eq('mesa_id', mesaId)
+    .eq('estado', 'abierto')
+    .maybeSingle()
+
+  if (pedidoExistente) return { pedidoId: pedidoExistente.id }
+
+  const { data: satelites } = await supabase
+    .from('pedido_mesas')
+    .select('pedido_id, pedidos!inner(estado)')
+    .eq('mesa_id', mesaId)
+    .eq('pedidos.estado', 'abierto')
+    .limit(1)
+
+  if (satelites && satelites.length > 0) return { pedidoId: satelites[0].pedido_id }
+
   const { data: pedido, error: pedidoErr } = await supabase
     .from('pedidos')
     .insert({
