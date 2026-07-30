@@ -27,6 +27,7 @@ interface PosShellProps {
   productos: ProductoCatalogo[]
   mesasOcupadas?: MesaOcupada[]
   puedesCancelar?: boolean
+  puedeAnularPedido?: boolean
   meseroNombre?: string
   rol?: string
   tipoMesa?: 'mesa' | 'llevar' | 'mostrador'
@@ -44,6 +45,7 @@ export function PosShell({
   productos,
   mesasOcupadas = [],
   puedesCancelar = false,
+  puedeAnularPedido = false,
   meseroNombre = 'Mesero',
   rol = 'mesero',
   tipoMesa = 'mesa',
@@ -305,6 +307,8 @@ export function PosShell({
             onCambiarSubpedido={(id) => setSubpedidoActivoId(id)}
             onAgregar={() => setVista('menu')}
             puedesCancelar={puedesCancelar}
+            puedeAnularPedido={puedeAnularPedido}
+            mesaId={mesaId ?? null}
             mesaLabel={mesaLabel}
             meseroNombre={meseroNombre}
             rol={rol}

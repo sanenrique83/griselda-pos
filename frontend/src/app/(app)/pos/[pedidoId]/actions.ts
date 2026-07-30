@@ -1,7 +1,8 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { imprimirTicket } from '@/lib/print'
+import { imprimirTicket, type ItemCancelacion } from '@/lib/print'
+import { anularPedido } from '@/app/(app)/cobro/[pedidoId]/actions'
 
 type Err = { error: string }
 
@@ -403,6 +404,120 @@ export async function eliminarComensal(
     .from('pedidos')
     .update({ num_comensales: nuevoMax })
     .eq('id', pedidoId)
+}
+
+// ─── Anular pedido completo (desde la comanda) ─────────────────────────────────
+// A diferencia de anularPedido() (cobro/actions.ts — solo disponible ahí cuando
+// el total ya quedó en $0 tras cancelar cada ítem a mano), esta acción cancela
+// TODOS los ítems del pedido de una sola vez con un motivo compartido:
+//   - 'enviado'   → se revierte inventario vía cancelar_item_enviado() (mismo
+//                   RPC que usa cancelarItem) y queda registrado en
+//                   `cancelaciones` con el motivo, porque de verdad se preparó.
+//   - 'pendiente' → se marca 'cancelado' directo, nada que revertir.
+// Al final reutiliza anularPedido() para cerrar el pedido y liberar mesas.
+export async function anularPedidoCompleto(
+  pedidoId: number,
+  mesaId: number | null,
+  motivo: string,
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Sin sesión.' }
+
+  const [{ data: perfil }, { data: config }] = await Promise.all([
+    supabase.from('perfiles').select('nombre, rol').eq('id', user.id).single(),
+    supabase.from('config_sistema').select('cancelar_pedido_mesero, impresion_activa').eq('id', 1).single(),
+  ])
+
+  const esAdmin = (perfil as any)?.rol === 'admin'
+  if (!esAdmin && !(config as any)?.cancelar_pedido_mesero) {
+    return { error: 'No tienes permiso para anular pedidos.' }
+  }
+
+  const { data: pedido } = await supabase
+    .from('pedidos')
+    .select('tipo, mesas(numero, nombre)')
+    .eq('id', pedidoId)
+    .single()
+  if (!pedido) return { error: 'Pedido no encontrado.' }
+
+  const { data: subs } = await supabase
+    .from('subpedidos')
+    .select(
+      'estado, pedido_productos(id, estado, precio_unit, cantidad, nombre_libre, productos(nombre), pedido_producto_opciones(precio_extra, opciones_modificador(nombre)))',
+    )
+    .eq('pedido_id', pedidoId)
+
+  if ((subs ?? []).some((s: any) => s.estado === 'pagado')) {
+    return { error: 'No se puede anular: ya hay pagos parciales registrados en este pedido.' }
+  }
+
+  const items = (subs ?? []).flatMap((s: any) => s.pedido_productos ?? [])
+  const enviados = items.filter((i: any) => i.estado === 'enviado')
+  const pendientes = items.filter((i: any) => i.estado === 'pendiente')
+
+  // 1. Pendientes: nada que revertir, se cancelan directo.
+  if (pendientes.length > 0) {
+    const { error } = await supabase
+      .from('pedido_productos')
+      .update({ estado: 'cancelado' })
+      .in('id', pendientes.map((i: any) => i.id))
+    if (error) return { error: 'Error al cancelar los ítems pendientes.' }
+  }
+
+  // 2. Enviados: revertir inventario uno por uno y registrar la cancelación.
+  const meseroNombre = (perfil as any)?.nombre ?? user.email?.split('@')[0] ?? 'Mesero'
+  const itemsTicket: ItemCancelacion[] = []
+
+  for (const it of enviados) {
+    const { error } = await supabase.rpc('cancelar_item_enviado', {
+      p_pedido_producto_id: it.id,
+    })
+    if (error) return { error: error.message || 'Error al cancelar un ítem enviado.' }
+
+    const extrasTotal = (it.pedido_producto_opciones ?? []).reduce(
+      (s: number, o: any) => s + o.precio_extra,
+      0,
+    )
+    const montoAfectado = (it.precio_unit + extrasTotal) * it.cantidad
+
+    await supabase.from('cancelaciones').insert({
+      pedido_producto_id: it.id,
+      usuario_id: user.id,
+      motivo,
+      monto_afectado: montoAfectado,
+    })
+
+    itemsTicket.push({
+      nombre: it.nombre_libre || it.productos?.nombre || 'Producto',
+      cantidad: it.cantidad,
+      modificadores: (it.pedido_producto_opciones ?? [])
+        .map((o: any) => o.opciones_modificador?.nombre as string | undefined)
+        .filter((n: string | undefined): n is string => !!n),
+      motivo,
+      canceladoPor: meseroNombre,
+    })
+  }
+
+  // 3. Ticket de anulación en cocina (un solo ticket con todos los ítems
+  // enviados que se cancelan) — fallo silencioso, no bloquea la anulación.
+  if (itemsTicket.length > 0) {
+    const mesaData = (pedido as any).mesas
+    const mesaLabel =
+      pedido.tipo === 'mesa'
+        ? (mesaData?.nombre ?? `Mesa ${mesaData?.numero ?? pedidoId}`)
+        : 'Para llevar'
+
+    void imprimirTicket(
+      { tipo: 'cancelacion', mesa: mesaLabel, mesero: meseroNombre, items: itemsTicket },
+      (config as any)?.impresion_activa ?? false,
+    )
+  }
+
+  // 4. Cerrar el pedido y liberar mesas (mismo camino que "Anular mesa" en cobro).
+  const result = await anularPedido(pedidoId, mesaId)
+  return result?.error ? { error: result.error } : {}
 }
 
 // ─── Compartir mesa (crear mesa temporal con su propio pedido) ────────────────

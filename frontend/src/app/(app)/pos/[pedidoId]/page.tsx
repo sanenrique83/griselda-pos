@@ -101,11 +101,14 @@ export default async function PosPage({
   // ── Permiso de cancelación ────────────────────────────────────────────────
   const { data: { user } } = await supabase.auth.getUser()
   const [{ data: config }, { data: perfil }] = await Promise.all([
-    supabase.from('config_sistema').select('cancelaciones_mesero').eq('id', 1).single(),
+    supabase.from('config_sistema').select('cancelaciones_mesero, cancelar_pedido_mesero').eq('id', 1).single(),
     user ? supabase.from('perfiles').select('rol, nombre').eq('id', user.id).single() : Promise.resolve({ data: null }),
   ])
+  const esAdmin = (perfil as any)?.rol === 'admin'
   const puedesCancelar =
-    (perfil as any)?.rol === 'admin' || (config as any)?.cancelaciones_mesero === true
+    esAdmin || (config as any)?.cancelaciones_mesero === true
+  const puedeAnularPedido =
+    esAdmin || (config as any)?.cancelar_pedido_mesero === true
   const meseroNombre: string =
     (perfil as any)?.nombre ?? user?.email?.split('@')[0] ?? 'Mesero'
   const rol: 'admin' | 'mesero' = (perfil as any)?.rol === 'admin' ? 'admin' : 'mesero'
@@ -201,6 +204,7 @@ export default async function PosPage({
       productos={productos}
       mesasOcupadas={mesasOcupadas}
       puedesCancelar={puedesCancelar}
+      puedeAnularPedido={puedeAnularPedido}
       meseroNombre={meseroNombre}
       rol={rol}
       tipoMesa={tipoMesa}

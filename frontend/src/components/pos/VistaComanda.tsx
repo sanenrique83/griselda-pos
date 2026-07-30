@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ItemComandaRow } from './ItemComanda'
-import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem, eliminarProductoPendiente, moverProducto, dividirProducto } from '@/app/(app)/pos/[pedidoId]/actions'
+import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem, eliminarProductoPendiente, moverProducto, dividirProducto, anularPedidoCompleto } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { SubpedidoPOS, ItemComanda } from '@/app/(app)/pos/[pedidoId]/page'
 import { imprimirTicket } from '@/lib/print'
 
@@ -21,6 +21,8 @@ interface VistaComandaProps {
   onCambiarSubpedido: (id: number) => void
   onAgregar: () => void // vuelve a vista menú
   puedesCancelar?: boolean
+  puedeAnularPedido?: boolean
+  mesaId?: number | null
   mesaLabel?: string
   meseroNombre?: string
   rol?: string
@@ -34,6 +36,8 @@ export function VistaComanda({
   onCambiarSubpedido,
   onAgregar,
   puedesCancelar = false,
+  puedeAnularPedido = false,
+  mesaId = null,
   mesaLabel = '',
   meseroNombre = 'Mesero',
   rol = 'mesero',
@@ -53,6 +57,9 @@ export function VistaComanda({
   const [itemAMover, setItemAMover] = useState<ItemComanda | null>(null)
   const [cantidadMover, setCantidadMover] = useState(1)
   const [isPendingReimprimir, setIsPendingReimprimir] = useState(false)
+  const [sheetAnularOpen, setSheetAnularOpen] = useState(false)
+  const [motivoAnularIdx, setMotivoAnularIdx] = useState(0)
+  const [isPendingAnular, startAnular] = useTransition()
 
   useEffect(() => {
     if (printError) {
@@ -228,6 +235,19 @@ export function VistaComanda({
     })
   }
 
+  function handleAnularPedido() {
+    setError(null)
+    const motivo = MOTIVOS_CANCELACION[motivoAnularIdx]
+    startAnular(async () => {
+      const result = await anularPedidoCompleto(pedidoId, mesaId ?? null, motivo)
+      if (result?.error) {
+        setError(result.error)
+        setSheetAnularOpen(false)
+      }
+      // Sin error: anularPedidoCompleto → anularPedido() ya redirige a /mesas.
+    })
+  }
+
   function handleAgregarComensal() {
     setError(null)
     startComensal(async () => {
@@ -300,6 +320,16 @@ export function VistaComanda({
             className="flex-shrink-0 px-3 py-2.5 text-[13px] font-medium text-text-3 active:opacity-60 disabled:opacity-40"
           >
             {isPendingReimprimir ? '…' : '🖨 Reimprimir'}
+          </button>
+        )}
+
+        {/* Anular pedido completo */}
+        {puedeAnularPedido && (
+          <button
+            onClick={() => { setMotivoAnularIdx(0); setSheetAnularOpen(true) }}
+            className="flex-shrink-0 px-3 py-2.5 text-[13px] font-medium text-red-600 active:opacity-60"
+          >
+            🗑 Anular pedido
           </button>
         )}
       </div>
@@ -480,6 +510,67 @@ export function VistaComanda({
                 className="w-full rounded-xl bg-s2 py-[15px] text-[15px] font-semibold text-text-2 active:scale-[.98] disabled:opacity-40"
               >
                 Cancelar
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Bottom sheet: Anular pedido completo ────────────────────────── */}
+      {sheetAnularOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-[65] bg-black/40"
+            onClick={() => !isPendingAnular && setSheetAnularOpen(false)}
+          />
+          <div className="fixed bottom-0 left-0 right-0 z-[70] max-h-[85vh] flex flex-col rounded-t-2xl bg-white">
+            <div className="flex-shrink-0 px-4 pt-5 pb-3 border-b border-[#E5E5EA]">
+              <p className="text-[16px] font-bold leading-snug text-red-600">
+                Anular pedido completo
+              </p>
+              <p className="mt-0.5 text-xs text-text-3">Selecciona el motivo</p>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+              {MOTIVOS_CANCELACION.map((m, idx) => (
+                <button
+                  key={m}
+                  onClick={() => setMotivoAnularIdx(idx)}
+                  className={`w-full flex items-center gap-3 rounded-xl px-4 py-3.5 text-left transition-colors ${
+                    motivoAnularIdx === idx
+                      ? 'bg-red-50 border-[1.5px] border-red-300'
+                      : 'bg-s2 border-[1.5px] border-transparent'
+                  }`}
+                >
+                  <div
+                    className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-bold text-white transition-all ${
+                      motivoAnularIdx === idx ? 'border-red-500 bg-red-500' : 'border-border'
+                    }`}
+                  >
+                    {motivoAnularIdx === idx && '✓'}
+                  </div>
+                  <span className="text-[14px] font-medium">{m}</span>
+                </button>
+              ))}
+
+              <div className="mt-2 rounded-xl bg-red-50 px-4 py-3 text-xs text-red-700">
+                ⚠️ Se cancelarán <strong>todos</strong> los productos de este pedido y se
+                cerrará la mesa. Esta acción no se puede deshacer.
+              </div>
+            </div>
+            <div className="flex-shrink-0 px-4 py-4 border-t border-[#E5E5EA] space-y-2.5">
+              <button
+                onClick={handleAnularPedido}
+                disabled={isPendingAnular}
+                className="w-full rounded-xl bg-red-600 py-[15px] text-[15px] font-bold text-white shadow-[0_4px_14px_rgba(220,38,38,.3)] active:scale-[.98] disabled:opacity-40"
+              >
+                {isPendingAnular ? 'Anulando…' : 'Sí, anular pedido completo'}
+              </button>
+              <button
+                onClick={() => setSheetAnularOpen(false)}
+                disabled={isPendingAnular}
+                className="w-full rounded-xl bg-s2 py-[15px] text-[15px] font-semibold text-text-2 active:scale-[.98] disabled:opacity-40"
+              >
+                No anular
               </button>
             </div>
           </div>
