@@ -80,6 +80,7 @@ export interface Mesa {
   rotacion: number | null
   forma: FormaMesa | null
   tamano: TamanoMesa | null
+  asientos_horario: boolean
 }
 
 export interface Impresora {

@@ -900,3 +900,39 @@ export async function agregarComensal(
 
   return { nuevoId: nuevo.id }
 }
+
+// ─── Asignar / reasignar silla física a un comensal ────────────────────────────
+// Sin columna UNIQUE en BD (el pedido no lo requiere) — se valida aquí que
+// ninguna otra silla del mismo pedido tenga ya ese número, para que dos
+// comensales nunca queden marcados en la misma silla por error.
+export async function asignarSilla(
+  subpedidoId: number,
+  sillaNumero: number | null,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  if (sillaNumero !== null) {
+    const { data: actual } = await supabase
+      .from('subpedidos')
+      .select('pedido_id')
+      .eq('id', subpedidoId)
+      .single()
+    if (!actual) return { error: 'Comensal no encontrado.' }
+
+    const { data: choque } = await supabase
+      .from('subpedidos')
+      .select('id')
+      .eq('pedido_id', actual.pedido_id)
+      .eq('silla_numero', sillaNumero)
+      .neq('id', subpedidoId)
+      .maybeSingle()
+    if (choque) return { error: 'Esa silla ya está asignada a otro comensal.' }
+  }
+
+  const { error } = await supabase
+    .from('subpedidos')
+    .update({ silla_numero: sillaNumero })
+    .eq('id', subpedidoId)
+
+  if (error) return { error: 'Error al asignar la silla.' }
+}

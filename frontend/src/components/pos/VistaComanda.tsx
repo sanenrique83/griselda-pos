@@ -4,8 +4,9 @@ import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ItemComandaRow } from './ItemComanda'
 import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem, eliminarProductoPendiente, moverProducto, dividirProducto, anularPedidoCompleto } from '@/app/(app)/pos/[pedidoId]/actions'
-import type { SubpedidoPOS, ItemComanda } from '@/app/(app)/pos/[pedidoId]/page'
+import type { SubpedidoPOS, ItemComanda, MesaSillas } from '@/app/(app)/pos/[pedidoId]/page'
 import { imprimirTicket } from '@/lib/print'
+import { SheetAsientos } from './SheetAsientos'
 
 const MOTIVOS_CANCELACION = [
   'Error de captura',
@@ -27,6 +28,7 @@ interface VistaComandaProps {
   meseroNombre?: string
   rol?: string
   tipoMesa?: 'mesa' | 'llevar' | 'mostrador'
+  mesaSillas?: MesaSillas
 }
 
 export function VistaComanda({
@@ -42,6 +44,7 @@ export function VistaComanda({
   meseroNombre = 'Mesero',
   rol = 'mesero',
   tipoMesa = 'mesa',
+  mesaSillas = null,
 }: VistaComandaProps) {
   const router = useRouter()
   const [isPendingEnviar, startEnviar] = useTransition()
@@ -60,6 +63,8 @@ export function VistaComanda({
   const [sheetAnularOpen, setSheetAnularOpen] = useState(false)
   const [motivoAnularIdx, setMotivoAnularIdx] = useState(0)
   const [isPendingAnular, startAnular] = useTransition()
+  const [sheetAsientosOpen, setSheetAsientosOpen] = useState(false)
+  const [comensalParaAsiento, setComensalParaAsiento] = useState<number | null>(null)
 
   useEffect(() => {
     if (printError) {
@@ -231,6 +236,10 @@ export function VistaComanda({
         setItemAMover(null)
         router.refresh()
         onCambiarSubpedido(nuevo.nuevoId)
+        if (mesaSillas) {
+          setComensalParaAsiento(nuevo.nuevoId)
+          setSheetAsientosOpen(true)
+        }
       }
     })
   }
@@ -257,6 +266,10 @@ export function VistaComanda({
       } else {
         router.refresh()
         onCambiarSubpedido(result.nuevoId)
+        if (mesaSillas) {
+          setComensalParaAsiento(result.nuevoId)
+          setSheetAsientosOpen(true)
+        }
       }
     })
   }
@@ -267,6 +280,7 @@ export function VistaComanda({
       <div className="flex overflow-x-auto border-b border-[#E5E5EA] bg-white scrollbar-none">
         {subpedidos.map((sub) => {
           const label = sub.nombre ?? `Comensal ${sub.comensal_numero}`
+          const labelConSilla = sub.silla_numero ? `${label} — Silla ${sub.silla_numero}` : label
           const activo = sub.id === subpedidoActivoId
           const tienePendientes = sub.items.some((i) => i.estado === 'pendiente')
           const vacio = sub.items.length === 0
@@ -284,7 +298,7 @@ export function VistaComanda({
                     : 'border-transparent text-text-3'
                 }`}
               >
-                {label}
+                {labelConSilla}
                 {tienePendientes && (
                   <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-blue-600" />
                 )}
@@ -320,6 +334,16 @@ export function VistaComanda({
             className="flex-shrink-0 px-3 py-2.5 text-[13px] font-medium text-text-3 active:opacity-60 disabled:opacity-40"
           >
             {isPendingReimprimir ? '…' : '🖨 Reimprimir'}
+          </button>
+        )}
+
+        {/* Ver/asignar sillas */}
+        {mesaSillas && (
+          <button
+            onClick={() => { setComensalParaAsiento(null); setSheetAsientosOpen(true) }}
+            className="flex-shrink-0 px-3 py-2.5 text-[13px] font-medium text-text-3 active:opacity-60"
+          >
+            🪑 Sillas
           </button>
         )}
 
@@ -576,6 +600,15 @@ export function VistaComanda({
           </div>
         </>
       )}
+
+      {/* ── Sheet: Asientos ──────────────────────────────────────────────── */}
+      <SheetAsientos
+        open={sheetAsientosOpen}
+        onClose={() => setSheetAsientosOpen(false)}
+        subpedidos={subpedidos}
+        mesaSillas={mesaSillas}
+        comensalPreseleccionadoId={comensalParaAsiento}
+      />
 
       {/* Footer fijo */}
       <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 border-t border-[#E5E5EA] bg-white px-4 py-3.5">

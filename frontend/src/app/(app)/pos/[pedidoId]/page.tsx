@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PosShell } from '@/components/pos/PosShell'
 import type { MesaOcupada } from '@/components/pos/SheetUnirMesa'
 import { columnaOrden } from '@/lib/ordenCatalogo'
+import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
 
 // ─── Tipos exportados (usados por PosShell y sub-componentes) ─────────────────
 
@@ -23,9 +24,21 @@ export type SubpedidoPOS = {
   id: number
   comensal_numero: number
   nombre: string | null
+  silla_numero: number | null
   total: number
   items: ItemComanda[]
 }
+
+// Geometría de la mesa física, para calcular las posiciones de silla en el
+// frontend (ver lib/asientos.ts) — null si el pedido no es de tipo 'mesa'
+// (para llevar / mostrador no tienen sillas que asignar).
+export type MesaSillas = {
+  capacidad: number | null
+  forma: FormaMesa
+  tamano: TamanoMesa
+  rotacion: number
+  asientosHorario: boolean
+} | null
 
 export type ProductoCatalogo = {
   id: number
@@ -59,7 +72,9 @@ export default async function PosPage({
   // ── Pedido + mesa ──────────────────────────────────────────────────────────
   const { data: pedido } = await supabase
     .from('pedidos')
-    .select('id, created_at, tipo, num_comensales, mesa_id, mesas(numero, nombre)')
+    .select(
+      'id, created_at, tipo, num_comensales, mesa_id, mesas(numero, nombre, capacidad, forma, tamano, rotacion, asientos_horario)',
+    )
     .eq('id', pedidoId)
     .single()
 
@@ -69,7 +84,7 @@ export default async function PosPage({
   const { data: rawSubs } = await supabase
     .from('subpedidos')
     .select(`
-      id, comensal_numero, nombre,
+      id, comensal_numero, nombre, silla_numero,
       pedido_productos(
         id, cantidad, precio_unit, estado, notas, nombre_libre,
         productos(nombre, emoji, categorias(nombre)),
@@ -168,13 +183,26 @@ export default async function PosPage({
       id: sub.id,
       comensal_numero: sub.comensal_numero,
       nombre: sub.nombre ?? null,
+      silla_numero: sub.silla_numero ?? null,
       total: subTotal,
       items,
     }
   })
 
-  // ── Label del pedido ───────────────────────────────────────────────────────
+  // ── Geometría de la mesa (para el diagrama de sillas) ──────────────────────
   const mesa = (pedido as any).mesas
+  const mesaSillas: MesaSillas =
+    pedido.tipo === 'mesa' && mesa
+      ? {
+          capacidad: mesa.capacidad ?? null,
+          forma: mesa.forma ?? 'rectangulo',
+          tamano: mesa.tamano ?? 'medio',
+          rotacion: mesa.rotacion ?? 0,
+          asientosHorario: mesa.asientos_horario ?? true,
+        }
+      : null
+
+  // ── Label del pedido ───────────────────────────────────────────────────────
   const mesaLabel =
     pedido.tipo === 'mesa'
       ? (mesa?.nombre ?? `Mesa ${mesa?.numero ?? pedidoId}`)
@@ -210,6 +238,7 @@ export default async function PosPage({
       meseroNombre={meseroNombre}
       rol={rol}
       tipoMesa={tipoMesa}
+      mesaSillas={mesaSillas}
     />
   )
 }
