@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -55,7 +56,8 @@ export default async function RecetarioPage() {
   return (
     <div className="min-h-full bg-s2">
       <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <h1 className="text-[20px] font-bold leading-tight">Recetario</h1>
+        <BotonRegresarMas />
+        <h1 className="mt-1 text-[20px] font-bold leading-tight">Recetario</h1>
         <p className="mt-0.5 text-[13px] text-text-3">
           Instrucciones e insumos por producto, para consulta en cocina
         </p>

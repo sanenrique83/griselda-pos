@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
 import {
   actualizarPermiso,
   actualizarBanco,
@@ -212,7 +213,8 @@ export function PermisosShell({ config }: PermisosShellProps) {
     <div className="min-h-full bg-s2">
       {/* Header */}
       <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <h1 className="text-[20px] font-bold leading-tight">Permisos y config.</h1>
+        <BotonRegresarMas />
+        <h1 className="mt-1 text-[20px] font-bold leading-tight">Permisos y config.</h1>
       </div>
 
       <div className="px-4 py-4 space-y-5">

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
 import { guardarConfigTicket } from '@/app/(app)/mas/configuracion/actions'
 import type { TicketConfig } from '@/lib/print'
 
@@ -51,7 +52,8 @@ export function TicketConfigShell({ initialConfig }: Props) {
     <div className="min-h-full bg-s2">
       {/* Header */}
       <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <h1 className="text-[20px] font-bold leading-tight">Ticket de impresión</h1>
+        <BotonRegresarMas />
+        <h1 className="mt-1 text-[20px] font-bold leading-tight">Ticket de impresión</h1>
       </div>
 
       <div className="px-4 py-4 space-y-5">

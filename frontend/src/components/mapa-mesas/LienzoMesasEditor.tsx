@@ -10,6 +10,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core'
+import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
 import { MesaShape, dimensionesMesa, colorParaGrupo } from '@/components/mesas/MesaShape'
 import { guardarDisposicion } from '@/app/(app)/mas/mapa-mesas/actions'
 import type { MesaEditable } from '@/app/(app)/mas/mapa-mesas/page'
@@ -172,7 +173,8 @@ export function LienzoMesasEditor({ mesas }: { mesas: MesaEditable[] }) {
   return (
     <div className="min-h-full bg-s2">
       <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <h1 className="text-[20px] font-bold leading-tight">Mapa de mesas</h1>
+        <BotonRegresarMas />
+        <h1 className="mt-1 text-[20px] font-bold leading-tight">Mapa de mesas</h1>
         <p className="mt-0.5 text-[13px] text-text-3">
           Arrastra cada mesa a su lugar · tócala para editar forma, tamaño y rotación
         </p>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
 import {
   toggleImpresionGlobal,
   actualizarImpresora,
@@ -310,12 +311,7 @@ export function ImpresionShell({ initialData }: { initialData: ConfigData }) {
       {/* Header */}
       <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => router.push('/mas')}
-            className="-ml-1 px-1 py-1 text-[15px] font-medium text-blue-600 active:opacity-60"
-          >
-            ‹ Más
-          </button>
+          <BotonRegresarMas />
           <h1 className="flex-1 text-center text-[16px] font-semibold">
             Impresoras
           </h1>

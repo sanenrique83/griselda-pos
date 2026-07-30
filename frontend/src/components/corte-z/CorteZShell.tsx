@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
 import type { CorteZReporte } from '@/app/(app)/mas/corte-z/page'
 import { imprimirTicket, type TicketConfig } from '@/lib/print'
 
@@ -141,7 +142,8 @@ export function CorteZShell({
     <div className="min-h-full bg-s2">
       {/* Header */}
       <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <h1 className="text-[20px] font-bold leading-tight">Corte Z</h1>
+        <BotonRegresarMas />
+        <h1 className="mt-1 text-[20px] font-bold leading-tight">Corte Z</h1>
         <p className="mt-0.5 text-[13px] text-text-3 capitalize">{fmtFechaLarga(reporte.fecha)}</p>
       </div>
 

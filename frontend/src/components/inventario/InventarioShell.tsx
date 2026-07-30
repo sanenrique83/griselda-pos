@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
 import { SeccionInsumos } from './SeccionInsumos'
 import { SeccionProveedores } from './SeccionProveedores'
 import { SeccionCompras } from './SeccionCompras'
@@ -59,7 +60,8 @@ function InventarioShellInner({
     <div className="min-h-full bg-s2">
       {/* Header */}
       <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-0">
-        <h1 className="text-[20px] font-bold leading-tight pb-3">Inventario</h1>
+        <BotonRegresarMas />
+        <h1 className="mt-1 text-[20px] font-bold leading-tight pb-3">Inventario</h1>
         <div className="flex overflow-x-auto scrollbar-none">
           {TABS.map((t) => (
             <button

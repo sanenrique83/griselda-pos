@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
 import { abrirTurno, cerrarTurno, registrarMovimiento } from '@/app/(app)/mas/turno/actions'
 import type { TurnoResumen, MovimientoCajaItem } from '@/app/(app)/mas/turno/page'
 
@@ -43,7 +44,8 @@ export function TurnoShell({ turnoActivo }: TurnoShellProps) {
     <div>
       {/* Header */}
       <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <h1 className="text-[20px] font-bold leading-tight">Turno</h1>
+        <BotonRegresarMas />
+        <h1 className="mt-1 text-[20px] font-bold leading-tight">Turno</h1>
         {turnoActivo ? (
           <p className="mt-0.5 text-[13px] text-text-3">
             #{turnoActivo.id} · {fmtFecha(turnoActivo.abierto_en)}

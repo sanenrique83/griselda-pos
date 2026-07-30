@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
 import { toggleDisponible, setTodosDisponibles } from '@/app/(app)/mas/menu-del-dia/actions'
 import type { CategoriaMenu } from '@/app/(app)/mas/menu-del-dia/page'
 
@@ -70,7 +71,8 @@ export function MenuDelDiaShell({
     <div className="min-h-full bg-s2">
       {/* Header */}
       <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <div className="flex items-start justify-between gap-2">
+        <BotonRegresarMas />
+        <div className="mt-1 flex items-start justify-between gap-2">
           <div>
             <h1 className="text-[20px] font-bold leading-tight">Menú del día</h1>
             <p className="mt-0.5 text-[13px] text-text-3">
