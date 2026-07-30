@@ -8,7 +8,7 @@ import { SheetModificadores, type ConfirmarModPayload } from './SheetModificador
 import { SheetCapturaPida, type ConfirmarRapidoPayload } from './SheetCapturaPida'
 import { SheetUnirMesa, type MesaOcupada } from './SheetUnirMesa'
 import { SheetProductoLibre } from './SheetProductoLibre'
-import { agregarProducto, agregarProductoRapido, agregarProductoLibre, compartirMesa } from '@/app/(app)/pos/[pedidoId]/actions'
+import { agregarProducto, agregarProductoRapido, agregarProductoLibre, compartirMesa, agregarComensal } from '@/app/(app)/pos/[pedidoId]/actions'
 import type {
   SubpedidoPOS,
   ProductoCatalogo,
@@ -64,8 +64,9 @@ export function PosShell({
   )
   const [sheetUnirOpen, setSheetUnirOpen] = useState(false)
   const [sheetLibreOpen, setSheetLibreOpen] = useState(false)
-  const [errorCompartir, setErrorCompartir] = useState<string | null>(null)
+  const [errorAccion, setErrorAccion] = useState<string | null>(null)
   const [isPendingCompartir, setIsPendingCompartir] = useState(false)
+  const [isPendingComensalMenu, setIsPendingComensalMenu] = useState(false)
 
   const totalPedido = subpedidos.reduce((s, sp) => s + sp.total, 0)
 
@@ -172,10 +173,27 @@ export function PosShell({
     const result = await compartirMesa(pedidoId, mesaId)
     setIsPendingCompartir(false)
     if ('error' in result) {
-      setErrorCompartir(result.error)
+      setErrorAccion(result.error)
       return
     }
     router.push(`/pos/${result.nuevoPedidoId}`)
+  }
+
+  // Acceso directo desde Menú: agrega un comensal y lo activa sin navegar a
+  // la vista de Comanda — el mesero sigue en Menú y puede tocar un producto
+  // de inmediato, ya asignado al comensal nuevo, sin pasos intermedios.
+  async function handleAgregarComensalMenu() {
+    if (pedidoId === null) return
+    setErrorAccion(null)
+    setIsPendingComensalMenu(true)
+    const result = await agregarComensal(pedidoId)
+    setIsPendingComensalMenu(false)
+    if ('error' in result) {
+      setErrorAccion(result.error)
+      return
+    }
+    setSubpedidoActivoId(result.nuevoId)
+    router.refresh()
   }
 
   const subpedidoId = subpedidoActivoId || subpedidos[0]?.id || 0
@@ -251,7 +269,7 @@ export function PosShell({
         </div>
 
         {/* Tabs Menú / Comanda */}
-        <div className="flex">
+        <div className="flex items-stretch">
           <button
             onClick={() => setVista('menu')}
             className={`flex-1 py-2.5 text-[13px] font-semibold border-b-2 transition-colors ${
@@ -262,6 +280,15 @@ export function PosShell({
           >
             Menú
           </button>
+          {!isDraft && (
+            <button
+              onClick={handleAgregarComensalMenu}
+              disabled={isPendingComensalMenu}
+              className="flex-shrink-0 self-center px-3 py-1.5 text-[12px] font-semibold text-blue-600 active:opacity-60 disabled:opacity-40"
+            >
+              {isPendingComensalMenu ? '…' : '+ Nuevo comensal'}
+            </button>
+          )}
           <button
             onClick={() => setVista('comanda')}
             disabled={isDraft}
@@ -281,13 +308,13 @@ export function PosShell({
         </div>
       </div>
 
-      {/* ── Error compartir ─────────────────────────────────────────────────── */}
-      {errorCompartir && (
+      {/* ── Error de acciones del header (compartir / nuevo comensal) ───────── */}
+      {errorAccion && (
         <div
           className="flex-shrink-0 bg-red-50 border-b border-red-100 px-4 py-2 text-xs text-red-600 font-medium"
-          onClick={() => setErrorCompartir(null)}
+          onClick={() => setErrorAccion(null)}
         >
-          {errorCompartir} · Toca para cerrar
+          {errorAccion} · Toca para cerrar
         </div>
       )}
 
