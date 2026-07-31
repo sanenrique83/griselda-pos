@@ -223,6 +223,7 @@ export function MesasShell({
           <PlanoMesas
             mesas={mesas}
             onMesaClick={handleMesaClick}
+            onUnionError={setError}
             ahora={ahora}
             alertaActiva={alertaActiva}
             alertaMinutos={alertaMinutos}

@@ -85,9 +85,9 @@ export function MesaShape({
       {marcadores?.map((m, idx) => (
         <svg
           key={idx}
-          width={8}
-          height={8}
-          viewBox="-4 -4 8 8"
+          width={16}
+          height={16}
+          viewBox="-8 -8 16 16"
           className="pointer-events-none absolute"
           style={{
             left: width / 2 + m.x,
@@ -99,10 +99,10 @@ export function MesaShape({
               el centro de la mesa antes de rotar), lado curvo hacia +x
               (hacia afuera) — `anguloDeg` lo rota a su orientación real. */}
           <path
-            d="M 0,-4 A 4 4 0 0 1 0,4 Z"
+            d="M 0,-8 A 8 8 0 0 1 0,8 Z"
             fill={m.ocupada ? '#f59e0b' : 'none'}
             stroke={m.ocupada ? 'none' : '#C7C7CC'}
-            strokeWidth={1.2}
+            strokeWidth={1.5}
           />
         </svg>
       ))}

@@ -44,7 +44,16 @@ export type PuntoSilla = { x: number; y: number; anguloDeg: number }
 // PAD px por lado (suma de Minkowski con un disco de radio PAD) sigue
 // siendo un rectángulo redondeado válido, con w/h +2·PAD y radio +PAD — por
 // eso el mismo caminador de perímetro sirve para el anillo sin cambios.
-const PAD_SILLA_PX = 16
+//
+// El marcador de silla (MesaShape) se centra exactamente en este anillo, y
+// su lado recto —el respaldo— pasa por su propio centro (no está desplazado
+// hacia adentro), así que PAD es literalmente la distancia entre el borde
+// real de la mesa y el respaldo de la silla. Se mantiene chico (no 0) para
+// que no se vea encimado con el trazo del borde de la mesa, pero lo
+// suficientemente chico para que la silla se vea "pegada" a la mesa en vez
+// de flotando — el tamaño visual de la silla (16px, ver MesaShape) lo pone
+// el propio marcador, no este valor.
+const PAD_SILLA_PX = 4
 
 // Punto 2D simple, sin `anguloDeg` — geometría interna del caminador de
 // perímetro (desde/hasta/centro de cada tramo), distinta de `PuntoSilla`

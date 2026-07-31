@@ -18,6 +18,13 @@ import { guardarDisposicion } from '@/app/(app)/mas/mapa-mesas/actions'
 import { unirMesas, unirMesaLibreAOcupada } from '@/app/(app)/pos/[pedidoId]/actions'
 import { calcularPosicionesSillas } from '@/lib/asientos'
 import { colorSemaforoMesa } from '@/lib/colorMesa'
+import {
+  COLOR_IMAN,
+  buscarCandidatoIman as buscarCandidatoImanBase,
+  posicionAdosada as posicionAdosadaBase,
+  type TipoUnionIman,
+  type CandidatoIman,
+} from '@/lib/imanMesas'
 import type { MesaEditable } from '@/app/(app)/mas/mapa-mesas/page'
 import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
 
@@ -26,21 +33,6 @@ const CANVAS_H = 1100
 const PASO_AUTO = 90 // separación al auto-acomodar mesas sin posición
 const COLUMNAS_AUTO = 6
 const CUADRICULA_PX = 40 // tamaño de la cuadrícula de fondo, solo visual
-const UMBRAL_IMAN_PX = 40 // distancia (entre bordes de las cajas) para "imantar"
-const COLOR_IMAN = '#22c55e'
-
-// Distancia entre los bordes de dos cajas rectangulares alineadas a los ejes
-// (AABB) — 0 si se traslapan. Aproxima "qué tan cerca están de tocarse" sin
-// importar si una mesa es chica/grande o si su forma real es circular
-// (para efectos de imantado solo interesa la caja contenedora).
-function distanciaEntreCajas(
-  a: { x: number; y: number; w: number; h: number },
-  b: { x: number; y: number; w: number; h: number },
-): number {
-  const dx = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w), 0)
-  const dy = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h), 0)
-  return Math.sqrt(dx * dx + dy * dy)
-}
 
 type Posicion = {
   x: number
@@ -49,17 +41,6 @@ type Posicion = {
   forma: FormaMesa
   tamano: TamanoMesa
 }
-
-// Los 3 casos de unión por arrastre, según el estado de ocupación de la mesa
-// arrastrada y la candidata más cercana (no importa cuál de las dos se
-// arrastró — se decide por ocupación, no por dirección del gesto):
-//   - 'ambas_libres'    → ninguna tiene pedido: dispara el picker de silla
-//                         combinado (nueva ruta /pos/nueva-combinada).
-//   - 'libre_a_ocupada' → una libre + una con pedido: la libre se registra
-//                         como capacidad extra de la cadena (sin picker).
-//   - 'ocupada_a_ocupada' → ambas con pedido (distinto): unirMesas() de
-//                         siempre, sin cambios de comportamiento.
-type TipoUnionIman = 'ambas_libres' | 'libre_a_ocupada' | 'ocupada_a_ocupada'
 
 // Mesas sin pos_x/pos_y (nunca se han colocado en el mapa) se acomodan en
 // una cuadrícula temporal para que aparezcan en el lienzo desde el primer
@@ -141,10 +122,10 @@ export function LienzoMesasEditor({
     setDirty((prev) => new Set(prev).add(id))
   }
 
-  // Candidato de imantado: mesa más cercana (por borde de caja, no centro —
-  // para que el umbral se sienta igual sin importar chico/grande) que forma
-  // uno de los 3 casos válidos de unión. Se excluye: la propia mesa, y dos
-  // mesas ya ocupadas por el MISMO pedido (ya están en la misma cadena).
+  // Candidato de imantado: delega la detección/clasificación al módulo
+  // compartido con /mesas (ver lib/imanMesas.ts) — aquí solo se arma la caja
+  // en vivo del arrastre y la lista de candidatos a partir del estado propio
+  // de este editor (posiciones, que en /mas/mapa-mesas sí es editable).
   function buscarCandidatoIman(
     draggedId: number,
     liveX: number,
@@ -156,36 +137,22 @@ export function LienzoMesasEditor({
     const { width: w, height: h } = dimensionesMesa(draggedPos.forma, draggedPos.tamano)
     const cajaArrastrada = { x: liveX, y: liveY, w, h }
 
-    let mejorId: number | null = null
-    let mejorDist = Infinity
-    for (const mesa of mesas) {
-      if (mesa.id === draggedId) continue
-      if (
-        draggedMesa.pedidoActivoId &&
-        mesa.pedidoActivoId &&
-        draggedMesa.pedidoActivoId === mesa.pedidoActivoId
-      ) {
-        continue
-      }
-      const pos = posiciones[mesa.id]
-      if (!pos) continue
-      const { width, height } = dimensionesMesa(pos.forma, pos.tamano)
-      const dist = distanciaEntreCajas(cajaArrastrada, { x: pos.x, y: pos.y, w: width, h: height })
-      if (dist <= UMBRAL_IMAN_PX && dist < mejorDist) {
-        mejorDist = dist
-        mejorId = mesa.id
-      }
-    }
-    if (mejorId === null) return null
+    const candidatos: CandidatoIman[] = mesas
+      .map((mesa) => {
+        const pos = posiciones[mesa.id]
+        if (!pos) return null
+        return {
+          id: mesa.id,
+          x: pos.x,
+          y: pos.y,
+          forma: pos.forma,
+          tamano: pos.tamano,
+          pedidoActivoId: mesa.pedidoActivoId,
+        }
+      })
+      .filter((c): c is CandidatoIman => c !== null)
 
-    const targetMesa = mesaPorId.get(mejorId)!
-    const tipo: TipoUnionIman =
-      !draggedMesa.pedidoActivoId && !targetMesa.pedidoActivoId
-        ? 'ambas_libres'
-        : draggedMesa.pedidoActivoId && targetMesa.pedidoActivoId
-          ? 'ocupada_a_ocupada'
-          : 'libre_a_ocupada'
-    return { targetId: mejorId, tipo }
+    return buscarCandidatoImanBase(draggedId, draggedMesa.pedidoActivoId, cajaArrastrada, candidatos)
   }
 
   function handleDragMove(event: DragMoveEvent) {
@@ -197,16 +164,11 @@ export function LienzoMesasEditor({
     setMagnetTarget(buscarCandidatoIman(id, liveX, liveY))
   }
 
-  // Posición pegada al lado derecho de `basePos` (misma fórmula que ya usaba
-  // el caso ocupada_a_ocupada) — usada para reacomodar visualmente la mesa
-  // satélite en los 3 casos, siempre relativa a la mesa que se queda fija.
+  // Posición pegada al lado derecho de `basePos` — reacomodo visual de la
+  // mesa satélite en los 3 casos (ver lib/imanMesas.ts), acotado al lienzo
+  // de este editor (900×1100).
   function posicionAdosada(basePos: Posicion): { x: number; y: number; rotacion: number } {
-    const { width } = dimensionesMesa(basePos.forma, basePos.tamano)
-    return {
-      x: Math.min(Math.max(0, Math.round(basePos.x + width)), CANVAS_W - 20),
-      y: Math.min(Math.max(0, Math.round(basePos.y)), CANVAS_H - 20),
-      rotacion: basePos.rotacion,
-    }
+    return posicionAdosadaBase(basePos, { width: CANVAS_W, height: CANVAS_H })
   }
 
   function handleDragEnd(event: DragEndEvent) {
