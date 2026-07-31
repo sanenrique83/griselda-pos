@@ -35,11 +35,38 @@ async function liberarMesasSatelite(supabase: SupabaseClient, pedidoId: number):
   const { data: mesasInfo } = await supabase.from('mesas').select('id, temporal').in('id', mesaIds)
   const origPorMesa = new Map((satelites ?? []).map((s) => [s.mesa_id, s]))
 
+  // Nota: estos updates/deletes corren DESPUÉS de que el pedido ya se cerró
+  // (cobro completo o anulación) — el negocio ya considera la operación
+  // completa en ese momento, así que un fallo aquí no debe convertirse en un
+  // error visible para el cajero (revertiría una acción que ya sucedió). Se
+  // loguea server-side para poder detectar mesas que se quedaron "atoradas"
+  // sin depender de que alguien lo reporte.
   for (const mesa of mesasInfo ?? []) {
     if (mesa.temporal) {
-      await supabase.from('pedido_mesas').delete().eq('mesa_id', mesa.id)
-      await supabase.from('pedidos').update({ mesa_id: null }).eq('mesa_id', mesa.id)
-      await supabase.from('mesas').delete().eq('id', mesa.id)
+      const { error: pmErr } = await supabase.from('pedido_mesas').delete().eq('mesa_id', mesa.id)
+      if (pmErr) {
+        console.error('[liberarMesasSatelite] error borrando pedido_mesas:', {
+          pedidoId,
+          mesaId: mesa.id,
+          error: pmErr.message,
+        })
+      }
+      const { error: nullErr } = await supabase.from('pedidos').update({ mesa_id: null }).eq('mesa_id', mesa.id)
+      if (nullErr) {
+        console.error('[liberarMesasSatelite] error limpiando mesa_id en pedidos:', {
+          pedidoId,
+          mesaId: mesa.id,
+          error: nullErr.message,
+        })
+      }
+      const { error: delErr } = await supabase.from('mesas').delete().eq('id', mesa.id)
+      if (delErr) {
+        console.error('[liberarMesasSatelite] error borrando mesa temporal:', {
+          pedidoId,
+          mesaId: mesa.id,
+          error: delErr.message,
+        })
+      }
     } else {
       const orig = origPorMesa.get(mesa.id)
       const patch: { estado: 'libre'; pos_x?: number | null; pos_y?: number | null; rotacion?: number | null } = {
@@ -50,7 +77,14 @@ async function liberarMesasSatelite(supabase: SupabaseClient, pedidoId: number):
         patch.pos_y = orig.pos_y_original
         patch.rotacion = orig.rotacion_original
       }
-      await supabase.from('mesas').update(patch).eq('id', mesa.id)
+      const { error: updErr } = await supabase.from('mesas').update(patch).eq('id', mesa.id)
+      if (updErr) {
+        console.error('[liberarMesasSatelite] error liberando mesa:', {
+          pedidoId,
+          mesaId: mesa.id,
+          error: updErr.message,
+        })
+      }
     }
   }
 }
@@ -78,10 +112,27 @@ export async function anularPedido(
 
     if (mesa?.temporal) {
       // Nullear FK en el pedido antes de eliminar la mesa para evitar constraint violation
-      await supabase.from('pedidos').update({ mesa_id: null }).eq('id', pedidoId)
-      await supabase.from('mesas').delete().eq('id', mesaId)
+      const { error: nullErr } = await supabase.from('pedidos').update({ mesa_id: null }).eq('id', pedidoId)
+      if (nullErr) {
+        console.error('[anularPedido] error limpiando mesa_id en pedidos:', {
+          pedidoId,
+          mesaId,
+          error: nullErr.message,
+        })
+      }
+      const { error: delErr } = await supabase.from('mesas').delete().eq('id', mesaId)
+      if (delErr) {
+        console.error('[anularPedido] error borrando mesa temporal:', {
+          pedidoId,
+          mesaId,
+          error: delErr.message,
+        })
+      }
     } else {
-      await supabase.from('mesas').update({ estado: 'libre' }).eq('id', mesaId)
+      const { error: libErr } = await supabase.from('mesas').update({ estado: 'libre' }).eq('id', mesaId)
+      if (libErr) {
+        console.error('[anularPedido] error liberando mesa:', { pedidoId, mesaId, error: libErr.message })
+      }
     }
   }
 
@@ -278,7 +329,14 @@ export async function cobrarPedido(data: {
       const { error: delErr } = await supabase.from('mesas').delete().eq('id', data.mesaId)
       console.log('[cobrarPedido] DELETE mesa temporal:', delErr?.message ?? 'ok')
     } else {
-      await supabase.from('mesas').update({ estado: 'libre' }).eq('id', data.mesaId)
+      const { error: libErr } = await supabase.from('mesas').update({ estado: 'libre' }).eq('id', data.mesaId)
+      if (libErr) {
+        console.error('[cobrarPedido] error liberando mesa:', {
+          pedidoId: data.pedidoId,
+          mesaId: data.mesaId,
+          error: libErr.message,
+        })
+      }
     }
   }
 

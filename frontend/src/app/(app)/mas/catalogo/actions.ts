@@ -240,6 +240,12 @@ export async function eliminarProducto(id: number): Promise<Err | undefined> {
   if (error) return { error: 'Error al eliminar el producto.' }
 }
 
+// Única implementación de toggle de disponibilidad de producto — la usan
+// tanto Catálogo → Productos como Menú del día (MenuDelDiaShell importa esta
+// misma función, ver mas/menu-del-dia/actions.ts). Antes había una copia en
+// cada pantalla y divergían: una guardaba disponible_actualizado_en y la
+// otra no, una revalidaba su path y la otra no. Ahora siempre hace ambas
+// cosas sin importar desde qué pantalla se llame.
 export async function toggleDisponible(
   id: number,
   disponible: boolean,
@@ -253,6 +259,9 @@ export async function toggleDisponible(
     })
     .eq('id', id)
   if (error) return { error: 'Error al actualizar disponibilidad.' }
+
+  revalidatePath('/mas/catalogo')
+  revalidatePath('/mas/menu-del-dia')
 }
 
 // ─── Grupos modificadores ─────────────────────────────────────────────────────

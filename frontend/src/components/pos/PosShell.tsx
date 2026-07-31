@@ -19,9 +19,8 @@ import type {
 } from '@/app/(app)/pos/[pedidoId]/page'
 
 interface PosShellProps {
-  pedidoId: number | null
+  pedidoId: number
   mesaId?: number
-  turnoId?: number
   mesaLabel: string
   numComensales: number
   pedidoCreatedAt: string
@@ -41,7 +40,6 @@ interface PosShellProps {
 export function PosShell({
   pedidoId,
   mesaId,
-  turnoId,
   mesaLabel,
   numComensales,
   pedidoCreatedAt,
@@ -92,73 +90,36 @@ export function PosShell({
 
   // ── Handlers para confirmar producto ──────────────────────────────────────
   async function handleConfirmarMod(payload: ConfirmarModPayload): Promise<{ error?: string }> {
-    if (pedidoId !== null) {
-      // Modo normal: pedido existente
-      const subpedidoId = subpedidoActivoId || subpedidos[0]?.id || 0
-      const result = await agregarProducto({
-        pedidoId,
-        subpedidoId,
-        productoId: payload.productoId,
-        precioUnit: payload.precioUnit,
-        cantidad: payload.cantidad,
-        notas: payload.notas,
-        opciones: payload.opciones,
-      })
-      if (result?.error) return { error: result.error }
-      handleSheetSuccess()
-      return {}
-    } else {
-      // Modo draft: crear pedido + agregar producto
-      if (!mesaId || !turnoId) return { error: 'Sin datos de mesa o turno.' }
-      const { crearPedidoYAgregarProducto } = await import('@/app/(app)/pos/nueva/[mesaId]/actions')
-      const result = await crearPedidoYAgregarProducto({
-        mesaId,
-        turnoId,
-        productoId: payload.productoId,
-        precioUnit: payload.precioUnit,
-        cantidad: payload.cantidad,
-        notas: payload.notas,
-        opciones: payload.opciones,
-      })
-      if ('error' in result) return { error: result.error }
-      router.push(`/pos/${result.pedidoId}`)
-      return {}
-    }
+    const subpedidoId = subpedidoActivoId || subpedidos[0]?.id || 0
+    const result = await agregarProducto({
+      pedidoId,
+      subpedidoId,
+      productoId: payload.productoId,
+      precioUnit: payload.precioUnit,
+      cantidad: payload.cantidad,
+      notas: payload.notas,
+      opciones: payload.opciones,
+    })
+    if (result?.error) return { error: result.error }
+    handleSheetSuccess()
+    return {}
   }
 
   async function handleConfirmarRapido(payload: ConfirmarRapidoPayload): Promise<{ error?: string }> {
-    if (pedidoId !== null) {
-      // Modo normal
-      const subpedidoId = subpedidoActivoId || subpedidos[0]?.id || 0
-      const result = await agregarProductoRapido({
-        pedidoId,
-        subpedidoId,
-        productoId: payload.productoId,
-        precioUnit: payload.precioUnit,
-        guisados: payload.guisados,
-      })
-      if (result?.error) return { error: result.error }
-      handleSheetSuccess()
-      return {}
-    } else {
-      // Modo draft
-      if (!mesaId || !turnoId) return { error: 'Sin datos de mesa o turno.' }
-      const { crearPedidoYAgregarRapido } = await import('@/app/(app)/pos/nueva/[mesaId]/actions')
-      const result = await crearPedidoYAgregarRapido({
-        mesaId,
-        turnoId,
-        productoId: payload.productoId,
-        precioUnit: payload.precioUnit,
-        guisados: payload.guisados,
-      })
-      if ('error' in result) return { error: result.error }
-      router.push(`/pos/${result.pedidoId}`)
-      return {}
-    }
+    const subpedidoId = subpedidoActivoId || subpedidos[0]?.id || 0
+    const result = await agregarProductoRapido({
+      pedidoId,
+      subpedidoId,
+      productoId: payload.productoId,
+      precioUnit: payload.precioUnit,
+      guisados: payload.guisados,
+    })
+    if (result?.error) return { error: result.error }
+    handleSheetSuccess()
+    return {}
   }
 
   async function handleConfirmarLibre(payload: { nombre: string; precio: number }): Promise<{ error?: string }> {
-    if (pedidoId === null) return { error: 'Abre la mesa agregando un producto normal primero.' }
     const subpedidoId = subpedidoActivoId || subpedidos[0]?.id || 0
     const result = await agregarProductoLibre({
       pedidoId,
@@ -172,7 +133,7 @@ export function PosShell({
   }
 
   async function handleCompartirMesa() {
-    if (!pedidoId || !mesaId) return
+    if (!mesaId) return
     setIsPendingCompartir(true)
     const result = await compartirMesa(pedidoId, mesaId)
     setIsPendingCompartir(false)
@@ -194,7 +155,6 @@ export function PosShell({
   // El botón manual "🪑 Sillas" en Comanda sigue disponible para corregir a
   // mano si alguien terminó sentado distinto al orden automático.
   async function handleAgregarComensalMenu() {
-    if (pedidoId === null) return
     setErrorAccion(null)
     setIsPendingComensalMenu(true)
     const result = await agregarComensal(pedidoId)
@@ -218,9 +178,6 @@ export function PosShell({
     setSubpedidoActivoId(result.nuevoId)
     router.refresh()
   }
-
-  const subpedidoId = subpedidoActivoId || subpedidos[0]?.id || 0
-  const isDraft = pedidoId === null
 
   return (
     // Ocupa el espacio disponible por encima del BottomNav fijo
@@ -246,49 +203,39 @@ export function PosShell({
             <p className="text-[15px] font-semibold leading-tight truncate">
               {mesaLabel}
             </p>
-            {isDraft ? (
-              <p className="text-[11px] text-amber-600 font-medium">
-                Mesa libre · agrega un ítem para abrir
-              </p>
-            ) : (
-              <p className="text-[11px] text-text-3">
-                {numComensales} comensal{numComensales !== 1 ? 'es' : ''} · desde{' '}
-                {horaApertura}
-              </p>
-            )}
+            <p className="text-[11px] text-text-3">
+              {numComensales} comensal{numComensales !== 1 ? 'es' : ''} · desde{' '}
+              {horaApertura}
+            </p>
           </div>
 
-          {!isDraft && pedidoId !== null ? (
-            <div className="flex items-center gap-1">
-              {mesasOcupadas.length > 0 && (
-                <button
-                  onClick={() => setSheetUnirOpen(true)}
-                  className="px-1 py-1 text-[12px] font-medium text-text-3 active:opacity-60"
-                  title="Unir con otra mesa"
-                >
-                  Unir
-                </button>
-              )}
-              {mesaId && (
-                <button
-                  onClick={handleCompartirMesa}
-                  disabled={isPendingCompartir}
-                  className="px-1 py-1 text-[12px] font-medium text-text-3 active:opacity-60 disabled:opacity-40"
-                  title="Compartir mesa"
-                >
-                  {isPendingCompartir ? '…' : 'Compartir'}
-                </button>
-              )}
+          <div className="flex items-center gap-1">
+            {mesasOcupadas.length > 0 && (
               <button
-                onClick={() => router.push(`/cobro/${pedidoId}`)}
-                className="px-1 py-1 text-[13px] font-semibold text-green-600 whitespace-nowrap active:opacity-60"
+                onClick={() => setSheetUnirOpen(true)}
+                className="px-1 py-1 text-[12px] font-medium text-text-3 active:opacity-60"
+                title="Unir con otra mesa"
               >
-                Cobrar →
+                Unir
               </button>
-            </div>
-          ) : (
-            <div className="w-[64px]" />
-          )}
+            )}
+            {mesaId && (
+              <button
+                onClick={handleCompartirMesa}
+                disabled={isPendingCompartir}
+                className="px-1 py-1 text-[12px] font-medium text-text-3 active:opacity-60 disabled:opacity-40"
+                title="Compartir mesa"
+              >
+                {isPendingCompartir ? '…' : 'Compartir'}
+              </button>
+            )}
+            <button
+              onClick={() => router.push(`/cobro/${pedidoId}`)}
+              className="px-1 py-1 text-[13px] font-semibold text-green-600 whitespace-nowrap active:opacity-60"
+            >
+              Cobrar →
+            </button>
+          </div>
         </div>
 
         {/* Tabs Menú / Comanda */}
@@ -305,12 +252,11 @@ export function PosShell({
           </button>
           <button
             onClick={() => setVista('comanda')}
-            disabled={isDraft}
             className={`flex-1 py-2.5 text-[13px] font-semibold border-b-2 transition-colors ${
               vista === 'comanda'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-text-3'
-            } disabled:opacity-40`}
+            }`}
           >
             Comanda
             {totalPedido > 0 && (
@@ -334,20 +280,20 @@ export function PosShell({
 
       {/* ── Vista principal ─────────────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {vista === 'menu' || isDraft ? (
+        {vista === 'menu' ? (
           <VistaMenu
             categorias={categorias}
             productos={productos}
             totalPedido={totalPedido}
-            onVerComanda={() => !isDraft && setVista('comanda')}
+            onVerComanda={() => setVista('comanda')}
             onAgregarProducto={handleAgregarProducto}
-            onAgregarLibre={isDraft ? undefined : () => setSheetLibreOpen(true)}
-            onAgregarComensal={isDraft ? undefined : handleAgregarComensalMenu}
+            onAgregarLibre={() => setSheetLibreOpen(true)}
+            onAgregarComensal={handleAgregarComensalMenu}
             isPendingAgregarComensal={isPendingComensalMenu}
           />
         ) : (
           <VistaComanda
-            pedidoId={pedidoId!}
+            pedidoId={pedidoId}
             subpedidos={subpedidos}
             subpedidoActivoId={subpedidoActivoId}
             onCambiarSubpedido={(id) => setSubpedidoActivoId(id)}
@@ -380,14 +326,12 @@ export function PosShell({
         onConfirmar={handleConfirmarMod}
         onClose={() => setSheetProducto(null)}
       />
-      {!isDraft && pedidoId !== null && (
-        <SheetUnirMesa
-          open={sheetUnirOpen}
-          pedidoOrigenId={pedidoId}
-          mesasOcupadas={mesasOcupadas}
-          onClose={() => setSheetUnirOpen(false)}
-        />
-      )}
+      <SheetUnirMesa
+        open={sheetUnirOpen}
+        pedidoOrigenId={pedidoId}
+        mesasOcupadas={mesasOcupadas}
+        onClose={() => setSheetUnirOpen(false)}
+      />
       <SheetProductoLibre
         open={sheetLibreOpen}
         onConfirmar={handleConfirmarLibre}

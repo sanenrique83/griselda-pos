@@ -3,7 +3,8 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
-import { toggleDisponible, setTodosDisponibles } from '@/app/(app)/mas/menu-del-dia/actions'
+import { setTodosDisponibles } from '@/app/(app)/mas/menu-del-dia/actions'
+import { toggleDisponible } from '@/app/(app)/mas/catalogo/actions'
 import type { CategoriaMenu } from '@/app/(app)/mas/menu-del-dia/page'
 
 interface MenuDelDiaShellProps {

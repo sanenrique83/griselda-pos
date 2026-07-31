@@ -763,11 +763,20 @@ export async function compartirMesa(
   }
 
   // Crear subpedido inicial (comensal 1)
-  await supabase.from('subpedidos').insert({
+  const { error: subErr } = await supabase.from('subpedidos').insert({
     pedido_id: nuevoPedido.id,
     mesero_id: user.id,
     comensal_numero: 1,
   })
+
+  if (subErr) {
+    console.error('[compartirMesa] error creando el comensal inicial:', {
+      pedidoId: nuevoPedido.id,
+      mesaId: nuevaMesa.id,
+      error: subErr.message,
+    })
+    return { error: 'Error al crear el comensal.' }
+  }
 
   return { nuevoPedidoId: nuevoPedido.id }
 }
@@ -868,14 +877,25 @@ export async function cancelarItem(
     monto_afectado: montoAfectado,
   })
 
-  // 6. Movimiento de caja negativo
-  await supabase.from('movimientos_caja').insert({
+  // 6. Movimiento de caja negativo — el ítem ya quedó cancelado por el RPC
+  // de arriba (paso 4), así que un fallo aquí no debe reportarse como
+  // "cancelación fallida" (sería engañoso, ya se canceló). Se loguea para
+  // que el descuadre de caja se pueda rastrear en vez de perderse en silencio.
+  const { error: movErr } = await supabase.from('movimientos_caja').insert({
     turno_id: pedido.turno_id,
     tipo: 'cancelacion',
     monto: -montoAfectado,
     notas: motivo,
     usuario_id: user.id,
   })
+  if (movErr) {
+    console.error('[cancelarItem] error registrando el movimiento de caja de la cancelación:', {
+      pedidoProductoId,
+      turnoId: pedido.turno_id,
+      montoAfectado,
+      error: movErr.message,
+    })
+  }
 
   // 7. Ticket de cancelación en cocina (fallo silencioso — no bloquea)
   const [{ data: cfg }, { data: perfil }] = await Promise.all([

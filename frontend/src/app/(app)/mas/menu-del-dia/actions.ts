@@ -3,22 +3,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export async function toggleDisponible(
-  productoId: number,
-  disponible: boolean,
-): Promise<{ error?: string }> {
-  const supabase = await createClient()
-
-  const { error } = await supabase
-    .from('productos')
-    .update({ disponible })
-    .eq('id', productoId)
-
-  if (error) return { error: 'Error al actualizar el producto.' }
-
-  revalidatePath('/mas/menu-del-dia')
-  return {}
-}
+// toggleDisponible vive en mas/catalogo/actions.ts — MenuDelDiaShell la
+// importa de ahí directamente (ver ese archivo), para no tener dos copias
+// de la misma lógica divergiendo entre sí.
 
 export async function setTodosDisponibles(): Promise<{ error?: string }> {
   const supabase = await createClient()
