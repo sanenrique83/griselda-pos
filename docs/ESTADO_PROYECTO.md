@@ -1,5 +1,5 @@
-# Griselda POS — Estado Consolidado del Proyecto (v2)
-**Última actualización:** 29 de julio de 2026. Reemplaza la versión anterior — se acumuló mucho desde la última vez que se tocó este documento (Fase 7 completa, rediseño de recetas de dos niveles, unir mesas persistente, modificadores condicionales, dos rondas de benchmarking, y 7 hallazgos de uso real).
+# Griselda POS — Estado Consolidado del Proyecto (v3)
+**Última actualización:** 31 de julio de 2026. Reemplaza la v2 — se cerraron 6 de 7 Hallazgos de Uso Real, se descartó H-07, y se construyó un feature grande no planeado originalmente (mesas unidas en cadena con geometría real, arrastre con imantado, marcadores de silla y semáforo de color).
 
 **Leyenda:** ✅ Hecho y confirmado · 🟡 Parcial · ⚪ Spec listo, sin implementar · 🚫 Descartado/superado · ❓ No verificado
 
@@ -87,17 +87,48 @@ Todos los huecos identificados en estas 3 rondas ya están consolidados en el **
 | F9-07 | Mermas como concepto propio | ⚪ |
 | F9-08 | Reloj de entrada/salida + exportación de horas | ⚪ |
 
-## Hallazgos de Uso Real (H-01 a H-07) — spec listo, nada implementado
+## Hallazgos de Uso Real (H-01 a H-07) — **6 de 7 cerrados, H-07 descartada**
 
 | Código | Descripción | Estado |
 |---|---|---|
-| H-01 | Anular pedido completo (con permiso configurable) | ⚪ — la función base (`anularPedido`) ya existe, solo falta el camino directo |
-| H-02 | Orden asc/desc/personalizado de productos y modificadores | ⚪ — **incluye bug real por confirmar**: `catalogo/page.tsx` ordena `productos` por una columna `orden` que nunca existió en esa tabla |
-| H-03 | Pestañas de tipo de insumo en Inventario | ⚪ |
-| H-04 | Botón "Regresar" faltante en pantallas de `/mas/*` | ⚪ — solo Impresoras lo tiene hoy |
-| H-05 | Posición real de comensales (silla) en el mapa de mesas | ⚪ |
-| H-06 | Acceso rápido "Nuevo comensal" desde el menú | ⚪ |
-| H-07 | Preguntar cuántas personas al abrir la mesa | ⚪ — se beneficia de H-05 pero no depende de él |
+| H-01 | Anular pedido completo (con permiso configurable) | ✅ Reutilizó un permiso (`cancelar_pedido_mesero`) que ya existía sin conectar — sin migración nueva |
+| H-02 | Orden asc/desc/personalizado de productos y modificadores | ✅ Incluyó el hallazgo de que `productos.orden` ya existía en la base real pero nunca en una migración versionada — corregido |
+| H-03 | Pestañas de tipo de insumo en Inventario | ✅ |
+| H-04 | Botón "Regresar" faltante en pantallas de `/mas/*` | ✅ 11 pantallas corregidas con componente compartido |
+| H-05 | Posición real de comensales (silla) en el mapa de mesas | ✅ — pasó por dos rondas de corrección (ver detalle abajo) |
+| H-06 | Acceso rápido "Nuevo comensal" desde el menú | ✅ — se corrigió de ubicación (footer de `VistaMenu.tsx`, no los tabs de `PosShell.tsx`) |
+| H-07 | Preguntar cuántas personas al abrir la mesa | 🚫 **Descartada** — se reemplazó por asignación automática de silla en secuencia al agregar comensales, que cubre el mismo objetivo sin restarle agilidad al mesero |
+
+### Cómo quedó el flujo final de H-05/H-06 (tras las correcciones)
+
+- **Al abrir una mesa vacía:** aparece el diagrama de sillas (`ElegirSillaInicialShell.tsx`) **antes** de crear el pedido — el mesero elige la silla del comensal 1 (única decisión manual de todo el flujo), y `abrirPedidoMesa(mesaId, turnoId, sillaElegida)` crea pedido + comensal 1 en un solo paso.
+- **Al tocar "+ Nuevo comensal"** (footer verde de `VistaMenu.tsx`, junto al botón azul "Ver comanda" que ya existía): asigna la siguiente silla libre en secuencia automáticamente, sin picker ni confirmación — cero fricción.
+- El botón manual "🪑 Sillas" se mantiene para corregir manualmente si alguien se sentó distinto al orden automático.
+- Pestaña de comensal muestra un badge compacto de silla (ej. "🪑4") en vez de "Comensal 2 — Silla 4", que era demasiado largo para una pestaña angosta.
+- **Deuda de código conocida, no resuelta a propósito:** quedó una función `abrirPedidoMesa()` huérfana (sin llamadores) en `mesas/actions.ts`, y las ramas de "modo draft" en `PosShell.tsx` (`isDraft` y sus condicionales) también quedaron sin ningún camino que las alcance. Documentado en el propio código; pendiente de una limpieza aparte cuando se quiera.
+
+---
+
+## Mesas Unidas en Cadena + Semáforo de Color (feature nuevo, no estaba en ningún spec original)
+
+Salió de una conversación sobre cómo se ven físicamente las mesas pegadas en la vida real — se construyó en una sola sesión grande, con 4 partes:
+
+| Parte | Descripción | Estado |
+|---|---|---|
+| 1 | Geometría de sillas en cadena (`calcularPosicionesSillasCadena`) — 2 cabeceras fijas + resto repartido parejo entre costados, rectángulo de lados rectos, límite de 5 mesas por cadena | ✅ Verificado a mano (2 mesas → 3 por lado, 3 mesas → 5 por lado) |
+| 2 | Arrastre con imantado en `/mas/mapa-mesas` — acercar una mesa a otra activa el mismo `unirMesas()` que ya existía, sin duplicar lógica | ✅ |
+| 3 | Marcadores de silla siempre visibles sobre la forma de la mesa (llenos/vacíos), reutilizando la misma geometría | ✅ |
+| 4 | Semáforo de color de la mesa completa (verde/naranja/azul/rojo), configurable y apagable desde `/mas/permisos` | ✅ Lógica centralizada en `lib/colorMesa.ts`, un solo lugar para que ninguna pantalla se desincronice |
+
+**Detalle importante del semáforo:** el rojo se definió como "cero productos en la comanda + tiempo transcurrido", **no** "nada enviado a cocina" — se descartó esa versión a propósito porque generaría falsas alarmas con pedidos simples que se comunican de viva voz sin pasar por el botón "Enviar".
+
+**Nota de alcance:** el mapa visual **sí se ve afectado** por esta feature (a diferencia de la decisión original de F7-09, donde el mapa se quedaba intacto al unir mesas) — esto fue una decisión consciente y confirmada durante el diseño, no una inconsistencia.
+
+---
+
+## Otro cambio suelto — editar grupo de modificadores existente
+
+Hecho en una sesión aparte de Claude Code (no pasó por el flujo de specs de este documento) — revisado y aprobado después: conecta `actualizarGrupoModificador()` (que ya existía sin usarse, mismo patrón que otros hallazgos de esta ronda) a una UI real de edición en `SeccionProductos.tsx` — ahora se puede editar nombre/requerido/mínimo/máximo/condición de un grupo ya creado, no solo crear uno nuevo. Sin migración.
 
 ---
 
@@ -113,7 +144,8 @@ Todos los huecos identificados en estas 3 rondas ya están consolidados en el **
 | Reconciliación física de inventario | ⚪ Mencionado, sin spec |
 | Conciliación de terminal bancaria | ⚪ Mencionado, sin spec |
 | **Auditoría de queries contra el esquema real** | ⚪ **Nuevo** — el bug de `productos.orden` (encontrado de casualidad en H-02) sugiere que puede haber más casos similares acumulados de tantas sesiones de Claude Code en paralelo. Vale la pena una revisión sistemática en algún momento. |
-| **Modelo de permisos escalará mal** | ⚪ **Nuevo** — cada permiso nuevo es una columna booleana más en `config_sistema` (`descuentos_mesero`, `cancelaciones_mesero`, y el `anular_pedido_mesero` de H-01). Funciona con 3-4; conviene una tabla de permisos antes de que sean 10. |
+| **Modelo de permisos escalará mal** | ⚪ Cada permiso nuevo es una columna booleana más en `config_sistema` (`descuentos_mesero`, `cancelaciones_mesero`, `cancelar_pedido_mesero` — este último reutilizado para H-01 en vez de duplicado). Funciona con 3-4; conviene una tabla de permisos antes de que sean 10. |
+| **Código muerto pendiente de limpieza** | ⚪ **Nuevo** — `abrirPedidoMesa()` huérfana en `mesas/actions.ts` (sin llamadores) y las ramas de "modo draft" en `PosShell.tsx` (`isDraft` y condicionales relacionados), ambos dejados de lado tras el rediseño de H-05/H-06. Documentado en el código, no bloqueante, pero vale la pena una sesión de limpieza en algún momento. |
 
 ---
 
