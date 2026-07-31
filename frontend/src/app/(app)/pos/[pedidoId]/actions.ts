@@ -312,9 +312,21 @@ export async function enviarACocina(pedidoId: number): Promise<Err | undefined> 
 // (se ordenan por su propio `orden` antes de re-numerarlas), y se agregan
 // siempre al final de la cadena del destino (MAX(orden) del destino + 1, +2…) —
 // nunca se insertan en medio.
+//
+// `reposicion` (opcional): viene del arrastre imantado en /mas/mapa-mesas —
+// identifica la mesa física que se arrastró (`mesaId`, siempre una de las
+// absorbidas) y a dónde debe moverse visualmente para quedar pegada a la
+// mesa destino. Si esa mesa es normal (no temporal), se guarda su posición
+// actual en pedido_mesas.pos_x_original/y/rotacion_original ANTES de
+// sobrescribirla — así se puede regresar a su lugar al cobrar el pedido (ver
+// liberarMesasSatelite en cobro/[pedidoId]/actions.ts). Las mesas temporales
+// no se tocan: se borran por completo al cobrar, no tienen a dónde volver.
+// Sin este parámetro (llamada desde SheetUnirMesa, sin mapa de por medio) el
+// comportamiento es exactamente el de antes.
 export async function unirMesas(
   pedidoOrigenId: number,
   pedidoDestinoId: number,
+  reposicion?: { mesaId: number; x: number; y: number; rotacion: number } | null,
 ): Promise<Err | undefined> {
   const supabase = await createClient()
 
@@ -349,6 +361,19 @@ export async function unirMesas(
   const maxOrdenDestino = satelitesDestino?.length
     ? satelitesDestino[satelitesDestino.length - 1].orden
     : 1
+
+  // Datos de la mesa a reposicionar (si aplica) — se leen ANTES de moverla
+  // para poder guardar su posición original.
+  let mesaRepo: { temporal: boolean; pos_x: number | null; pos_y: number | null; rotacion: number | null } | null =
+    null
+  if (reposicion && mesasAAbsorber.includes(reposicion.mesaId)) {
+    const { data } = await supabase
+      .from('mesas')
+      .select('temporal, pos_x, pos_y, rotacion')
+      .eq('id', reposicion.mesaId)
+      .single()
+    mesaRepo = data ?? null
+  }
 
   // Máximo comensal_numero del destino
   const { data: maxSub } = await supabase
@@ -399,17 +424,99 @@ export async function unirMesas(
   if (mesasAAbsorber.length > 0) {
     await supabase.from('pedido_mesas').delete().eq('pedido_id', pedidoOrigenId)
 
+    const guardaOriginal = !!(reposicion && mesaRepo && !mesaRepo.temporal)
+
     const { error: pmError } = await supabase.from('pedido_mesas').upsert(
       mesasAAbsorber.map((mesaId, idx) => ({
         pedido_id: pedidoDestinoId,
         mesa_id: mesaId,
         orden: maxOrdenDestino + 1 + idx,
+        ...(guardaOriginal && mesaId === reposicion!.mesaId
+          ? {
+              pos_x_original: mesaRepo!.pos_x,
+              pos_y_original: mesaRepo!.pos_y,
+              rotacion_original: mesaRepo!.rotacion,
+            }
+          : {}),
       })),
       { onConflict: 'pedido_id,mesa_id' },
     )
     if (pmError) return { error: 'Error al unir las mesas.' }
 
     await supabase.from('mesas').update({ estado: 'ocupada' }).in('id', mesasAAbsorber)
+
+    // Reacomodo visual: solo para mesas normales, ver nota de `reposicion` arriba.
+    if (guardaOriginal) {
+      await supabase
+        .from('mesas')
+        .update({ pos_x: reposicion!.x, pos_y: reposicion!.y, rotacion: reposicion!.rotacion })
+        .eq('id', reposicion!.mesaId)
+    }
+  }
+}
+
+// ─── Unir mesa LIBRE a una cadena ya ocupada ───────────────────────────────────
+// A diferencia de unirMesas() (que fusiona dos pedidos ya existentes,
+// moviendo comensales de uno a otro), aquí la mesa que se une no tiene
+// pedido propio — es una mesa libre que se arrastra junto a una mesa/cadena
+// ya ocupada en /mas/mapa-mesas. No hay comensales que mover ni picker de
+// silla: simplemente amplía la capacidad de la cadena destino con una fila
+// más en pedido_mesas, siempre al final (mismo criterio de `orden` y mismo
+// límite de 5 mesas que unirMesas()).
+export async function unirMesaLibreAOcupada(
+  mesaLibreId: number,
+  pedidoDestinoId: number,
+  reposicion: { x: number; y: number; rotacion: number } | null,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { data: mesaLibre } = await supabase
+    .from('mesas')
+    .select('estado, temporal, pos_x, pos_y, rotacion')
+    .eq('id', mesaLibreId)
+    .single()
+  if (!mesaLibre) return { error: 'Mesa no encontrada.' }
+  // Protección contra condición de carrera: si alguien más ya la ocupó justo
+  // antes de que se soltara el arrastre, no se une a ciegas.
+  if (mesaLibre.estado === 'ocupada') return { error: 'Esa mesa ya está ocupada.' }
+
+  const { data: satelitesDestino } = await supabase
+    .from('pedido_mesas')
+    .select('orden')
+    .eq('pedido_id', pedidoDestinoId)
+    .order('orden')
+
+  const totalActualDestino = 1 + (satelitesDestino?.length ?? 0)
+  if (totalActualDestino + 1 > 5) {
+    return { error: 'No se pueden unir más de 5 mesas en una misma cadena.' }
+  }
+  const maxOrdenDestino = satelitesDestino?.length
+    ? satelitesDestino[satelitesDestino.length - 1].orden
+    : 1
+
+  const guardaOriginal = !mesaLibre.temporal && !!reposicion
+
+  const { error: pmError } = await supabase.from('pedido_mesas').insert({
+    pedido_id: pedidoDestinoId,
+    mesa_id: mesaLibreId,
+    orden: maxOrdenDestino + 1,
+    ...(guardaOriginal
+      ? {
+          pos_x_original: mesaLibre.pos_x,
+          pos_y_original: mesaLibre.pos_y,
+          rotacion_original: mesaLibre.rotacion,
+        }
+      : {}),
+  })
+  if (pmError) return { error: 'Error al unir la mesa.' }
+
+  await supabase.from('mesas').update({ estado: 'ocupada' }).eq('id', mesaLibreId)
+
+  if (guardaOriginal) {
+    await supabase
+      .from('mesas')
+      .update({ pos_x: reposicion!.x, pos_y: reposicion!.y, rotacion: reposicion!.rotacion })
+      .eq('id', mesaLibreId)
   }
 }
 

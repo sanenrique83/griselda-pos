@@ -29,7 +29,13 @@ import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
 //     superior y a distancia de arco constante = perímetro/capacidad.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type PuntoSilla = { x: number; y: number }
+// `anguloDeg` es el ángulo (convención atan2(y,x), en grados — 0°=derecha,
+// 90°=abajo, igual que un CSS `rotate()`) hacia donde "mira" la silla en ese
+// punto, es decir, la normal saliente del perímetro de la mesa ahí. Sirve
+// para rotar el marcador de silla (medio círculo, ver MesaShape) de forma
+// que el lado curvo (asiento) quede hacia afuera y el lado recto (respaldo)
+// hacia el centro de la mesa.
+export type PuntoSilla = { x: number; y: number; anguloDeg: number }
 
 // Cuánto más grande que la mesa es el "anillo" donde se paran las sillas —
 // en vez de calcular la normal saliente punto por punto (distinta en cada
@@ -40,15 +46,20 @@ export type PuntoSilla = { x: number; y: number }
 // eso el mismo caminador de perímetro sirve para el anillo sin cambios.
 const PAD_SILLA_PX = 16
 
+// Punto 2D simple, sin `anguloDeg` — geometría interna del caminador de
+// perímetro (desde/hasta/centro de cada tramo), distinta de `PuntoSilla`
+// (la salida pública, que sí lleva el ángulo de la silla en ese punto).
+type Punto2D = { x: number; y: number }
+
 type SegmentoRecto = {
   tipo: 'linea'
-  desde: PuntoSilla
-  hasta: PuntoSilla
+  desde: Punto2D
+  hasta: Punto2D
   longitud: number
 }
 type SegmentoArco = {
   tipo: 'arco'
-  centro: PuntoSilla
+  centro: Punto2D
   anguloInicioDeg: number
   anguloFinDeg: number
   radio: number
@@ -101,22 +112,33 @@ function puntoADistancia(segmentos: Segmento[], distancia: number): PuntoSilla {
       const local = Math.max(0, distancia - acumulado)
       const t = seg.longitud === 0 ? 0 : Math.min(1, local / seg.longitud)
       if (seg.tipo === 'linea') {
-        return {
-          x: seg.desde.x + (seg.hasta.x - seg.desde.x) * t,
-          y: seg.desde.y + (seg.hasta.y - seg.desde.y) * t,
-        }
+        const x = seg.desde.x + (seg.hasta.x - seg.desde.x) * t
+        const y = seg.desde.y + (seg.hasta.y - seg.desde.y) * t
+        // Normal saliente de un tramo recto = su tangente rotada -90°
+        // ((dx,dy) → (dy,-dx)) — el caminador de segmentosRectanguloRedondeado
+        // siempre avanza en sentido HORARIO, así que esa rotación fija
+        // siempre apunta hacia AFUERA del rectángulo en los 4 lados (probado
+        // para el lado superior y el lado derecho; los otros dos son iguales
+        // por la simetría de la construcción).
+        const dx = seg.hasta.x - seg.desde.x
+        const dy = seg.hasta.y - seg.desde.y
+        const anguloDeg = (Math.atan2(-dx, dy) * 180) / Math.PI
+        return { x, y, anguloDeg }
       }
-      const anguloDeg = seg.anguloInicioDeg + (seg.anguloFinDeg - seg.anguloInicioDeg) * t
-      const anguloRad = (anguloDeg * Math.PI) / 180
+      const anguloArcoDeg = seg.anguloInicioDeg + (seg.anguloFinDeg - seg.anguloInicioDeg) * t
+      const anguloRad = (anguloArcoDeg * Math.PI) / 180
+      // Normal saliente de un arco = su propia dirección radial (mismo
+      // ángulo con el que se parametrizó el punto sobre el círculo del arco).
       return {
         x: seg.centro.x + seg.radio * Math.cos(anguloRad),
         y: seg.centro.y + seg.radio * Math.sin(anguloRad),
+        anguloDeg: anguloArcoDeg,
       }
     }
     acumulado += seg.longitud
   }
   // No debería llegar aquí (el bucle siempre retorna en el último segmento).
-  return { x: 0, y: 0 }
+  return { x: 0, y: 0, anguloDeg: 0 }
 }
 
 /**
@@ -147,7 +169,11 @@ export function calcularPosicionesSillas(
     for (let k = 0; k < numSillas; k++) {
       const anguloDeg = (horario ? 1 : -1) * ((360 * k) / numSillas)
       const anguloRad = (anguloDeg * Math.PI) / 180
-      puntos.push({ x: radio * Math.sin(anguloRad), y: -radio * Math.cos(anguloRad) })
+      const x = radio * Math.sin(anguloRad)
+      const y = -radio * Math.cos(anguloRad)
+      // En un círculo la normal saliente es siempre radial: mismo ángulo
+      // que el propio punto visto desde el centro.
+      puntos.push({ x, y, anguloDeg: (Math.atan2(y, x) * 180) / Math.PI })
     }
     return puntos
   }
@@ -167,7 +193,7 @@ export function calcularPosicionesSillas(
     const distanciaCruda = horario ? k * paso : perimetro - k * paso
     const distancia = ((distanciaCruda % perimetro) + perimetro) % perimetro
     const p = puntoADistancia(segmentos, distancia)
-    puntos.push({ x: p.x - w / 2, y: p.y - h / 2 })
+    puntos.push({ x: p.x - w / 2, y: p.y - h / 2, anguloDeg: p.anguloDeg })
   }
   return puntos
 }
@@ -229,7 +255,8 @@ export function calcularPosicionesSillasCadena(
     Math.min(mesas.length - 1, Math.max(0, Math.floor(x / anchoIndividual)))
 
   if (total === 1) {
-    return [{ x: -anchoTotal / 2, y: 0, mesaIndice: 0 }]
+    // Cabecera 1 sola: mira hacia afuera del extremo izquierdo (180°).
+    return [{ x: -anchoTotal / 2, y: 0, anguloDeg: 180, mesaIndice: 0 }]
   }
 
   const resto = total - 2
@@ -238,22 +265,27 @@ export function calcularPosicionesSillasCadena(
 
   const puntos: PuntoSillaCadena[] = []
 
-  // Cabecera 1: extremo corto izquierdo, siempre de la primera mesa.
-  puntos.push({ x: -anchoTotal / 2, y: 0, mesaIndice: 0 })
+  // Cabecera 1: extremo corto izquierdo, siempre de la primera mesa. Mira
+  // hacia afuera (izquierda, 180°) — el rectángulo de la cadena es de lados
+  // rectos, así que a diferencia de una mesa individual el ángulo no varía
+  // punto a punto dentro de cada tramo, es fijo por sección.
+  puntos.push({ x: -anchoTotal / 2, y: 0, anguloDeg: 180, mesaIndice: 0 })
 
-  // Lado de arriba, izquierda → derecha.
+  // Lado de arriba, izquierda → derecha. Mira hacia arriba (-90°).
   for (let i = 0; i < ladoArribaCount; i++) {
     const x = (anchoTotal * (i + 0.5)) / ladoArribaCount
-    puntos.push({ x: x - anchoTotal / 2, y: -alto / 2, mesaIndice: mesaIndicePorX(x) })
+    puntos.push({ x: x - anchoTotal / 2, y: -alto / 2, anguloDeg: -90, mesaIndice: mesaIndicePorX(x) })
   }
 
-  // Cabecera 2: extremo corto derecho, siempre de la última mesa.
-  puntos.push({ x: anchoTotal / 2, y: 0, mesaIndice: mesas.length - 1 })
+  // Cabecera 2: extremo corto derecho, siempre de la última mesa. Mira hacia
+  // afuera (derecha, 0°).
+  puntos.push({ x: anchoTotal / 2, y: 0, anguloDeg: 0, mesaIndice: mesas.length - 1 })
 
-  // Lado de abajo, derecha → izquierda (cierra el anillo en sentido consistente).
+  // Lado de abajo, derecha → izquierda (cierra el anillo en sentido
+  // consistente). Mira hacia abajo (90°).
   for (let i = 0; i < ladoAbajoCount; i++) {
     const x = anchoTotal * (1 - (i + 0.5) / ladoAbajoCount)
-    puntos.push({ x: x - anchoTotal / 2, y: alto / 2, mesaIndice: mesaIndicePorX(x) })
+    puntos.push({ x: x - anchoTotal / 2, y: alto / 2, anguloDeg: 90, mesaIndice: mesaIndicePorX(x) })
   }
 
   return puntos

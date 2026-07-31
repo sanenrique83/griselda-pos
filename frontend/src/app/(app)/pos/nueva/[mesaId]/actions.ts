@@ -76,6 +76,110 @@ export async function abrirPedidoMesa(
   return { pedidoId: pedido.id }
 }
 
+// ─── Abrir mesa combinada (2 mesas libres unidas desde el arrastre) ────────────
+// Caso "arrastrar una mesa libre cerca de otra mesa libre" en
+// /mas/mapa-mesas: en vez de crear un pedido por mesa, se crea UNO SOLO en la
+// mesa "principal" (la que quedó fija en el mapa) con la mesa arrastrada ya
+// registrada como satélite (pedido_mesas, orden=2) desde el momento cero —
+// nunca pasan por unirMesas() porque nunca existieron como pedidos separados.
+// El picker de silla (ver ElegirSillaInicialShell) usa la capacidad
+// combinada de ambas mesas para el comensal 1.
+export async function abrirPedidoMesaCombinada(
+  mesaPrincipalId: number,
+  mesaSateliteId: number,
+  turnoId: number,
+  sillaElegida: number,
+  reposicionSatelite: { x: number; y: number; rotacion: number } | null,
+): Promise<{ pedidoId: number } | Err> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Sin sesión.' }
+
+  // Misma protección contra condición de carrera que abrirPedidoMesa: si ya
+  // hay un pedido en la principal (como principal o como satélite de otro),
+  // se usa ese en vez de crear uno duplicado.
+  const { data: pedidoExistente } = await supabase
+    .from('pedidos')
+    .select('id')
+    .eq('mesa_id', mesaPrincipalId)
+    .eq('estado', 'abierto')
+    .maybeSingle()
+  if (pedidoExistente) return { pedidoId: pedidoExistente.id }
+
+  const { data: satelitesExistentes } = await supabase
+    .from('pedido_mesas')
+    .select('pedido_id, pedidos!inner(estado)')
+    .eq('mesa_id', mesaPrincipalId)
+    .eq('pedidos.estado', 'abierto')
+    .limit(1)
+  if (satelitesExistentes && satelitesExistentes.length > 0) {
+    return { pedidoId: satelitesExistentes[0].pedido_id }
+  }
+
+  // La mesa satélite tampoco debe estar ya ocupada por otro lado.
+  const { data: mesaSatelite } = await supabase
+    .from('mesas')
+    .select('estado, temporal, pos_x, pos_y, rotacion')
+    .eq('id', mesaSateliteId)
+    .single()
+  if (!mesaSatelite) return { error: 'Mesa satélite no encontrada.' }
+  if (mesaSatelite.estado === 'ocupada') return { error: 'La otra mesa ya está ocupada.' }
+
+  const { data: pedido, error: pedidoErr } = await supabase
+    .from('pedidos')
+    .insert({
+      turno_id: turnoId,
+      mesa_id: mesaPrincipalId,
+      mesero_id: user.id,
+      tipo: 'mesa',
+    })
+    .select('id')
+    .single()
+  if (pedidoErr || !pedido) return { error: 'Error al crear el pedido.' }
+
+  const { error: subErr } = await supabase
+    .from('subpedidos')
+    .insert({
+      pedido_id: pedido.id,
+      mesero_id: user.id,
+      comensal_numero: 1,
+      silla_numero: sillaElegida,
+    })
+  if (subErr) return { error: 'Error al crear el comensal.' }
+
+  const guardaOriginal = !mesaSatelite.temporal && !!reposicionSatelite
+
+  const { error: pmError } = await supabase.from('pedido_mesas').insert({
+    pedido_id: pedido.id,
+    mesa_id: mesaSateliteId,
+    orden: 2,
+    ...(guardaOriginal
+      ? {
+          pos_x_original: mesaSatelite.pos_x,
+          pos_y_original: mesaSatelite.pos_y,
+          rotacion_original: mesaSatelite.rotacion,
+        }
+      : {}),
+  })
+  if (pmError) return { error: 'Error al unir la mesa satélite.' }
+
+  await supabase.rpc('set_estado_mesa', { p_mesa_id: mesaPrincipalId, p_estado: 'ocupada' })
+  await supabase.rpc('set_estado_mesa', { p_mesa_id: mesaSateliteId, p_estado: 'ocupada' })
+
+  if (guardaOriginal) {
+    await supabase
+      .from('mesas')
+      .update({
+        pos_x: reposicionSatelite!.x,
+        pos_y: reposicionSatelite!.y,
+        rotacion: reposicionSatelite!.rotacion,
+      })
+      .eq('id', mesaSateliteId)
+  }
+
+  return { pedidoId: pedido.id }
+}
+
 // ─── Crear pedido + agregar producto (modo estándar) ──────────────────────────
 // NOTA: sin llamadores tras el cambio de flujo de arriba — pos/nueva/[mesaId]
 // ya no muestra el catálogo en modo draft antes de que exista pedido, así

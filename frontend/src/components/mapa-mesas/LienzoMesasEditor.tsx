@@ -15,7 +15,7 @@ import {
 import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
 import { MesaShape, dimensionesMesa, colorParaGrupo } from '@/components/mesas/MesaShape'
 import { guardarDisposicion } from '@/app/(app)/mas/mapa-mesas/actions'
-import { unirMesas } from '@/app/(app)/pos/[pedidoId]/actions'
+import { unirMesas, unirMesaLibreAOcupada } from '@/app/(app)/pos/[pedidoId]/actions'
 import { calcularPosicionesSillas } from '@/lib/asientos'
 import { colorSemaforoMesa } from '@/lib/colorMesa'
 import type { MesaEditable } from '@/app/(app)/mas/mapa-mesas/page'
@@ -49,6 +49,17 @@ type Posicion = {
   forma: FormaMesa
   tamano: TamanoMesa
 }
+
+// Los 3 casos de unión por arrastre, según el estado de ocupación de la mesa
+// arrastrada y la candidata más cercana (no importa cuál de las dos se
+// arrastró — se decide por ocupación, no por dirección del gesto):
+//   - 'ambas_libres'    → ninguna tiene pedido: dispara el picker de silla
+//                         combinado (nueva ruta /pos/nueva-combinada).
+//   - 'libre_a_ocupada' → una libre + una con pedido: la libre se registra
+//                         como capacidad extra de la cadena (sin picker).
+//   - 'ocupada_a_ocupada' → ambas con pedido (distinto): unirMesas() de
+//                         siempre, sin cambios de comportamiento.
+type TipoUnionIman = 'ambas_libres' | 'libre_a_ocupada' | 'ocupada_a_ocupada'
 
 // Mesas sin pos_x/pos_y (nunca se han colocado en el mapa) se acomodan en
 // una cuadrícula temporal para que aparezcan en el lienzo desde el primer
@@ -101,7 +112,11 @@ export function LienzoMesasEditor({
   const [seleccionId, setSeleccionId] = useState<number | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
-  const [magnetTargetId, setMagnetTargetId] = useState<number | null>(null)
+  // Tipo de unión que dispararía soltar AHORA, según el estado de ocupación
+  // de la mesa arrastrada y la candidata más cercana — ver buscarCandidatoIman.
+  const [magnetTarget, setMagnetTarget] = useState<{ targetId: number; tipo: TipoUnionIman } | null>(
+    null,
+  )
   const [uniendo, setUniendo] = useState(false)
   const [ahora, setAhora] = useState(() => Date.now())
 
@@ -126,16 +141,18 @@ export function LienzoMesasEditor({
     setDirty((prev) => new Set(prev).add(id))
   }
 
-  // Candidato de imantado: mesa OCUPADA más cercana (por borde de caja, no
-  // centro — para que el umbral se sienta igual sin importar chico/grande),
-  // de un pedido distinto al de la mesa que se arrastra. Solo mesas ocupadas
-  // participan — no tiene sentido "unir" una mesa libre, unirMesas() opera
-  // sobre pedidos, no sobre mesas sueltas.
-  function buscarCandidatoIman(draggedId: number, liveX: number, liveY: number): number | null {
+  // Candidato de imantado: mesa más cercana (por borde de caja, no centro —
+  // para que el umbral se sienta igual sin importar chico/grande) que forma
+  // uno de los 3 casos válidos de unión. Se excluye: la propia mesa, y dos
+  // mesas ya ocupadas por el MISMO pedido (ya están en la misma cadena).
+  function buscarCandidatoIman(
+    draggedId: number,
+    liveX: number,
+    liveY: number,
+  ): { targetId: number; tipo: TipoUnionIman } | null {
     const draggedMesa = mesaPorId.get(draggedId)
-    if (!draggedMesa?.pedidoActivoId) return null
     const draggedPos = posiciones[draggedId]
-    if (!draggedPos) return null
+    if (!draggedMesa || !draggedPos) return null
     const { width: w, height: h } = dimensionesMesa(draggedPos.forma, draggedPos.tamano)
     const cajaArrastrada = { x: liveX, y: liveY, w, h }
 
@@ -143,7 +160,13 @@ export function LienzoMesasEditor({
     let mejorDist = Infinity
     for (const mesa of mesas) {
       if (mesa.id === draggedId) continue
-      if (!mesa.pedidoActivoId || mesa.pedidoActivoId === draggedMesa.pedidoActivoId) continue
+      if (
+        draggedMesa.pedidoActivoId &&
+        mesa.pedidoActivoId &&
+        draggedMesa.pedidoActivoId === mesa.pedidoActivoId
+      ) {
+        continue
+      }
       const pos = posiciones[mesa.id]
       if (!pos) continue
       const { width, height } = dimensionesMesa(pos.forma, pos.tamano)
@@ -153,7 +176,16 @@ export function LienzoMesasEditor({
         mejorId = mesa.id
       }
     }
-    return mejorId
+    if (mejorId === null) return null
+
+    const targetMesa = mesaPorId.get(mejorId)!
+    const tipo: TipoUnionIman =
+      !draggedMesa.pedidoActivoId && !targetMesa.pedidoActivoId
+        ? 'ambas_libres'
+        : draggedMesa.pedidoActivoId && targetMesa.pedidoActivoId
+          ? 'ocupada_a_ocupada'
+          : 'libre_a_ocupada'
+    return { targetId: mejorId, tipo }
   }
 
   function handleDragMove(event: DragMoveEvent) {
@@ -162,45 +194,131 @@ export function LienzoMesasEditor({
     if (!actual) return
     const liveX = actual.x + event.delta.x
     const liveY = actual.y + event.delta.y
-    setMagnetTargetId(buscarCandidatoIman(id, liveX, liveY))
+    setMagnetTarget(buscarCandidatoIman(id, liveX, liveY))
+  }
+
+  // Posición pegada al lado derecho de `basePos` (misma fórmula que ya usaba
+  // el caso ocupada_a_ocupada) — usada para reacomodar visualmente la mesa
+  // satélite en los 3 casos, siempre relativa a la mesa que se queda fija.
+  function posicionAdosada(basePos: Posicion): { x: number; y: number; rotacion: number } {
+    const { width } = dimensionesMesa(basePos.forma, basePos.tamano)
+    return {
+      x: Math.min(Math.max(0, Math.round(basePos.x + width)), CANVAS_W - 20),
+      y: Math.min(Math.max(0, Math.round(basePos.y)), CANVAS_H - 20),
+      rotacion: basePos.rotacion,
+    }
   }
 
   function handleDragEnd(event: DragEndEvent) {
     const id = Number(event.active.id)
     const { delta } = event
-    const targetId = magnetTargetId
-    setMagnetTargetId(null)
-    if (delta.x === 0 && delta.y === 0 && targetId === null) return
+    const magnet = magnetTarget
+    setMagnetTarget(null)
+    if (delta.x === 0 && delta.y === 0 && magnet === null) return
 
     const actual = posiciones[id]
     if (!actual) return
     const x = Math.min(Math.max(0, Math.round(actual.x + delta.x)), CANVAS_W - 20)
     const y = Math.min(Math.max(0, Math.round(actual.y + delta.y)), CANVAS_H - 20)
 
-    if (targetId !== null) {
+    if (magnet !== null) {
+      const { targetId, tipo } = magnet
       const draggedMesa = mesaPorId.get(id)
       const targetMesa = mesaPorId.get(targetId)
       const targetPos = posiciones[targetId]
-      if (draggedMesa?.pedidoActivoId && targetMesa?.pedidoActivoId && targetPos) {
+
+      if (tipo === 'ocupada_a_ocupada' && draggedMesa?.pedidoActivoId && targetMesa?.pedidoActivoId && targetPos) {
         setUniendo(true)
         setMensaje(null)
-        unirMesas(draggedMesa.pedidoActivoId, targetMesa.pedidoActivoId).then((result) => {
+        const reposicion = draggedMesa.temporal
+          ? null
+          : { mesaId: id, ...posicionAdosada(targetPos) }
+        unirMesas(draggedMesa.pedidoActivoId, targetMesa.pedidoActivoId, reposicion).then((result) => {
           setUniendo(false)
           if (result?.error) {
             setMensaje({ tipo: 'error', texto: result.error })
             actualizarMesa(id, { x, y })
             return
           }
-          // Efecto solo visual: acomoda la mesa arrastrada tocando a la
+          // Efecto visual: acomoda la mesa arrastrada tocando a la
           // principal — no afecta el cálculo de sillas (eso usa el orden
-          // guardado en pedido_mesas, no la posición en el mapa).
-          const { width: targetWidth } = dimensionesMesa(targetPos.forma, targetPos.tamano)
-          const nuevaX = Math.min(Math.max(0, Math.round(targetPos.x + targetWidth)), CANVAS_W - 20)
-          const nuevaY = Math.min(Math.max(0, Math.round(targetPos.y)), CANVAS_H - 20)
-          actualizarMesa(id, { x: nuevaX, y: nuevaY, rotacion: targetPos.rotacion })
+          // guardado en pedido_mesas, no la posición en el mapa). Si es
+          // normal (no temporal) ya quedó persistido en BD por unirMesas(),
+          // así que se saca de "dirty" para no pedir guardar de nuevo.
+          if (reposicion) {
+            actualizarMesa(id, { x: reposicion.x, y: reposicion.y, rotacion: reposicion.rotacion })
+            setDirty((prev) => {
+              const s = new Set(prev)
+              s.delete(id)
+              return s
+            })
+          } else {
+            actualizarMesa(id, { x, y })
+          }
           setMensaje({ tipo: 'ok', texto: `${draggedMesa.nombre ?? draggedMesa.numero} unida.` })
           router.refresh()
         })
+        return
+      }
+
+      if (tipo === 'libre_a_ocupada' && draggedMesa && targetMesa && targetPos) {
+        // No importa cuál de las dos se arrastró: la que ya tiene pedido es
+        // siempre la principal (nunca se mueve por la unión); la libre se
+        // registra como capacidad extra y es la que se reacomoda.
+        const draggedEsLibre = !draggedMesa.pedidoActivoId
+        const libreId = draggedEsLibre ? id : targetId
+        const libreMesa = draggedEsLibre ? draggedMesa : targetMesa
+        const ocupadaMesa = draggedEsLibre ? targetMesa : draggedMesa
+        const pedidoDestinoId = ocupadaMesa.pedidoActivoId!
+        // Posición de la ocupada tras este drag: si es la que se arrastró,
+        // ya tiene su nueva posición (x,y de arriba); si es el objetivo (no
+        // se arrastró), se queda donde estaba.
+        const ocupadaPos: Posicion = draggedEsLibre
+          ? targetPos
+          : { ...actual, x, y }
+
+        setUniendo(true)
+        setMensaje(null)
+        const reposicion = libreMesa.temporal ? null : posicionAdosada(ocupadaPos)
+        unirMesaLibreAOcupada(libreId, pedidoDestinoId, reposicion).then((result) => {
+          setUniendo(false)
+          if (result?.error) {
+            setMensaje({ tipo: 'error', texto: result.error })
+            actualizarMesa(id, { x, y })
+            return
+          }
+          // La mesa ocupada (si fue la arrastrada) toma su posición normal
+          // de drop; la libre (arrastrada o no) se reacomoda pegada a ella.
+          if (!draggedEsLibre) actualizarMesa(id, { x, y })
+          if (reposicion) {
+            actualizarMesa(libreId, reposicion)
+            setDirty((prev) => {
+              const s = new Set(prev)
+              s.delete(libreId)
+              return s
+            })
+          } else if (draggedEsLibre) {
+            actualizarMesa(id, { x, y })
+          }
+          setMensaje({
+            tipo: 'ok',
+            texto: `${libreMesa.nombre ?? libreMesa.numero} añadida a ${ocupadaMesa.nombre ?? ocupadaMesa.numero}.`,
+          })
+          router.refresh()
+        })
+        return
+      }
+
+      if (tipo === 'ambas_libres' && draggedMesa && targetMesa && targetPos) {
+        // Ninguna de las dos tiene pedido: hace falta elegir silla para el
+        // comensal 1 con la capacidad combinada — no se puede resolver aquí
+        // mismo, se navega al picker (mesa objetivo = principal, se queda
+        // fija; mesa arrastrada = satélite, orden 2, se reposiciona al
+        // confirmar). No hay nada que persistir todavía en este punto.
+        const repo = posicionAdosada(targetPos)
+        router.push(
+          `/pos/nueva-combinada/${targetId}/${id}?x=${repo.x}&y=${repo.y}&r=${repo.rotacion}`,
+        )
         return
       }
     }
@@ -348,9 +466,9 @@ export function LienzoMesasEditor({
                       posicion={posiciones[mesa.id]}
                       seleccionada={seleccionId === mesa.id}
                       anilloColor={
-                        mesa.id === magnetTargetId ? COLOR_IMAN : colorPorMesa.get(mesa.id)
+                        mesa.id === magnetTarget?.targetId ? COLOR_IMAN : colorPorMesa.get(mesa.id)
                       }
-                      magnetActivo={magnetTargetId !== null}
+                      magnetActivo={magnetTarget !== null}
                       colorEstado={colorSemaforoMesa(
                         {
                           ocupada: mesa.pedidoActivoId !== null,

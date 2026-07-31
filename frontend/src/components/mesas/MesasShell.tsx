@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { TarjetaMesa } from './TarjetaMesa'
 import { PlanoMesas } from './PlanoMesas'
 import { SheetParaLlevar } from './SheetParaLlevar'
+import { SheetMesaExtra } from './SheetMesaExtra'
 import { abrirPedidoMostrador } from '@/app/(app)/mesas/actions'
 import type { GrupoArea, MesaUI } from '@/app/(app)/mesas/page'
 
@@ -27,6 +28,7 @@ export function MesasShell({
 }: MesasShellProps) {
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetMesaExtraOpen, setSheetMesaExtraOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPendingMostrador, startMostrador] = useTransition()
   // Si hay al menos una mesa posicionada, el mapa es la vista por default;
@@ -161,6 +163,28 @@ export function MesasShell({
           </button>
         </div>
 
+        {/* Botón + Mesa extra */}
+        <div className="px-3 pt-2.5">
+          <button
+            onClick={() => {
+              if (!turnoId) {
+                setError('No hay turno activo. Ve a Más → Turno para abrir uno.')
+                return
+              }
+              setSheetMesaExtraOpen(true)
+            }}
+            className="flex w-full cursor-pointer items-center gap-3 rounded-xl border-[1.5px] border-dashed border-[#D1D1D6] bg-white px-4 py-3.5 text-text-2 active:scale-[.98]"
+          >
+            <span className="text-[22px] leading-none">➕</span>
+            <div className="flex-1 text-left">
+              <div className="text-[14px] font-semibold">Mesa extra</div>
+              <div className="mt-0.5 text-[12px] text-text-3">
+                Para grupos que no caben en las mesas normales
+              </div>
+            </div>
+          </button>
+        </div>
+
         {/* Sin mesas configuradas */}
         {grupos.length === 0 && (
           <div className="mt-12 text-center text-sm text-text-3">
@@ -237,6 +261,12 @@ export function MesasShell({
       <SheetParaLlevar
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
+      />
+
+      {/* Sheet Mesa extra */}
+      <SheetMesaExtra
+        open={sheetMesaExtraOpen}
+        onClose={() => setSheetMesaExtraOpen(false)}
       />
     </>
   )

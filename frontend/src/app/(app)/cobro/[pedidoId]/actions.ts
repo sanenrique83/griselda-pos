@@ -17,16 +17,23 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 // registro histórico de qué pedido la ocupó, igual que pedidos.mesa_id nunca
 // se limpia al cerrar una mesa normal. reabrir_pedido() la necesita: si este
 // pedido se reabre después, así sabe qué mesas satélite debe volver a ocupar.
+//
+// Si la mesa se movió visualmente al unirse por arrastre (pos_x_original no
+// nulo — ver unirMesas/unirMesaLibreAOcupada/abrirPedidoMesaCombinada), se
+// regresa a esa posición antes de liberarla. Si nunca se movió (unión vía
+// SheetUnirMesa, sin mapa de por medio), esas columnas quedan NULL y no hay
+// nada que restaurar.
 async function liberarMesasSatelite(supabase: SupabaseClient, pedidoId: number): Promise<void> {
   const { data: satelites } = await supabase
     .from('pedido_mesas')
-    .select('mesa_id')
+    .select('mesa_id, pos_x_original, pos_y_original, rotacion_original')
     .eq('pedido_id', pedidoId)
 
   const mesaIds = (satelites ?? []).map((s) => s.mesa_id)
   if (mesaIds.length === 0) return
 
   const { data: mesasInfo } = await supabase.from('mesas').select('id, temporal').in('id', mesaIds)
+  const origPorMesa = new Map((satelites ?? []).map((s) => [s.mesa_id, s]))
 
   for (const mesa of mesasInfo ?? []) {
     if (mesa.temporal) {
@@ -34,7 +41,16 @@ async function liberarMesasSatelite(supabase: SupabaseClient, pedidoId: number):
       await supabase.from('pedidos').update({ mesa_id: null }).eq('mesa_id', mesa.id)
       await supabase.from('mesas').delete().eq('id', mesa.id)
     } else {
-      await supabase.from('mesas').update({ estado: 'libre' }).eq('id', mesa.id)
+      const orig = origPorMesa.get(mesa.id)
+      const patch: { estado: 'libre'; pos_x?: number | null; pos_y?: number | null; rotacion?: number | null } = {
+        estado: 'libre',
+      }
+      if (orig?.pos_x_original !== null && orig?.pos_x_original !== undefined) {
+        patch.pos_x = orig.pos_x_original
+        patch.pos_y = orig.pos_y_original
+        patch.rotacion = orig.rotacion_original
+      }
+      await supabase.from('mesas').update(patch).eq('id', mesa.id)
     }
   }
 }

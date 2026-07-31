@@ -3,7 +3,8 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { DiagramaSillas } from './DiagramaSillas'
-import { abrirPedidoMesa } from '@/app/(app)/pos/nueva/[mesaId]/actions'
+import { DiagramaSillasCadena } from './DiagramaSillasCadena'
+import { abrirPedidoMesa, abrirPedidoMesaCombinada } from '@/app/(app)/pos/nueva/[mesaId]/actions'
 import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
 
 interface ElegirSillaInicialShellProps {
@@ -15,6 +16,13 @@ interface ElegirSillaInicialShellProps {
   tamano: TamanoMesa
   rotacion: number
   asientosHorario: boolean
+  // Combinación con una segunda mesa libre (arrastre imantado libre+libre en
+  // /mas/mapa-mesas) — si viene presente, el diagrama muestra las 2 mesas en
+  // cadena (DiagramaSillasCadena) y, al confirmar, se crea un solo pedido
+  // combinado (abrirPedidoMesaCombinada) en vez de uno solo para `mesaId`.
+  mesaSateliteId?: number
+  capacidadSatelite?: number
+  reposicionSatelite?: { x: number; y: number; rotacion: number } | null
 }
 
 // Paso previo a crear el pedido de una mesa vacía: el mesero elige en qué
@@ -31,19 +39,33 @@ export function ElegirSillaInicialShell({
   tamano,
   rotacion,
   asientosHorario,
+  mesaSateliteId,
+  capacidadSatelite,
+  reposicionSatelite = null,
 }: ElegirSillaInicialShellProps) {
   const router = useRouter()
   const [sillaElegida, setSillaElegida] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const numSillas = Math.max(capacidad ?? 1, 1)
+  const esCombinada = mesaSateliteId !== undefined
+  const numSillas = esCombinada
+    ? Math.max((capacidad ?? 1) + (capacidadSatelite ?? 1), 1)
+    : Math.max(capacidad ?? 1, 1)
 
   function handleConfirmar() {
     if (sillaElegida === null) return
     setError(null)
     startTransition(async () => {
-      const result = await abrirPedidoMesa(mesaId, turnoId, sillaElegida)
+      const result = esCombinada
+        ? await abrirPedidoMesaCombinada(
+            mesaId,
+            mesaSateliteId!,
+            turnoId,
+            sillaElegida,
+            reposicionSatelite,
+          )
+        : await abrirPedidoMesa(mesaId, turnoId, sillaElegida)
       if ('error' in result) {
         setError(result.error)
         return
@@ -83,25 +105,43 @@ export function ElegirSillaInicialShell({
           partir de esta referencia.
         </p>
 
-        <DiagramaSillas
-          forma={forma}
-          tamano={tamano}
-          rotacion={rotacion}
-          asientosHorario={asientosHorario}
-          numSillas={numSillas}
-          renderSilla={(sillaNum) => (
-            <button
-              onClick={() => setSillaElegida(sillaNum)}
-              className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-[13px] font-bold transition-transform active:scale-90 ${
-                sillaElegida === sillaNum
-                  ? 'border-blue-600 bg-blue-600 text-white'
-                  : 'border-blue-400 bg-blue-50 text-blue-700'
-              }`}
-            >
-              {sillaNum}
-            </button>
-          )}
-        />
+        {esCombinada ? (
+          <DiagramaSillasCadena
+            mesas={[{ capacidad: capacidad ?? 1 }, { capacidad: capacidadSatelite ?? 1 }]}
+            renderSilla={(sillaNum) => (
+              <button
+                onClick={() => setSillaElegida(sillaNum)}
+                className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-[13px] font-bold transition-transform active:scale-90 ${
+                  sillaElegida === sillaNum
+                    ? 'border-blue-600 bg-blue-600 text-white'
+                    : 'border-blue-400 bg-blue-50 text-blue-700'
+                }`}
+              >
+                {sillaNum}
+              </button>
+            )}
+          />
+        ) : (
+          <DiagramaSillas
+            forma={forma}
+            tamano={tamano}
+            rotacion={rotacion}
+            asientosHorario={asientosHorario}
+            numSillas={numSillas}
+            renderSilla={(sillaNum) => (
+              <button
+                onClick={() => setSillaElegida(sillaNum)}
+                className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-[13px] font-bold transition-transform active:scale-90 ${
+                  sillaElegida === sillaNum
+                    ? 'border-blue-600 bg-blue-600 text-white'
+                    : 'border-blue-400 bg-blue-50 text-blue-700'
+                }`}
+              >
+                {sillaNum}
+              </button>
+            )}
+          />
+        )}
 
         {error && (
           <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-center text-sm text-red-600">

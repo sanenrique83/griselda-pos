@@ -23,7 +23,10 @@ export function colorParaGrupo(indice: number): string {
 // en lib/asientos.ts) — MesaShape no calcula posiciones, solo dibuja las que
 // le pasan, para no duplicar esa geometría aquí (y evitar un import circular
 // con lib/asientos.ts, que ya importa `dimensionesMesa` de este archivo).
-export type MarcadorSilla = { x: number; y: number; ocupada: boolean }
+// `anguloDeg` es la normal saliente en ese punto (ver lib/asientos.ts) — con
+// eso se rota el medio círculo para que el lado curvo (asiento) quede hacia
+// afuera y el lado recto (respaldo) hacia el centro de la mesa.
+export type MarcadorSilla = { x: number; y: number; anguloDeg: number; ocupada: boolean }
 
 /**
  * Representación visual de una mesa (forma real según `forma`/`tamano`,
@@ -34,9 +37,11 @@ export type MarcadorSilla = { x: number; y: number; ocupada: boolean }
  * a otras — se usa `outline` en vez de sumarse a `shadow-card` para no pisar
  * la sombra propia de la mesa.
  *
- * `marcadores` dibuja triángulos pequeños alrededor de la silueta —
- * rellenos si `ocupada`, solo contorno si no — para ver de un vistazo
- * cuántos asientos están tomados sin abrir la mesa.
+ * `marcadores` dibuja medios círculos pequeños alrededor de la silueta (el
+ * lado recto —respaldo— hacia el centro de la mesa, el lado curvo —asiento—
+ * hacia afuera, rotado según `anguloDeg`) — rellenos si `ocupada`, solo
+ * contorno si no — para ver de un vistazo cuántos asientos están tomados
+ * sin abrir la mesa.
  *
  * `colorEstado` es el semáforo completo de la mesa (ver lib/colorMesa.ts) —
  * reemplaza al viejo booleano `ocupada`, que solo distinguía 2 estados.
@@ -82,12 +87,19 @@ export function MesaShape({
           key={idx}
           width={8}
           height={8}
-          viewBox="0 0 8 8"
+          viewBox="-4 -4 8 8"
           className="pointer-events-none absolute"
-          style={{ left: width / 2 + m.x, top: height / 2 + m.y, transform: 'translate(-50%, -50%)' }}
+          style={{
+            left: width / 2 + m.x,
+            top: height / 2 + m.y,
+            transform: `translate(-50%, -50%) rotate(${m.anguloDeg}deg)`,
+          }}
         >
-          <polygon
-            points="4,0 8,8 0,8"
+          {/* Medio círculo centrado en el origen: lado recto en x=0 (hacia
+              el centro de la mesa antes de rotar), lado curvo hacia +x
+              (hacia afuera) — `anguloDeg` lo rota a su orientación real. */}
+          <path
+            d="M 0,-4 A 4 4 0 0 1 0,4 Z"
             fill={m.ocupada ? '#f59e0b' : 'none'}
             stroke={m.ocupada ? 'none' : '#C7C7CC'}
             strokeWidth={1.2}

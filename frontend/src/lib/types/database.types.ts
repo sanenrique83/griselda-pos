@@ -278,6 +278,10 @@ export interface PedidoMesa {
   pedido_id: number
   mesa_id: number
   created_at: string
+  orden: number
+  pos_x_original: number | null
+  pos_y_original: number | null
+  rotacion_original: number | null
 }
 
 export interface Ingrediente {
