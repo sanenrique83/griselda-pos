@@ -40,6 +40,12 @@ export type MesaSillas = {
   asientosHorario: boolean
 } | null
 
+// Lista de mesas físicas de la cadena (mesa principal + satélites, en orden),
+// solo con la capacidad de cada una — es todo lo que necesita
+// calcularPosicionesSillasCadena. null/vacío si el pedido no tiene mesas
+// satélite (SheetAsientos sigue usando el diagrama individual sin cambios).
+export type MesaCadenaItem = { capacidad: number }
+
 export type ProductoCatalogo = {
   id: number
   nombre: string
@@ -202,6 +208,26 @@ export default async function PosPage({
         }
       : null
 
+  // ── Mesas satélite unidas (cadena) ──────────────────────────────────────────
+  // Solo aplica a pedidos tipo 'mesa'. Si no hay ninguna, mesasCadena queda
+  // null y el diagrama de sillas se comporta exactamente igual que antes
+  // (mesa individual, sin cambios).
+  let mesasCadena: MesaCadenaItem[] | null = null
+  if (pedido.tipo === 'mesa' && mesa) {
+    const { data: satelites } = await supabase
+      .from('pedido_mesas')
+      .select('orden, mesas(capacidad)')
+      .eq('pedido_id', pedidoId)
+      .order('orden')
+
+    if (satelites && satelites.length > 0) {
+      mesasCadena = [
+        { capacidad: mesa.capacidad ?? 1 },
+        ...satelites.map((s: any) => ({ capacidad: s.mesas?.capacidad ?? 1 })),
+      ]
+    }
+  }
+
   // ── Label del pedido ───────────────────────────────────────────────────────
   const mesaLabel =
     pedido.tipo === 'mesa'
@@ -239,6 +265,7 @@ export default async function PosPage({
       rol={rol}
       tipoMesa={tipoMesa}
       mesaSillas={mesaSillas}
+      mesasCadena={mesasCadena}
     />
   )
 }

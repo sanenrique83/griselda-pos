@@ -2,6 +2,8 @@
 
 import { MesaShape, dimensionesMesa, colorParaGrupo } from './MesaShape'
 import { TarjetaMesa } from './TarjetaMesa'
+import { calcularPosicionesSillas } from '@/lib/asientos'
+import { colorSemaforoMesa, ESTILO_COLOR_MESA } from '@/lib/colorMesa'
 import type { MesaUI } from '@/app/(app)/mesas/page'
 
 const MARGEN = 100
@@ -16,9 +18,15 @@ const MARGEN = 100
 export function PlanoMesas({
   mesas,
   onMesaClick,
+  ahora,
+  alertaActiva,
+  alertaMinutos,
 }: {
   mesas: MesaUI[]
   onMesaClick: (mesa: MesaUI) => void
+  ahora: number
+  alertaActiva: boolean
+  alertaMinutos: number
 }) {
   const posicionadas = mesas.filter((m) => m.pos_x !== null && m.pos_y !== null)
   const sinPosicion = mesas.filter((m) => m.pos_x === null || m.pos_y === null)
@@ -83,29 +91,50 @@ export function PlanoMesas({
             </svg>
           )}
 
-          {posicionadas.map((mesa) => (
-            <button
-              key={mesa.id}
-              onClick={() => onMesaClick(mesa)}
-              className="absolute active:scale-[.96] transition-transform"
-              style={{ left: mesa.pos_x!, top: mesa.pos_y! }}
-            >
-              <MesaShape
-                forma={mesa.forma}
-                tamano={mesa.tamano}
-                rotacion={mesa.rotacion}
-                ocupada={mesa.pedido_activo !== null}
-                anilloColor={colorPorMesa.get(mesa.id)}
+          {posicionadas.map((mesa) => {
+            const color = colorSemaforoMesa(
+              {
+                ocupada: mesa.pedido_activo !== null,
+                algunoPagadoNoTodos: mesa.pedido_activo?.algunoPagadoNoTodos ?? false,
+                tieneProductos: mesa.pedido_activo?.tieneProductos ?? false,
+                pedidoCreatedAt: mesa.pedido_activo?.created_at ?? null,
+                alertaActiva,
+                alertaMinutos,
+              },
+              ahora,
+            )
+            const capacidad = Math.max(mesa.capacidad ?? 1, 1)
+            const puntos = calcularPosicionesSillas(capacidad, mesa.forma, mesa.tamano, mesa.asientos_horario)
+            const marcadores = puntos.map((p, idx) => ({ ...p, ocupada: idx < mesa.ocupadas }))
+
+            return (
+              <button
+                key={mesa.id}
+                onClick={() => onMesaClick(mesa)}
+                className="absolute active:scale-[.96] transition-transform"
+                style={{ left: mesa.pos_x!, top: mesa.pos_y! }}
               >
-                <span className="text-[13px] font-bold leading-none">
-                  {mesa.nombre ?? mesa.numero}
-                </span>
-                {mesa.pedido_activo && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                )}
-              </MesaShape>
-            </button>
-          ))}
+                <MesaShape
+                  forma={mesa.forma}
+                  tamano={mesa.tamano}
+                  rotacion={mesa.rotacion}
+                  colorEstado={color}
+                  anilloColor={colorPorMesa.get(mesa.id)}
+                  marcadores={marcadores}
+                >
+                  <span className="text-[13px] font-bold leading-none">
+                    {mesa.nombre ?? mesa.numero}
+                  </span>
+                  {mesa.pedido_activo && (
+                    <span
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ backgroundColor: ESTILO_COLOR_MESA[color].dot }}
+                    />
+                  )}
+                </MesaShape>
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -116,7 +145,14 @@ export function PlanoMesas({
           </p>
           <div className="grid grid-cols-2 gap-2.5">
             {sinPosicion.map((mesa) => (
-              <TarjetaMesa key={mesa.id} mesa={mesa} onClick={() => onMesaClick(mesa)} isPending={false} />
+              <TarjetaMesa
+                key={mesa.id}
+                mesa={mesa}
+                onClick={() => onMesaClick(mesa)}
+                isPending={false}
+                alertaActiva={alertaActiva}
+                alertaMinutos={alertaMinutos}
+              />
             ))}
           </div>
         </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { TarjetaMesa } from './TarjetaMesa'
 import { PlanoMesas } from './PlanoMesas'
@@ -13,9 +13,18 @@ interface MesasShellProps {
   mesas: MesaUI[]
   hayMapa: boolean
   turnoId: number | null
+  alertaActiva: boolean
+  alertaMinutos: number
 }
 
-export function MesasShell({ grupos, mesas, hayMapa, turnoId }: MesasShellProps) {
+export function MesasShell({
+  grupos,
+  mesas,
+  hayMapa,
+  turnoId,
+  alertaActiva,
+  alertaMinutos,
+}: MesasShellProps) {
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -23,6 +32,16 @@ export function MesasShell({ grupos, mesas, hayMapa, turnoId }: MesasShellProps)
   // Si hay al menos una mesa posicionada, el mapa es la vista por default;
   // si no, no tiene caso mostrarlo (estaría vacío) y se arranca en lista.
   const [vista, setVista] = useState<'mapa' | 'lista'>(hayMapa ? 'mapa' : 'lista')
+
+  // Reloj compartido para el semáforo rojo (mesa sin atender por tiempo) —
+  // un solo interval para todas las tarjetas/mesas del plano, en vez de uno
+  // por tarjeta, y así la condición de "ya pasaron N minutos" se reevalúa
+  // sin necesitar refrescar la página entera.
+  const [ahora, setAhora] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setAhora(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   function handleVentaRapida() {
     if (!turnoId) {
@@ -177,7 +196,13 @@ export function MesasShell({ grupos, mesas, hayMapa, turnoId }: MesasShellProps)
 
         {/* Vista de mapa */}
         {grupos.length > 0 && vista === 'mapa' && hayMapa && (
-          <PlanoMesas mesas={mesas} onMesaClick={handleMesaClick} />
+          <PlanoMesas
+            mesas={mesas}
+            onMesaClick={handleMesaClick}
+            ahora={ahora}
+            alertaActiva={alertaActiva}
+            alertaMinutos={alertaMinutos}
+          />
         )}
 
         {/* Vista de lista: grupos por área */}
@@ -197,6 +222,8 @@ export function MesasShell({ grupos, mesas, hayMapa, turnoId }: MesasShellProps)
                     mesa={mesa}
                     onClick={() => handleMesaClick(mesa)}
                     isPending={false}
+                    alertaActiva={alertaActiva}
+                    alertaMinutos={alertaMinutos}
                   />
                 ))}
               </div>

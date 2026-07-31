@@ -58,6 +58,8 @@ export interface ConfigSistema {
   timeout_inactividad_minutos: number
   orden_productos: 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
   orden_modificadores: 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
+  alerta_mesa_sin_atender: boolean
+  alerta_mesa_sin_atender_minutos: number
 }
 
 export interface Area {

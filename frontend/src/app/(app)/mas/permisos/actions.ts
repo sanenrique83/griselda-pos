@@ -59,6 +59,19 @@ export async function actualizarTimeoutInactividad(
   if (error) return { error: 'Error al actualizar el tiempo de inactividad.' }
 }
 
+export async function actualizarAlertaMesaMinutos(
+  minutos: number,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('config_sistema')
+    .update({ alerta_mesa_sin_atender_minutos: minutos })
+    .eq('id', 1)
+
+  if (error) return { error: 'Error al actualizar los minutos de alerta.' }
+}
+
 type ModoOrden = 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
 
 export async function actualizarOrdenProductos(

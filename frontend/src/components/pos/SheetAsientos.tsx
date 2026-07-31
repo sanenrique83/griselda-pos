@@ -3,14 +3,16 @@
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { DiagramaSillas } from './DiagramaSillas'
+import { DiagramaSillasCadena } from './DiagramaSillasCadena'
 import { asignarSilla } from '@/app/(app)/pos/[pedidoId]/actions'
-import type { SubpedidoPOS, MesaSillas } from '@/app/(app)/pos/[pedidoId]/page'
+import type { SubpedidoPOS, MesaSillas, MesaCadenaItem } from '@/app/(app)/pos/[pedidoId]/page'
 
 interface SheetAsientosProps {
   open: boolean
   onClose: () => void
   subpedidos: SubpedidoPOS[]
   mesaSillas: MesaSillas
+  mesasCadena?: MesaCadenaItem[] | null
 }
 
 // Reasignación manual — agregar un comensal nuevo ya no pasa por aquí (se
@@ -22,6 +24,7 @@ export function SheetAsientos({
   onClose,
   subpedidos,
   mesaSillas,
+  mesasCadena = null,
 }: SheetAsientosProps) {
   const router = useRouter()
   const [comensalSeleccionadoId, setComensalSeleccionadoId] = useState<number | null>(null)
@@ -59,9 +62,42 @@ export function SheetAsientos({
     })
   }
 
-  const numSillas = mesaSillas
-    ? Math.max(mesaSillas.capacidad ?? 0, subpedidos.length, 1)
-    : 0
+  function renderSilla(sillaNum: number) {
+    const ocupante = subpedidos.find((s) => s.silla_numero === sillaNum)
+    const esPropia = ocupante?.id === comensalSeleccionadoId
+    const asignable = comensalSeleccionadoId !== null && !ocupante
+    const tappable = asignable || esPropia
+
+    return (
+      <button
+        onClick={() => handleTapSilla(sillaNum, ocupante)}
+        disabled={!tappable || isPending}
+        title={
+          ocupante
+            ? `Silla ${sillaNum} — ${ocupante.nombre ?? `Comensal ${ocupante.comensal_numero}`}`
+            : `Silla ${sillaNum} — vacía`
+        }
+        className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-[12px] font-bold transition-transform ${
+          esPropia
+            ? 'border-amber-500 bg-amber-50 text-amber-700 active:scale-90'
+            : ocupante
+              ? 'border-[#D1D1D6] bg-s2 text-text-3'
+              : asignable
+                ? 'border-blue-500 bg-blue-50 text-blue-700 active:scale-90'
+                : 'border-[#E5E5EA] bg-white text-text-4'
+        } ${!tappable ? 'cursor-default' : ''}`}
+      >
+        {sillaNum}
+      </button>
+    )
+  }
+
+  const capacidadCadena = mesasCadena?.reduce((s, m) => s + m.capacidad, 0) ?? 0
+  const numSillas = mesasCadena
+    ? Math.max(capacidadCadena, subpedidos.length, 1)
+    : mesaSillas
+      ? Math.max(mesaSillas.capacidad ?? 0, subpedidos.length, 1)
+      : 0
 
   return (
     <>
@@ -87,49 +123,41 @@ export function SheetAsientos({
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {!mesaSillas ? (
+          {!mesaSillas && !mesasCadena ? (
             <p className="py-8 text-center text-sm text-text-3">
               Este pedido no tiene mesa asignada.
             </p>
           ) : (
             <>
               {/* ── Diagrama de la mesa con marcadores de silla ─────────────── */}
-              <DiagramaSillas
-                forma={mesaSillas.forma}
-                tamano={mesaSillas.tamano}
-                rotacion={mesaSillas.rotacion}
-                asientosHorario={mesaSillas.asientosHorario}
-                numSillas={numSillas}
-                renderSilla={(sillaNum) => {
-                  const ocupante = subpedidos.find((s) => s.silla_numero === sillaNum)
-                  const esPropia = ocupante?.id === comensalSeleccionadoId
-                  const asignable = comensalSeleccionadoId !== null && !ocupante
-                  const tappable = asignable || esPropia
-
-                  return (
-                    <button
-                      onClick={() => handleTapSilla(sillaNum, ocupante)}
-                      disabled={!tappable || isPending}
-                      title={
-                        ocupante
-                          ? `Silla ${sillaNum} — ${ocupante.nombre ?? `Comensal ${ocupante.comensal_numero}`}`
-                          : `Silla ${sillaNum} — vacía`
-                      }
-                      className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-[12px] font-bold transition-transform ${
-                        esPropia
-                          ? 'border-amber-500 bg-amber-50 text-amber-700 active:scale-90'
-                          : ocupante
-                            ? 'border-[#D1D1D6] bg-s2 text-text-3'
-                            : asignable
-                              ? 'border-blue-500 bg-blue-50 text-blue-700 active:scale-90'
-                              : 'border-[#E5E5EA] bg-white text-text-4'
-                      } ${!tappable ? 'cursor-default' : ''}`}
-                    >
-                      {sillaNum}
-                    </button>
-                  )
-                }}
-              />
+              {mesasCadena ? (
+                <DiagramaSillasCadena
+                  mesas={
+                    numSillas > capacidadCadena
+                      ? [
+                          ...mesasCadena.slice(0, -1),
+                          {
+                            capacidad:
+                              mesasCadena[mesasCadena.length - 1].capacidad +
+                              (numSillas - capacidadCadena),
+                          },
+                        ]
+                      : mesasCadena
+                  }
+                  renderSilla={renderSilla}
+                />
+              ) : (
+                mesaSillas && (
+                  <DiagramaSillas
+                    forma={mesaSillas.forma}
+                    tamano={mesaSillas.tamano}
+                    rotacion={mesaSillas.rotacion}
+                    asientosHorario={mesaSillas.asientosHorario}
+                    numSillas={numSillas}
+                    renderSilla={renderSilla}
+                  />
+                )
+              )}
 
               {/* ── Lista de comensales ──────────────────────────────────────── */}
               <div className="space-y-2">

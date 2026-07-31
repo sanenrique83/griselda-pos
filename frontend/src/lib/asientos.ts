@@ -172,6 +172,142 @@ export function calcularPosicionesSillas(
   return puntos
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Geometría de sillas para una CADENA de mesas unidas (varias mesas físicas
+// tratadas como una sola mesa larga para efectos de sentar comensales).
+//
+// A diferencia de `calcularPosicionesSillas` (perímetro de UNA mesa, forma
+// real con esquinas redondeadas), aquí se asume siempre un rectángulo de
+// lados RECTOS sin esquinas redondeadas — "varias mesas pegadas en fila" no
+// se ve como una mesa individual con radio de esquina, se ve como una mesa
+// larga recta. Tampoco se pide `forma`/`tamano` por mesa: se asume el mismo
+// tamaño en toda la cadena (ver instrucción del ticket), así que el ancho de
+// referencia de "una mesa individual" se toma de dimensionesMesa('rectangulo',
+// 'medio') — un valor fijo, no el tamaño real configurado de cada mesa física
+// (que puede variar mesa por mesa incluso dentro de la misma cadena; ese caso
+// mixto queda fuera de alcance por ahora, tal como se pidió).
+//
+// Silla 1 = centro del extremo corto IZQUIERDO (la "cabecera 1"). A partir de
+// ahí se numera: cabecera 1 → lado largo de ARRIBA (izquierda a derecha) →
+// cabecera 2 (extremo corto derecho) → lado largo de ABAJO (derecha a
+// izquierda) → cierra el anillo de vuelta a cabecera 1. Incluye la mitad de
+// las sillas de cada costado repartidas uniformemente por longitud de arco
+// (nunca en las esquinas exactas, para que se vean "sobre el lado recto").
+//
+// Redondeo si (total - 2 cabeceras) es impar: el costado que se camina
+// PRIMERO (el de arriba, justo después de la cabecera 1) recibe el asiento
+// extra — mismo principio de "un solo sentido consistente" que ya usa
+// `calcularPosicionesSillas` para no tener que decidir caso por caso.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type PuntoSillaCadena = PuntoSilla & {
+  // Índice (0-based) de la mesa física, dentro del arreglo `mesas` recibido,
+  // a la que pertenece geométricamente este asiento — la cabecera 1 siempre
+  // es de la mesa 0, la cabecera 2 siempre es de la última mesa, y cada
+  // asiento de costado se atribuye a la mesa sobre cuyo tramo de ancho cae
+  // (mismo ancho de referencia para todas, ver nota de arriba).
+  mesaIndice: number
+}
+
+const REF_MESA_CADENA = { forma: 'rectangulo' as const, tamano: 'medio' as const }
+
+export function calcularPosicionesSillasCadena(
+  mesas: { capacidad: number }[],
+): PuntoSillaCadena[] {
+  if (mesas.length === 0) return []
+
+  const { width: anchoIndividual, height: alto } = dimensionesMesa(
+    REF_MESA_CADENA.forma,
+    REF_MESA_CADENA.tamano,
+  )
+  const anchoTotal = anchoIndividual * mesas.length
+  const total = mesas.reduce((s, m) => s + Math.max(m.capacidad, 0), 0)
+
+  if (total <= 0) return []
+
+  const mesaIndicePorX = (x: number): number =>
+    Math.min(mesas.length - 1, Math.max(0, Math.floor(x / anchoIndividual)))
+
+  if (total === 1) {
+    return [{ x: -anchoTotal / 2, y: 0, mesaIndice: 0 }]
+  }
+
+  const resto = total - 2
+  const ladoArribaCount = Math.ceil(resto / 2)
+  const ladoAbajoCount = Math.floor(resto / 2)
+
+  const puntos: PuntoSillaCadena[] = []
+
+  // Cabecera 1: extremo corto izquierdo, siempre de la primera mesa.
+  puntos.push({ x: -anchoTotal / 2, y: 0, mesaIndice: 0 })
+
+  // Lado de arriba, izquierda → derecha.
+  for (let i = 0; i < ladoArribaCount; i++) {
+    const x = (anchoTotal * (i + 0.5)) / ladoArribaCount
+    puntos.push({ x: x - anchoTotal / 2, y: -alto / 2, mesaIndice: mesaIndicePorX(x) })
+  }
+
+  // Cabecera 2: extremo corto derecho, siempre de la última mesa.
+  puntos.push({ x: anchoTotal / 2, y: 0, mesaIndice: mesas.length - 1 })
+
+  // Lado de abajo, derecha → izquierda (cierra el anillo en sentido consistente).
+  for (let i = 0; i < ladoAbajoCount; i++) {
+    const x = anchoTotal * (1 - (i + 0.5) / ladoAbajoCount)
+    puntos.push({ x: x - anchoTotal / 2, y: alto / 2, mesaIndice: mesaIndicePorX(x) })
+  }
+
+  return puntos
+}
+
+/**
+ * Cuenta cuántos asientos aparecen ocupados en CADA mesa física, a partir de
+ * los pedidos abiertos y sus subpedidos con silla asignada — usado para los
+ * marcadores siempre-visibles de MesaShape en /mesas y /mas/mapa-mesas.
+ *
+ * Si el pedido de una mesa no tiene mesas satélite, la cuenta es directa
+ * (cuántas sillas de esa mesa aparecen en sillasOcupadasPorPedido). Si tiene
+ * cadena, se reparte usando `calcularPosicionesSillasCadena` para saber a
+ * cuál mesa física pertenece cada número de silla — mismo criterio que usa
+ * el diagrama de asignación de comensal, para no inventar una atribución
+ * distinta aquí.
+ */
+export function calcularOcupacionPorMesa(params: {
+  pedidos: { id: number; mesaId: number }[]
+  pedidoMesas: { pedidoId: number; mesaId: number; orden: number }[]
+  capacidadPorMesa: Map<number, number>
+  sillasOcupadasPorPedido: Map<number, number[]>
+}): Map<number, number> {
+  const { pedidos, pedidoMesas, capacidadPorMesa, sillasOcupadasPorPedido } = params
+  const resultado = new Map<number, number>()
+
+  for (const pedido of pedidos) {
+    const satelites = pedidoMesas
+      .filter((pm) => pm.pedidoId === pedido.id)
+      .sort((a, b) => a.orden - b.orden)
+    const cadenaMesaIds = [pedido.mesaId, ...satelites.map((s) => s.mesaId)]
+    const sillasOcupadas = sillasOcupadasPorPedido.get(pedido.id) ?? []
+
+    if (cadenaMesaIds.length === 1) {
+      resultado.set(pedido.mesaId, sillasOcupadas.length)
+      continue
+    }
+
+    const mesasCadena = cadenaMesaIds.map((mid) => ({ capacidad: capacidadPorMesa.get(mid) ?? 1 }))
+    const puntos = calcularPosicionesSillasCadena(mesasCadena)
+    const conteoPorIndice = new Map<number, number>()
+    for (const sillaNum of sillasOcupadas) {
+      const punto = puntos[sillaNum - 1]
+      if (!punto) continue // silla fuera de rango (sobre-ocupación) — no rompe el conteo visual
+      conteoPorIndice.set(punto.mesaIndice, (conteoPorIndice.get(punto.mesaIndice) ?? 0) + 1)
+    }
+    cadenaMesaIds.forEach((mid, idx) => {
+      resultado.set(mid, conteoPorIndice.get(idx) ?? 0)
+    })
+  }
+
+  return resultado
+}
+
 /**
  * Siguiente silla libre en secuencia (1, 2, 3…) dada la lista de números de
  * silla ya ocupados del pedido — usada al agregar un comensal nuevo para

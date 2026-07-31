@@ -308,22 +308,47 @@ export async function enviarACocina(pedidoId: number): Promise<Err | undefined> 
 // pedido se cobre por completo (ver cobrarPedido) o se anule. Si el origen ya
 // traía sus propias mesas satélite (unión encadenada, A→B y luego B→C), esas
 // también se transfieren a C — nunca deben quedar "huérfanas" apuntando a un
-// pedido que ya cerró.
+// pedido que ya cerró. El orden relativo de la cadena del origen se preserva
+// (se ordenan por su propio `orden` antes de re-numerarlas), y se agregan
+// siempre al final de la cadena del destino (MAX(orden) del destino + 1, +2…) —
+// nunca se insertan en medio.
 export async function unirMesas(
   pedidoOrigenId: number,
   pedidoDestinoId: number,
 ): Promise<Err | undefined> {
   const supabase = await createClient()
 
-  const [{ data: pedidoOrigen }, { data: satelitesOrigen }] = await Promise.all([
-    supabase.from('pedidos').select('mesa_id').eq('id', pedidoOrigenId).single(),
-    supabase.from('pedido_mesas').select('mesa_id').eq('pedido_id', pedidoOrigenId),
-  ])
+  const [{ data: pedidoOrigen }, { data: satelitesOrigen }, { data: satelitesDestino }] =
+    await Promise.all([
+      supabase.from('pedidos').select('mesa_id').eq('id', pedidoOrigenId).single(),
+      supabase
+        .from('pedido_mesas')
+        .select('mesa_id, orden')
+        .eq('pedido_id', pedidoOrigenId)
+        .order('orden'),
+      supabase
+        .from('pedido_mesas')
+        .select('orden')
+        .eq('pedido_id', pedidoDestinoId)
+        .order('orden'),
+    ])
 
   const mesasAAbsorber = [
     ...(pedidoOrigen?.mesa_id ? [pedidoOrigen.mesa_id] : []),
     ...(satelitesOrigen ?? []).map((s) => s.mesa_id),
   ]
+
+  // Límite de 5 mesas por cadena: destino (mesa principal + satélites que ya
+  // tenía) + todas las que se van a absorber del origen. Se valida ANTES de
+  // mutar nada — si se rechaza, el pedido origen debe quedar exactamente como
+  // estaba (nada de comensales movidos a medias ni pedido cerrado sin unión).
+  const totalActualDestino = 1 + (satelitesDestino?.length ?? 0)
+  if (mesasAAbsorber.length > 0 && totalActualDestino + mesasAAbsorber.length > 5) {
+    return { error: 'No se pueden unir más de 5 mesas en una misma cadena.' }
+  }
+  const maxOrdenDestino = satelitesDestino?.length
+    ? satelitesDestino[satelitesDestino.length - 1].orden
+    : 1
 
   // Máximo comensal_numero del destino
   const { data: maxSub } = await supabase
@@ -375,7 +400,11 @@ export async function unirMesas(
     await supabase.from('pedido_mesas').delete().eq('pedido_id', pedidoOrigenId)
 
     const { error: pmError } = await supabase.from('pedido_mesas').upsert(
-      mesasAAbsorber.map((mesaId) => ({ pedido_id: pedidoDestinoId, mesa_id: mesaId })),
+      mesasAAbsorber.map((mesaId, idx) => ({
+        pedido_id: pedidoDestinoId,
+        mesa_id: mesaId,
+        orden: maxOrdenDestino + 1 + idx,
+      })),
       { onConflict: 'pedido_id,mesa_id' },
     )
     if (pmError) return { error: 'Error al unir las mesas.' }

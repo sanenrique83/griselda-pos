@@ -15,6 +15,7 @@ import type {
   ProductoCatalogo,
   CategoriaPOS,
   MesaSillas,
+  MesaCadenaItem,
 } from '@/app/(app)/pos/[pedidoId]/page'
 
 interface PosShellProps {
@@ -34,6 +35,7 @@ interface PosShellProps {
   rol?: string
   tipoMesa?: 'mesa' | 'llevar' | 'mostrador'
   mesaSillas?: MesaSillas
+  mesasCadena?: MesaCadenaItem[] | null
 }
 
 export function PosShell({
@@ -53,6 +55,7 @@ export function PosShell({
   rol = 'mesero',
   tipoMesa = 'mesa',
   mesaSillas = null,
+  mesasCadena = null,
 }: PosShellProps) {
   const router = useRouter()
   const [vista, setVista] = useState<'menu' | 'comanda'>('menu')
@@ -357,6 +360,7 @@ export function PosShell({
             rol={rol}
             tipoMesa={tipoMesa}
             mesaSillas={mesaSillas}
+            mesasCadena={mesasCadena}
           />
         )}
       </div>

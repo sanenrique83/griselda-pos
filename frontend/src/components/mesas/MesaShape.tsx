@@ -1,4 +1,5 @@
 import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
+import { ESTILO_COLOR_MESA, type ColorMesa } from '@/lib/colorMesa'
 
 const TAMANO_PX: Record<TamanoMesa, number> = { chico: 52, medio: 68, grande: 84 }
 
@@ -17,6 +18,13 @@ export function colorParaGrupo(indice: number): string {
   return COLORES_GRUPO[indice % COLORES_GRUPO.length]
 }
 
+// Un marcador de silla, en coordenadas LOCALES centro-relativas (mismo
+// sistema que devuelve `calcularPosicionesSillas`/`calcularPosicionesSillasCadena`
+// en lib/asientos.ts) — MesaShape no calcula posiciones, solo dibuja las que
+// le pasan, para no duplicar esa geometría aquí (y evitar un import circular
+// con lib/asientos.ts, que ya importa `dimensionesMesa` de este archivo).
+export type MarcadorSilla = { x: number; y: number; ocupada: boolean }
+
 /**
  * Representación visual de una mesa (forma real según `forma`/`tamano`,
  * rotada según `rotacion`). Compartida entre el plano de solo lectura de
@@ -25,39 +33,67 @@ export function colorParaGrupo(indice: number): string {
  * `anilloColor` marca visualmente que esta mesa está unida (vía pedido_mesas)
  * a otras — se usa `outline` en vez de sumarse a `shadow-card` para no pisar
  * la sombra propia de la mesa.
+ *
+ * `marcadores` dibuja triángulos pequeños alrededor de la silueta —
+ * rellenos si `ocupada`, solo contorno si no — para ver de un vistazo
+ * cuántos asientos están tomados sin abrir la mesa.
+ *
+ * `colorEstado` es el semáforo completo de la mesa (ver lib/colorMesa.ts) —
+ * reemplaza al viejo booleano `ocupada`, que solo distinguía 2 estados.
  */
 export function MesaShape({
   forma,
   tamano,
   rotacion,
-  ocupada = false,
+  colorEstado = 'verde',
   anilloColor,
+  marcadores,
   children,
 }: {
   forma: FormaMesa
   tamano: TamanoMesa
   rotacion: number
-  ocupada?: boolean
+  colorEstado?: ColorMesa
   anilloColor?: string
+  marcadores?: MarcadorSilla[]
   children?: React.ReactNode
 }) {
   const { width, height, radius } = dimensionesMesa(forma, tamano)
+  const estilo = ESTILO_COLOR_MESA[colorEstado]
 
   return (
     <div
-      className={`flex flex-col items-center justify-center gap-0.5 border-[1.5px] shadow-card select-none ${
-        ocupada ? 'border-[#FDE68A] bg-[#FFFDF0]' : 'border-[#E5E5EA] bg-white'
-      }`}
+      className="relative flex flex-col items-center justify-center gap-0.5 border-[1.5px] shadow-card select-none"
       style={{
         width,
         height,
         borderRadius: radius,
+        borderColor: estilo.border,
+        backgroundColor: estilo.bg,
         transform: `rotate(${rotacion}deg)`,
         outline: anilloColor ? `3px solid ${anilloColor}` : undefined,
         outlineOffset: anilloColor ? 2 : undefined,
       }}
     >
       {children}
+
+      {marcadores?.map((m, idx) => (
+        <svg
+          key={idx}
+          width={8}
+          height={8}
+          viewBox="0 0 8 8"
+          className="pointer-events-none absolute"
+          style={{ left: width / 2 + m.x, top: height / 2 + m.y, transform: 'translate(-50%, -50%)' }}
+        >
+          <polygon
+            points="4,0 8,8 0,8"
+            fill={m.ocupada ? '#f59e0b' : 'none'}
+            stroke={m.ocupada ? 'none' : '#C7C7CC'}
+            strokeWidth={1.2}
+          />
+        </svg>
+      ))}
     </div>
   )
 }

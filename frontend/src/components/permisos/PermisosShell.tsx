@@ -9,6 +9,7 @@ import {
   actualizarTimeoutInactividad,
   actualizarOrdenProductos,
   actualizarOrdenModificadores,
+  actualizarAlertaMesaMinutos,
 } from '@/app/(app)/mas/permisos/actions'
 import type { ConfigPermisos } from '@/app/(app)/mas/permisos/page'
 
@@ -114,6 +115,11 @@ export function PermisosShell({ config }: PermisosShellProps) {
   const [ordenModificadores, setOrdenModificadores] = useState<ModoOrden>(config.orden_modificadores)
   const [ordenBanner, setOrdenBanner] = useState<string | null>(null)
 
+  // Alerta de mesa sin atender
+  const [alertaMin, setAlertaMin] = useState(config.alerta_mesa_sin_atender_minutos.toString())
+  const [savingAlerta, setSavingAlerta] = useState(false)
+  const [alertaBanner, setAlertaBanner] = useState<string | null>(null)
+
   function handleToggle(campo: keyof ConfigPermisos, valor: boolean) {
     // Optimistic update
     setPermisos((prev) => ({ ...prev, [campo]: valor }))
@@ -178,6 +184,24 @@ export function PermisosShell({ config }: PermisosShellProps) {
     } else {
       setTimeoutBanner('Guardado ✓')
       setTimeout(() => setTimeoutBanner(null), 3000)
+    }
+  }
+
+  async function handleGuardarAlertaMinutos() {
+    const minutos = parseInt(alertaMin, 10)
+    if (isNaN(minutos) || minutos < 0) {
+      setAlertaBanner('Ingresa un número de minutos válido (0 o más).')
+      return
+    }
+    setSavingAlerta(true)
+    setAlertaBanner(null)
+    const result = await actualizarAlertaMesaMinutos(minutos)
+    setSavingAlerta(false)
+    if (result?.error) {
+      setAlertaBanner(result.error)
+    } else {
+      setAlertaBanner('Guardado ✓')
+      setTimeout(() => setAlertaBanner(null), 3000)
     }
   }
 
@@ -381,6 +405,55 @@ export function PermisosShell({ config }: PermisosShellProps) {
               className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
             >
               {savingTimeout ? 'Guardando…' : 'Guardar tiempo de inactividad'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Alerta de mesa sin atender ───────────────────────────────────── */}
+        <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+          <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+              Alerta de mesa sin atender
+            </p>
+          </div>
+          <ToggleRow
+            label="Mostrar alerta roja"
+            desc="Resalta en rojo una mesa con pedido abierto que lleva rato sin captura"
+            value={permisos.alerta_mesa_sin_atender}
+            onChange={(v) => handleToggle('alerta_mesa_sin_atender', v)}
+            disabled={isPending}
+          />
+          <div className="px-4 py-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-3">
+                Minutos sin productos capturados
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={alertaMin}
+                onChange={(e) => setAlertaMin(e.target.value)}
+                disabled={!permisos.alerta_mesa_sin_atender}
+                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-blue-500 disabled:opacity-40"
+              />
+            </div>
+            <p className="text-xs text-text-3">
+              Una mesa con pedido abierto pero sin ningún producto pendiente o enviado se marca en
+              rojo al pasar este tiempo desde que se abrió.
+            </p>
+            {alertaBanner && (
+              <p className={`text-xs font-semibold ${alertaBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+                {alertaBanner}
+              </p>
+            )}
+            <button
+              onClick={handleGuardarAlertaMinutos}
+              disabled={savingAlerta || !permisos.alerta_mesa_sin_atender}
+              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+            >
+              {savingAlerta ? 'Guardando…' : 'Guardar minutos de alerta'}
             </button>
           </div>
         </div>
