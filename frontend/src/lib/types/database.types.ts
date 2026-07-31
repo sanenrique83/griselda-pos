@@ -60,6 +60,17 @@ export interface ConfigSistema {
   orden_modificadores: 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
   alerta_mesa_sin_atender: boolean
   alerta_mesa_sin_atender_minutos: number
+  // Texto del ticket impreso (TicketConfigShell, /mas/configuracion) — ya
+  // existían en la base antes de tener migración propia, ver
+  // 20260801000005_config_sistema_ticket_columnas_existentes.sql.
+  ticket_nombre: string | null
+  ticket_direccion: string | null
+  ticket_telefono: string | null
+  ticket_rfc: string | null
+  ticket_linea1: string | null
+  ticket_linea2: string | null
+  ticket_pie: string | null
+  ticket_pie2: string | null
 }
 
 export interface Area {
