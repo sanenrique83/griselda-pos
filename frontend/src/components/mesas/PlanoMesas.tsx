@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   DndContext,
@@ -13,10 +13,10 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { MesaShape, dimensionesMesa, colorParaGrupo } from './MesaShape'
-import { TarjetaMesa } from './TarjetaMesa'
 import { calcularPosicionesSillas } from '@/lib/asientos'
 import { colorSemaforoMesa, ESTILO_COLOR_MESA } from '@/lib/colorMesa'
 import { unirMesas, unirMesaLibreAOcupada } from '@/app/(app)/pos/[pedidoId]/actions'
+import { guardarDisposicion } from '@/app/(app)/mas/mapa-mesas/actions'
 import {
   COLOR_IMAN,
   buscarCandidatoIman,
@@ -24,6 +24,7 @@ import {
   type TipoUnionIman,
   type CandidatoIman,
 } from '@/lib/imanMesas'
+import { posicionAutoGrid } from '@/lib/autoAcomodoMesas'
 import type { MesaUI } from '@/app/(app)/mesas/page'
 
 const MARGEN = 100
@@ -34,10 +35,15 @@ const MARGEN = 100
  * layout. El arrastre existe SOLO para detectar el imán y disparar la unión
  * (mismos 3 casos, mismas acciones de backend que /mas/mapa-mesas — ver
  * lib/imanMesas.ts): si se suelta sin estar imantado, la mesa regresa a su
- * posición actual — esta pantalla nunca reposiciona el plano, eso sigue
- * siendo exclusivo del editor de admin. Las mesas sin posición asignada
- * (pos_x/pos_y nulos) no tienen dónde dibujarse en el lienzo, así que se
- * listan aparte para que sigan siendo accesibles.
+ * posición actual — esta pantalla nunca reposiciona el plano a mano, eso
+ * sigue siendo exclusivo del editor de admin.
+ *
+ * Mesas sin pos_x/pos_y (recién creadas, ej. "+ Mesa extra") se auto-acomodan
+ * en la misma cuadrícula que usa LienzoMesasEditor (ver lib/autoAcomodoMesas)
+ * para aparecer arrastrables desde el primer momento — a diferencia del
+ * editor de admin, aquí esa posición se persiste sola en segundo plano (sin
+ * pedirle nada al usuario) apenas se calcula, así que la próxima vez ya es
+ * su posición real en BD.
  */
 export function PlanoMesas({
   mesas,
@@ -65,18 +71,55 @@ export function PlanoMesas({
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
   )
 
-  const posicionadas = mesas.filter((m) => m.pos_x !== null && m.pos_y !== null)
+  // Posición EFECTIVA de cada mesa: la real (pos_x/pos_y) si ya la tiene, o
+  // la calculada por auto-acomodo si no — todas las mesas terminan con una,
+  // así que ya no hace falta una lista aparte de "sin posición".
   const sinPosicion = mesas.filter((m) => m.pos_x === null || m.pos_y === null)
+  const autoPosPorId = new Map<number, { x: number; y: number }>()
+  sinPosicion.forEach((m, idx) => autoPosPorId.set(m.id, posicionAutoGrid(idx)))
 
-  const maxX = Math.max(400, ...posicionadas.map((m) => m.pos_x! + MARGEN))
-  const maxY = Math.max(300, ...posicionadas.map((m) => m.pos_y! + MARGEN))
+  function posEfectiva(mesa: MesaUI): { x: number; y: number } {
+    if (mesa.pos_x !== null && mesa.pos_y !== null) return { x: mesa.pos_x, y: mesa.pos_y }
+    return autoPosPorId.get(mesa.id)!
+  }
 
-  const mesaPorId = new Map(posicionadas.map((m) => [m.id, m]))
+  // Persistir en segundo plano la posición recién calculada para mesas sin
+  // posición — silencioso (sin mensaje de éxito ni bloquear nada): la mesa
+  // ya se ve y se puede arrastrar de inmediato con la posición calculada,
+  // esto solo hace que esa misma posición quede real en BD para la próxima
+  // vez. `guardadasRef` evita reintentar una mesa ya enviada mientras
+  // esperamos la respuesta (o el revalidate que trae pos_x/pos_y reales).
+  const guardadasRef = useRef<Set<number>>(new Set())
+  useEffect(() => {
+    const pendientes = sinPosicion.filter((m) => !guardadasRef.current.has(m.id))
+    if (pendientes.length === 0) return
+
+    const cambios = pendientes.map((m) => {
+      guardadasRef.current.add(m.id)
+      const pos = autoPosPorId.get(m.id)!
+      return { id: m.id, posX: pos.x, posY: pos.y, rotacion: m.rotacion, forma: m.forma, tamano: m.tamano }
+    })
+
+    guardarDisposicion(cambios).then((res) => {
+      if ('error' in res) {
+        console.error('[PlanoMesas] error al auto-guardar posición de mesas nuevas:', {
+          mesaIds: cambios.map((c) => c.id),
+          error: res.error,
+        })
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mesas])
+
+  const maxX = Math.max(400, ...mesas.map((m) => posEfectiva(m).x + MARGEN))
+  const maxY = Math.max(300, ...mesas.map((m) => posEfectiva(m).y + MARGEN))
+
+  const mesaPorId = new Map(mesas.map((m) => [m.id, m]))
 
   // Mesas unidas (mismo pedido_activo.id, vía unirMesas persistente) — solo
   // interesa para el conector cuando el grupo tiene 2 o más mesas.
   const gruposMap = new Map<number, MesaUI[]>()
-  for (const mesa of posicionadas) {
+  for (const mesa of mesas) {
     if (!mesa.pedido_activo) continue
     const arr = gruposMap.get(mesa.pedido_activo.id) ?? []
     arr.push(mesa)
@@ -94,8 +137,9 @@ export function PlanoMesas({
     const ordenadas = [...ms].sort((a, b) => a.id - b.id)
     const centros = ordenadas.map((m) => {
       const { width, height } = dimensionesMesa(m.forma, m.tamano)
+      const pos = posEfectiva(m)
       colorPorMesa.set(m.id, color)
-      return { x: m.pos_x! + width / 2, y: m.pos_y! + height / 2 }
+      return { x: pos.x + width / 2, y: pos.y + height / 2 }
     })
     for (let i = 0; i < centros.length - 1; i++) {
       lineas.push({
@@ -112,21 +156,25 @@ export function PlanoMesas({
     const id = Number(event.active.id)
     const mesa = mesaPorId.get(id)
     if (!mesa) return
+    const pos = posEfectiva(mesa)
     const { width, height } = dimensionesMesa(mesa.forma, mesa.tamano)
     const cajaArrastrada = {
-      x: mesa.pos_x! + event.delta.x,
-      y: mesa.pos_y! + event.delta.y,
+      x: pos.x + event.delta.x,
+      y: pos.y + event.delta.y,
       w: width,
       h: height,
     }
-    const candidatos: CandidatoIman[] = posicionadas.map((m) => ({
-      id: m.id,
-      x: m.pos_x!,
-      y: m.pos_y!,
-      forma: m.forma,
-      tamano: m.tamano,
-      pedidoActivoId: m.pedido_activo?.id ?? null,
-    }))
+    const candidatos: CandidatoIman[] = mesas.map((m) => {
+      const p = posEfectiva(m)
+      return {
+        id: m.id,
+        x: p.x,
+        y: p.y,
+        forma: m.forma,
+        tamano: m.tamano,
+        pedidoActivoId: m.pedido_activo?.id ?? null,
+      }
+    })
     setMagnetTarget(
       buscarCandidatoIman(id, mesa.pedido_activo?.id ?? null, cajaArrastrada, candidatos),
     )
@@ -147,13 +195,15 @@ export function PlanoMesas({
     const targetMesa = mesaPorId.get(magnet.targetId)
     if (!draggedMesa || !targetMesa) return
 
+    const draggedPos = posEfectiva(draggedMesa)
+    const targetPos = posEfectiva(targetMesa)
     const bounds = { width: maxX, height: maxY }
 
     if (magnet.tipo === 'ocupada_a_ocupada' && draggedMesa.pedido_activo && targetMesa.pedido_activo) {
       const reposicion = {
         mesaId: id,
         ...posicionAdosada(
-          { x: targetMesa.pos_x!, y: targetMesa.pos_y!, rotacion: targetMesa.rotacion, forma: targetMesa.forma, tamano: targetMesa.tamano },
+          { x: targetPos.x, y: targetPos.y, rotacion: targetMesa.rotacion, forma: targetMesa.forma, tamano: targetMesa.tamano },
           bounds,
         ),
       }
@@ -170,7 +220,6 @@ export function PlanoMesas({
     if (magnet.tipo === 'libre_a_ocupada') {
       const draggedEsLibre = !draggedMesa.pedido_activo
       const libreId = draggedEsLibre ? id : magnet.targetId
-      const libreMesa = draggedEsLibre ? draggedMesa : targetMesa
       const ocupadaMesa = draggedEsLibre ? targetMesa : draggedMesa
       const pedidoDestinoId = ocupadaMesa.pedido_activo?.id
       if (!pedidoDestinoId) return
@@ -179,10 +228,10 @@ export function PlanoMesas({
       // tiene su nueva posición (delta del evento); si es el objetivo (no se
       // arrastró), se queda donde estaba — igual que en /mas/mapa-mesas.
       const ocupadaPos = draggedEsLibre
-        ? { x: targetMesa.pos_x!, y: targetMesa.pos_y!, rotacion: targetMesa.rotacion, forma: targetMesa.forma, tamano: targetMesa.tamano }
+        ? { x: targetPos.x, y: targetPos.y, rotacion: targetMesa.rotacion, forma: targetMesa.forma, tamano: targetMesa.tamano }
         : {
-            x: draggedMesa.pos_x! + event.delta.x,
-            y: draggedMesa.pos_y! + event.delta.y,
+            x: draggedPos.x + event.delta.x,
+            y: draggedPos.y + event.delta.y,
             rotacion: draggedMesa.rotacion,
             forma: draggedMesa.forma,
             tamano: draggedMesa.tamano,
@@ -201,7 +250,7 @@ export function PlanoMesas({
 
     if (magnet.tipo === 'ambas_libres') {
       const repo = posicionAdosada(
-        { x: targetMesa.pos_x!, y: targetMesa.pos_y!, rotacion: targetMesa.rotacion, forma: targetMesa.forma, tamano: targetMesa.tamano },
+        { x: targetPos.x, y: targetPos.y, rotacion: targetMesa.rotacion, forma: targetMesa.forma, tamano: targetMesa.tamano },
         bounds,
       )
       router.push(`/pos/nueva-combinada/${magnet.targetId}/${id}?x=${repo.x}&y=${repo.y}&r=${repo.rotacion}`)
@@ -236,7 +285,7 @@ export function PlanoMesas({
             onDragMove={handleDragMove}
             onDragEnd={handleDragEnd}
           >
-            {posicionadas.map((mesa) => {
+            {mesas.map((mesa) => {
               const color = colorSemaforoMesa(
                 {
                   ocupada: mesa.pedido_activo !== null,
@@ -258,6 +307,7 @@ export function PlanoMesas({
                 <MesaArrastrable
                   key={mesa.id}
                   mesa={mesa}
+                  posicion={posEfectiva(mesa)}
                   onClick={() => onMesaClick(mesa)}
                   anilloColor={
                     esImantada || (esArrastrada && magnetTarget !== null) ? COLOR_IMAN : colorPorMesa.get(mesa.id)
@@ -270,38 +320,20 @@ export function PlanoMesas({
           </DndContext>
         </div>
       </div>
-
-      {sinPosicion.length > 0 && (
-        <div className="px-3 pt-4">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.05em] text-text-3">
-            Sin posición en el mapa
-          </p>
-          <div className="grid grid-cols-2 gap-2.5">
-            {sinPosicion.map((mesa) => (
-              <TarjetaMesa
-                key={mesa.id}
-                mesa={mesa}
-                onClick={() => onMesaClick(mesa)}
-                isPending={false}
-                alertaActiva={alertaActiva}
-                alertaMinutos={alertaMinutos}
-              />
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
 function MesaArrastrable({
   mesa,
+  posicion,
   onClick,
   anilloColor,
   colorEstado,
   marcadores,
 }: {
   mesa: MesaUI
+  posicion: { x: number; y: number }
   onClick: () => void
   anilloColor?: string
   colorEstado: ReturnType<typeof colorSemaforoMesa>
@@ -312,8 +344,8 @@ function MesaArrastrable({
   })
 
   const style: React.CSSProperties = {
-    left: mesa.pos_x!,
-    top: mesa.pos_y!,
+    left: posicion.x,
+    top: posicion.y,
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     zIndex: isDragging ? 10 : 1,
   }

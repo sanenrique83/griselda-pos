@@ -25,13 +25,12 @@ import {
   type TipoUnionIman,
   type CandidatoIman,
 } from '@/lib/imanMesas'
+import { posicionAutoGrid } from '@/lib/autoAcomodoMesas'
 import type { MesaEditable } from '@/app/(app)/mas/mapa-mesas/page'
 import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
 
 const CANVAS_W = 900
 const CANVAS_H = 1100
-const PASO_AUTO = 90 // separación al auto-acomodar mesas sin posición
-const COLUMNAS_AUTO = 6
 const CUADRICULA_PX = 40 // tamaño de la cuadrícula de fondo, solo visual
 
 type Posicion = {
@@ -43,9 +42,11 @@ type Posicion = {
 }
 
 // Mesas sin pos_x/pos_y (nunca se han colocado en el mapa) se acomodan en
-// una cuadrícula temporal para que aparezcan en el lienzo desde el primer
-// uso — quedan marcadas "sucias" para que "Guardar disposición" persista
-// esa posición inicial en vez de perderla al recargar.
+// una cuadrícula temporal (ver lib/autoAcomodoMesas.ts) para que aparezcan
+// en el lienzo desde el primer uso — quedan marcadas "sucias" para que
+// "Guardar disposición" persista esa posición inicial en vez de perderla al
+// recargar. (/mesas usa la misma cuadrícula pero persiste sola, sin esperar
+// a que nadie la guarde — ver PlanoMesas.tsx.)
 function posicionesIniciales(mesas: MesaEditable[]): Record<number, Posicion> {
   const posiciones: Record<number, Posicion> = {}
   let indiceSinPosicion = 0
@@ -59,11 +60,8 @@ function posicionesIniciales(mesas: MesaEditable[]): Record<number, Posicion> {
         tamano: mesa.tamano,
       }
     } else {
-      const col = indiceSinPosicion % COLUMNAS_AUTO
-      const fila = Math.floor(indiceSinPosicion / COLUMNAS_AUTO)
       posiciones[mesa.id] = {
-        x: 30 + col * PASO_AUTO,
-        y: 30 + fila * PASO_AUTO,
+        ...posicionAutoGrid(indiceSinPosicion),
         rotacion: mesa.rotacion,
         forma: mesa.forma,
         tamano: mesa.tamano,

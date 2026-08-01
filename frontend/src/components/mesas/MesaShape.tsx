@@ -85,9 +85,9 @@ export function MesaShape({
       {marcadores?.map((m, idx) => (
         <svg
           key={idx}
-          width={16}
-          height={16}
-          viewBox="-8 -8 16 16"
+          width={36}
+          height={36}
+          viewBox="-18 -18 36 36"
           className="pointer-events-none absolute"
           style={{
             left: width / 2 + m.x,
@@ -97,12 +97,14 @@ export function MesaShape({
         >
           {/* Medio círculo centrado en el origen: lado recto en x=0 (hacia
               el centro de la mesa antes de rotar), lado curvo hacia +x
-              (hacia afuera) — `anguloDeg` lo rota a su orientación real. */}
+              (hacia afuera) — `anguloDeg` lo rota a su orientación real.
+              36px = mismo diámetro que los círculos del picker de silla
+              (h-9 w-9 en ElegirSillaInicialShell.tsx), a propósito iguales. */}
           <path
-            d="M 0,-8 A 8 8 0 0 1 0,8 Z"
+            d="M 0,-18 A 18 18 0 0 1 0,18 Z"
             fill={m.ocupada ? '#f59e0b' : 'none'}
             stroke={m.ocupada ? 'none' : '#C7C7CC'}
-            strokeWidth={1.5}
+            strokeWidth={2}
           />
         </svg>
       ))}

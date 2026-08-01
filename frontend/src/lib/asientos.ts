@@ -51,9 +51,10 @@ export type PuntoSilla = { x: number; y: number; anguloDeg: number }
 // real de la mesa y el respaldo de la silla. Se mantiene chico (no 0) para
 // que no se vea encimado con el trazo del borde de la mesa, pero lo
 // suficientemente chico para que la silla se vea "pegada" a la mesa en vez
-// de flotando — el tamaño visual de la silla (16px, ver MesaShape) lo pone
-// el propio marcador, no este valor.
-const PAD_SILLA_PX = 4
+// de flotando — el tamaño visual de la silla (36px, mismo diámetro que los
+// círculos del picker de silla, ver MesaShape) lo pone el propio marcador,
+// no este valor.
+const PAD_SILLA_PX = 6
 
 // Punto 2D simple, sin `anguloDeg` — geometría interna del caminador de
 // perímetro (desde/hasta/centro de cada tramo), distinta de `PuntoSilla`
