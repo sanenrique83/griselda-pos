@@ -178,6 +178,57 @@ export async function cargarGuisados(
   return { grupos }
 }
 
+// ─── Combos electivos (F7-04) ─────────────────────────────────────────────────
+
+export type ComboSlotOpcion = {
+  id: number
+  productoId: number
+  nombre: string
+  precio: number
+  emoji: string | null
+}
+
+export type ComboSlot = {
+  id: number
+  nombre: string
+  requerido: boolean
+  opciones: ComboSlotOpcion[]
+}
+
+// Se llama ANTES de decidir qué sheet abrir al tocar un producto es_combo=true
+// (ver PosShell.handleAgregarProducto) — si devuelve slots, se abre
+// SheetComboSlots con ellos ya cargados (sin volver a pedirlos); si devuelve
+// vacío, el producto se agrega con el flujo normal (modificadores/rápido),
+// exactamente igual que hoy.
+export async function cargarComboSlots(productoId: number): Promise<{ slots: ComboSlot[] } | Err> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('combo_slots')
+    .select(
+      'id, nombre, requerido, combo_slot_opciones(id, producto_id, productos(nombre, precio, emoji))',
+    )
+    .eq('combo_id', productoId)
+    .order('id')
+
+  if (error) return { error: 'Error al cargar las opciones del combo.' }
+
+  const slots: ComboSlot[] = (data ?? []).map((s: any) => ({
+    id: s.id,
+    nombre: s.nombre,
+    requerido: s.requerido,
+    opciones: (s.combo_slot_opciones ?? []).map((o: any) => ({
+      id: o.id,
+      productoId: o.producto_id,
+      nombre: o.productos?.nombre ?? '',
+      precio: o.productos?.precio ?? 0,
+      emoji: o.productos?.emoji ?? null,
+    })),
+  }))
+
+  return { slots }
+}
+
 // ─── Agregar producto (modo estándar) ─────────────────────────────────────────
 export async function agregarProducto(data: {
   pedidoId: number
@@ -187,6 +238,10 @@ export async function agregarProducto(data: {
   cantidad: number
   notas: string | null
   opciones: { opcionId: number; precioExtra: number }[]
+  // Combos electivos (F7-04): una entrada por slot con selección — ver
+  // SheetComboSlots. undefined/vacío para productos que no son combos
+  // electivos (incluye combos fijos sin slots, que siguen igual que antes).
+  comboSelecciones?: { slotId: number; productoId: number }[]
 }): Promise<Err | undefined> {
   const supabase = await createClient()
 
@@ -199,6 +254,10 @@ export async function agregarProducto(data: {
       cantidad: data.cantidad,
       notas: data.notas,
       estado: 'pendiente',
+      combo_selecciones:
+        data.comboSelecciones && data.comboSelecciones.length > 0
+          ? data.comboSelecciones.map((s) => ({ slot_id: s.slotId, producto_id: s.productoId }))
+          : null,
     })
     .select('id')
     .single()

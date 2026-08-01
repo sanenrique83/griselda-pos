@@ -95,7 +95,11 @@ export function VistaComanda({
             .map((i) => ({
               cantidad: i.cantidad,
               nombre: i.nombre,
-              modificadores: i.opciones.map((o) => o.nombre),
+              // Combo (F7-04): el desglose de componentes fijos + elecciones
+              // de slot ya viene resuelto a texto desde el servidor (ver
+              // pos/[pedidoId]/page.tsx) — se concatena a los modificadores
+              // para que cocina vea todo bajo el mismo nombre de producto.
+              modificadores: [...i.opciones.map((o) => o.nombre), ...(i.comboDesglose ?? [])],
               nota: i.notas ?? '',
               esBebida: i.esBebida,
             })),
@@ -137,7 +141,7 @@ export function VistaComanda({
             .map((i) => ({
               cantidad: i.cantidad,
               nombre: i.nombre,
-              modificadores: i.opciones.map((o) => o.nombre),
+              modificadores: [...i.opciones.map((o) => o.nombre), ...(i.comboDesglose ?? [])],
               nota: i.notas ?? '',
               esBebida: i.esBebida,
             })),

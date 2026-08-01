@@ -18,6 +18,10 @@ export type ItemComanda = {
   notas: string | null
   opciones: { id: number; nombre: string; precio_extra: number }[]
   esBebida: boolean
+  // Desglose de combo (fijo + electivo), ya resuelto a texto listo para
+  // imprimir — ej. ["2x Refresco", "Bebida: Coca-Cola"]. undefined si el
+  // producto no es un combo.
+  comboDesglose?: string[]
 }
 
 export type SubpedidoPOS = {
@@ -55,6 +59,7 @@ export type ProductoCatalogo = {
   disponible: boolean
   modo_captura: 'estandar' | 'rapido'
   categoria_id: number
+  es_combo: boolean
 }
 
 export type CategoriaPOS = {
@@ -92,8 +97,8 @@ export default async function PosPage({
     .select(`
       id, comensal_numero, nombre, silla_numero,
       pedido_productos(
-        id, cantidad, precio_unit, estado, notas, nombre_libre,
-        productos(nombre, emoji, categorias(nombre)),
+        id, producto_id, cantidad, precio_unit, estado, notas, nombre_libre, combo_selecciones,
+        productos(nombre, emoji, es_combo, categorias(nombre)),
         pedido_producto_opciones(
           precio_extra,
           opciones_modificador(id, nombre)
@@ -102,6 +107,58 @@ export default async function PosPage({
     `)
     .eq('pedido_id', pedidoId)
     .order('comensal_numero')
+
+  // ── Desglose de combos para el ticket de cocina (F7-04) ────────────────────
+  // Los componentes fijos (combo_productos) y las elecciones de slot
+  // (combo_selecciones, JSONB) se resuelven aquí a texto listo para
+  // imprimir — VistaComanda solo concatena `comboDesglose` a los
+  // modificadores del item, no vuelve a resolver nada.
+  const comboIds = [
+    ...new Set(
+      (rawSubs ?? []).flatMap((sub: any) =>
+        (sub.pedido_productos ?? [])
+          .filter((pp: any) => pp.productos?.es_combo)
+          .map((pp: any) => pp.producto_id as number),
+      ),
+    ),
+  ]
+
+  const seleccionProductoIds = new Set<number>()
+  const seleccionSlotIds = new Set<number>()
+  for (const sub of (rawSubs ?? []) as any[]) {
+    for (const pp of sub.pedido_productos ?? []) {
+      const selecciones = (pp.combo_selecciones ?? []) as { slot_id: number; producto_id: number }[]
+      for (const s of selecciones) {
+        seleccionProductoIds.add(s.producto_id)
+        seleccionSlotIds.add(s.slot_id)
+      }
+    }
+  }
+
+  const [{ data: comboProductosRaw }, { data: slotsRaw }, { data: productosEleccionRaw }] = await Promise.all([
+    comboIds.length > 0
+      ? supabase.from('combo_productos').select('combo_id, producto_id, cantidad, productos(nombre)').in('combo_id', comboIds)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      : Promise.resolve({ data: [] as any[] }),
+    seleccionSlotIds.size > 0
+      ? supabase.from('combo_slots').select('id, nombre').in('id', [...seleccionSlotIds])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      : Promise.resolve({ data: [] as any[] }),
+    seleccionProductoIds.size > 0
+      ? supabase.from('productos').select('id, nombre').in('id', [...seleccionProductoIds])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      : Promise.resolve({ data: [] as any[] }),
+  ])
+
+  const componentesFijosPorCombo = new Map<number, string[]>()
+  for (const cp of (comboProductosRaw ?? []) as any[]) {
+    const arr = componentesFijosPorCombo.get(cp.combo_id) ?? []
+    const nombreComponente = cp.productos?.nombre ?? ''
+    arr.push(cp.cantidad > 1 ? `${cp.cantidad}x ${nombreComponente}` : nombreComponente)
+    componentesFijosPorCombo.set(cp.combo_id, arr)
+  }
+  const slotNombrePorId = new Map((slotsRaw ?? []).map((s: any) => [s.id as number, s.nombre as string]))
+  const productoNombrePorId = new Map((productosEleccionRaw ?? []).map((p: any) => [p.id as number, p.nombre as string]))
 
   // ── Otras mesas ocupadas (para unir) ──────────────────────────────────────
   let mesasOcupadas: MesaOcupada[] = []
@@ -148,7 +205,7 @@ export default async function PosPage({
     supabase
       .from('productos')
       .select(
-        'id, nombre, descripcion, precio, emoji, disponible, modo_captura, categoria_id',
+        'id, nombre, descripcion, precio, emoji, disponible, modo_captura, categoria_id, es_combo',
       )
       .eq('activo', true)
       .order(ordenProductos.column, { ascending: ordenProductos.ascending }),
@@ -167,6 +224,20 @@ export default async function PosPage({
         0,
       )
       const catNombre: string = (pp.productos as any)?.categorias?.nombre?.toLowerCase() ?? ''
+
+      let comboDesglose: string[] | undefined
+      if (pp.productos?.es_combo) {
+        const fijos = componentesFijosPorCombo.get(pp.producto_id) ?? []
+        const selecciones = ((pp.combo_selecciones ?? []) as { slot_id: number; producto_id: number }[]).map(
+          (s) => {
+            const slotNombre = slotNombrePorId.get(s.slot_id) ?? 'Opción'
+            const prodNombre = productoNombrePorId.get(s.producto_id) ?? ''
+            return `${slotNombre}: ${prodNombre}`
+          },
+        )
+        comboDesglose = [...fijos, ...selecciones]
+      }
+
       return {
         id: pp.id,
         nombre: pp.nombre_libre || pp.productos?.nombre || '',
@@ -178,6 +249,7 @@ export default async function PosPage({
         notas: pp.notas ?? null,
         opciones,
         esBebida: catNombre.includes('bebida'),
+        comboDesglose,
       }
     })
 
@@ -246,6 +318,7 @@ export default async function PosPage({
     disponible: p.disponible,
     modo_captura: p.modo_captura ?? 'estandar',
     categoria_id: p.categoria_id,
+    es_combo: p.es_combo ?? false,
   }))
 
   return (

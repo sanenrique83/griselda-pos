@@ -150,6 +150,21 @@ export interface ComboProducto {
   incluye_extras: boolean
 }
 
+// Combos electivos (F7-04) — distinto de ComboProducto (componentes fijos):
+// aquí el cliente elige una opción por fila de combo_slots.
+export interface ComboSlot {
+  id: number
+  combo_id: number
+  nombre: string
+  requerido: boolean
+}
+
+export interface ComboSlotOpcion {
+  id: number
+  slot_id: number
+  producto_id: number
+}
+
 export interface GrupoModificador {
   id: number
   producto_id: number
@@ -226,6 +241,10 @@ export interface PedidoProducto {
   estado: EstadoProductoPedido
   notas: string | null
   created_at: string
+  // Combos electivos (F7-04): una entrada por slot con selección, ej.
+  // [{"slot_id": 3, "producto_id": 45}]. null si el producto no tiene
+  // slots elegidos (incluye combos fijos y productos normales).
+  combo_selecciones: { slot_id: number; producto_id: number }[] | null
 }
 
 export interface PedidoProductoOpcion {

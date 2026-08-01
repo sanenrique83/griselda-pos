@@ -6,9 +6,19 @@ import { VistaMenu } from './VistaMenu'
 import { VistaComanda } from './VistaComanda'
 import { SheetModificadores, type ConfirmarModPayload } from './SheetModificadores'
 import { SheetCapturaPida, type ConfirmarRapidoPayload } from './SheetCapturaPida'
+import { SheetComboSlots, type ConfirmarComboPayload } from './SheetComboSlots'
 import { SheetUnirMesa, type MesaOcupada } from './SheetUnirMesa'
 import { SheetProductoLibre } from './SheetProductoLibre'
-import { agregarProducto, agregarProductoRapido, agregarProductoLibre, compartirMesa, agregarComensal, asignarSilla } from '@/app/(app)/pos/[pedidoId]/actions'
+import {
+  agregarProducto,
+  agregarProductoRapido,
+  agregarProductoLibre,
+  compartirMesa,
+  agregarComensal,
+  asignarSilla,
+  cargarComboSlots,
+  type ComboSlot,
+} from '@/app/(app)/pos/[pedidoId]/actions'
 import { siguienteSillaLibre } from '@/lib/asientos'
 import type {
   SubpedidoPOS,
@@ -64,6 +74,11 @@ export function PosShell({
   const [sheetProducto, setSheetProducto] = useState<ProductoCatalogo | null>(
     null,
   )
+  // Combos electivos (F7-04): null mientras no hay ninguno abierto.
+  const [sheetCombo, setSheetCombo] = useState<{ producto: ProductoCatalogo; slots: ComboSlot[] } | null>(
+    null,
+  )
+  const [comprobandoComboId, setComprobandoComboId] = useState<number | null>(null)
   const [sheetUnirOpen, setSheetUnirOpen] = useState(false)
   const [sheetLibreOpen, setSheetLibreOpen] = useState(false)
   const [errorAccion, setErrorAccion] = useState<string | null>(null)
@@ -80,7 +95,23 @@ export function PosShell({
       })
     : '--:--'
 
-  function handleAgregarProducto(producto: ProductoCatalogo) {
+  // Combos electivos (F7-04): si el producto es un combo con slots
+  // configurados, se elige una opción por slot ANTES de abrir el flujo
+  // normal — SheetComboSlots reemplaza a modificadores/rápido para ese
+  // producto. Si no tiene slots (combo fijo o producto normal), o si la
+  // consulta falla, se agrega directo como siempre (mismo comportamiento
+  // de antes de este cambio).
+  async function handleAgregarProducto(producto: ProductoCatalogo) {
+    if (comprobandoComboId !== null) return // evita doble-tap mientras se revisa el combo anterior
+    if (producto.es_combo) {
+      setComprobandoComboId(producto.id)
+      const result = await cargarComboSlots(producto.id)
+      setComprobandoComboId(null)
+      if (!('error' in result) && result.slots.length > 0) {
+        setSheetCombo({ producto, slots: result.slots })
+        return
+      }
+    }
     setSheetProducto(producto)
   }
 
@@ -113,6 +144,23 @@ export function PosShell({
       productoId: payload.productoId,
       precioUnit: payload.precioUnit,
       guisados: payload.guisados,
+    })
+    if (result?.error) return { error: result.error }
+    handleSheetSuccess()
+    return {}
+  }
+
+  async function handleConfirmarCombo(payload: ConfirmarComboPayload): Promise<{ error?: string }> {
+    const subpedidoId = subpedidoActivoId || subpedidos[0]?.id || 0
+    const result = await agregarProducto({
+      pedidoId,
+      subpedidoId,
+      productoId: payload.productoId,
+      precioUnit: payload.precioUnit,
+      cantidad: payload.cantidad,
+      notas: payload.notas,
+      opciones: [],
+      comboSelecciones: payload.comboSelecciones,
     })
     if (result?.error) return { error: result.error }
     handleSheetSuccess()
@@ -312,6 +360,12 @@ export function PosShell({
       </div>
 
       {/* ── Sheets ─────────────────────────────────────────────────────────── */}
+      <SheetComboSlots
+        producto={sheetCombo?.producto ?? null}
+        slots={sheetCombo?.slots ?? []}
+        onConfirmar={handleConfirmarCombo}
+        onClose={() => setSheetCombo(null)}
+      />
       <SheetCapturaPida
         producto={
           sheetProducto?.modo_captura === 'rapido' ? sheetProducto : null
