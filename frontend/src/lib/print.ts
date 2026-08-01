@@ -28,13 +28,17 @@ export type ItemCliente = {
 export function consolidarItemsCliente(items: ItemCliente[]): ItemCliente[] {
   const mapa = new Map<string, ItemCliente>()
   for (const item of items) {
+    // El orden alfabético es SOLO para la clave de agrupación (que dos items
+    // con los mismos modificadores en distinto orden se reconozcan como
+    // iguales) — lo que se guarda para mostrar conserva el orden original
+    // de item.modificadores (orden de configuración: grupo/opción).
     const modsOrdenados = [...(item.modificadores ?? [])].sort()
     const clave = `${item.nombre}|${item.precio}|${modsOrdenados.join('+')}`
     const existente = mapa.get(clave)
     if (existente) {
       existente.cantidad += item.cantidad
     } else {
-      mapa.set(clave, { ...item, modificadores: modsOrdenados.length > 0 ? modsOrdenados : undefined })
+      mapa.set(clave, { ...item, modificadores: item.modificadores?.length ? item.modificadores : undefined })
     }
   }
   return [...mapa.values()]
