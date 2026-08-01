@@ -64,6 +64,12 @@ export interface ConfigSistema {
   // se colorea el texto del tiempo transcurrido — independiente del
   // semáforo de arriba (ese es por falta de captura, esto es el tiempo en sí).
   tiempo_mesa_alerta_minutos: number
+  // Alerta de ventas bajas en tiempo real (F9-06): si el total cobrado del
+  // turno activo hasta ahora está `alerta_ventas_bajas_umbral_pct`% o más
+  // por debajo del promedio histórico para este mismo día de la semana a
+  // esta misma hora, se muestra un aviso — ver dashboard_alerta_ventas_bajas().
+  alerta_ventas_bajas_activa: boolean
+  alerta_ventas_bajas_umbral_pct: number
   // Texto del ticket impreso (TicketConfigShell, /mas/configuracion) — ya
   // existían en la base antes de tener migración propia, ver
   // 20260801000005_config_sistema_ticket_columnas_existentes.sql.

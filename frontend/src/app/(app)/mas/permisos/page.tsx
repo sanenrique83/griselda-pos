@@ -20,6 +20,8 @@ export type ConfigPermisos = Pick<
   | 'alerta_mesa_sin_atender_minutos'
   | 'modificadores_por_linea'
   | 'tiempo_mesa_alerta_minutos'
+  | 'alerta_ventas_bajas_activa'
+  | 'alerta_ventas_bajas_umbral_pct'
 >
 
 export default async function PermisosPage() {
@@ -40,7 +42,7 @@ export default async function PermisosPage() {
   const { data: config } = await supabase
     .from('config_sistema')
     .select(
-      'cancelaciones_mesero, descuentos_mesero, cancelar_pedido_mesero, ver_dashboard_mesero, propina_sugerida_pct, transferencia_banco, transferencia_clabe, transferencia_titular, timeout_inactividad_minutos, orden_productos, orden_modificadores, alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos, modificadores_por_linea, tiempo_mesa_alerta_minutos',
+      'cancelaciones_mesero, descuentos_mesero, cancelar_pedido_mesero, ver_dashboard_mesero, propina_sugerida_pct, transferencia_banco, transferencia_clabe, transferencia_titular, timeout_inactividad_minutos, orden_productos, orden_modificadores, alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos, modificadores_por_linea, tiempo_mesa_alerta_minutos, alerta_ventas_bajas_activa, alerta_ventas_bajas_umbral_pct',
     )
     .eq('id', 1)
     .single()

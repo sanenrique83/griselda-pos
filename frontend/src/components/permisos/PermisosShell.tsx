@@ -12,6 +12,7 @@ import {
   actualizarAlertaMesaMinutos,
   actualizarModificadoresPorLinea,
   actualizarTiempoMesaAlerta,
+  actualizarAlertaVentasBajasUmbral,
 } from '@/app/(app)/mas/permisos/actions'
 import type { ConfigPermisos } from '@/app/(app)/mas/permisos/page'
 
@@ -132,6 +133,11 @@ export function PermisosShell({ config }: PermisosShellProps) {
   const [savingTiempoMesa, setSavingTiempoMesa] = useState(false)
   const [tiempoMesaBanner, setTiempoMesaBanner] = useState<string | null>(null)
 
+  // Alerta de ventas bajas en tiempo real (F9-06)
+  const [ventasBajasPct, setVentasBajasPct] = useState(config.alerta_ventas_bajas_umbral_pct.toString())
+  const [savingVentasBajas, setSavingVentasBajas] = useState(false)
+  const [ventasBajasBanner, setVentasBajasBanner] = useState<string | null>(null)
+
   function handleToggle(campo: keyof ConfigPermisos, valor: boolean) {
     // Optimistic update
     setPermisos((prev) => ({ ...prev, [campo]: valor }))
@@ -250,6 +256,24 @@ export function PermisosShell({ config }: PermisosShellProps) {
     } else {
       setTiempoMesaBanner('Guardado ✓')
       setTimeout(() => setTiempoMesaBanner(null), 3000)
+    }
+  }
+
+  async function handleGuardarVentasBajasUmbral() {
+    const pct = parseInt(ventasBajasPct, 10)
+    if (isNaN(pct) || pct < 1 || pct > 100) {
+      setVentasBajasBanner('Ingresa un porcentaje entre 1 y 100.')
+      return
+    }
+    setSavingVentasBajas(true)
+    setVentasBajasBanner(null)
+    const result = await actualizarAlertaVentasBajasUmbral(pct)
+    setSavingVentasBajas(false)
+    if (result?.error) {
+      setVentasBajasBanner(result.error)
+    } else {
+      setVentasBajasBanner('Guardado ✓')
+      setTimeout(() => setVentasBajasBanner(null), 3000)
     }
   }
 
@@ -502,6 +526,57 @@ export function PermisosShell({ config }: PermisosShellProps) {
               className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
             >
               {savingAlerta ? 'Guardando…' : 'Guardar minutos de alerta'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Alerta de ventas bajas en tiempo real (F9-06) ─────────────────── */}
+        <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+          <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+              Alerta de ventas bajas
+            </p>
+          </div>
+          <ToggleRow
+            label="Mostrar aviso"
+            desc="Avisa en Dashboard (y en /mesas a los admin) si las ventas del turno van muy por debajo de lo normal para esta hora"
+            value={permisos.alerta_ventas_bajas_activa}
+            onChange={(v) => handleToggle('alerta_ventas_bajas_activa', v)}
+            disabled={isPending}
+          />
+          <div className="px-4 py-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-3">
+                % de desviación hacia abajo que dispara la alerta
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={100}
+                step={1}
+                value={ventasBajasPct}
+                onChange={(e) => setVentasBajasPct(e.target.value)}
+                disabled={!permisos.alerta_ventas_bajas_activa}
+                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-blue-500 disabled:opacity-40"
+              />
+            </div>
+            <p className="text-xs text-text-3">
+              Compara lo cobrado en el turno activo hasta ahora contra el promedio de los últimos
+              turnos del mismo día de la semana a esta misma hora. Es una señal de que algo puede
+              estar mal en este momento — no tiene relación con la predicción de demanda de mañana.
+            </p>
+            {ventasBajasBanner && (
+              <p className={`text-xs font-semibold ${ventasBajasBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+                {ventasBajasBanner}
+              </p>
+            )}
+            <button
+              onClick={handleGuardarVentasBajasUmbral}
+              disabled={savingVentasBajas || !permisos.alerta_ventas_bajas_activa}
+              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+            >
+              {savingVentasBajas ? 'Guardando…' : 'Guardar umbral de alerta'}
             </button>
           </div>
         </div>

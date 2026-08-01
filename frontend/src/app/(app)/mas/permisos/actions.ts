@@ -98,6 +98,19 @@ export async function actualizarAlertaMesaMinutos(
   if (error) return { error: 'Error al actualizar los minutos de alerta.' }
 }
 
+export async function actualizarAlertaVentasBajasUmbral(
+  pct: number,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('config_sistema')
+    .update({ alerta_ventas_bajas_umbral_pct: pct })
+    .eq('id', 1)
+
+  if (error) return { error: 'Error al actualizar el umbral de alerta de ventas bajas.' }
+}
+
 type ModoOrden = 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
 
 export async function actualizarOrdenProductos(

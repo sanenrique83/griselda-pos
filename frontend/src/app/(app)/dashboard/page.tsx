@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Perfil } from '@/lib/types/database.types'
 import { DashboardCharts } from '@/components/dashboard/DashboardCharts'
+import { calcularAlertaVentasBajas, type FilaAlertaVentasBajas } from '@/lib/alertaVentasBajas'
 import type {
   VentaHora,
   TopProducto,
@@ -207,8 +208,15 @@ export default async function DashboardPage() {
   // Queries del turno activo
   // ─────────────────────────────────────────────────────────────────────────
 
-  const [movimientosRes, pedidosCerradosRes, pedidosActivosRes, pedidoIdsRes, turnosRecientesRes] =
-    await Promise.all([
+  const [
+    movimientosRes,
+    pedidosCerradosRes,
+    pedidosActivosRes,
+    pedidoIdsRes,
+    turnosRecientesRes,
+    configAlertaVentasRes,
+    alertaVentasBajasRes,
+  ] = await Promise.all([
       supabase
         .from('movimientos_caja')
         .select('id, tipo, monto, propina, created_at')
@@ -235,6 +243,15 @@ export default async function DashboardPage() {
         .eq('estado', 'cerrado')
         .order('cerrado_en', { ascending: false })
         .limit(10),
+      // Alerta de ventas bajas en tiempo real (F9-06) — config + comparativo,
+      // ambos en paralelo con todo lo demás; se descartan abajo si
+      // alerta_ventas_bajas_activa está apagada.
+      supabase
+        .from('config_sistema')
+        .select('alerta_ventas_bajas_activa, alerta_ventas_bajas_umbral_pct')
+        .eq('id', 1)
+        .single(),
+      supabase.rpc('dashboard_alerta_ventas_bajas'),
     ])
 
   const movimientos = movimientosRes.data ?? []
@@ -243,6 +260,16 @@ export default async function DashboardPage() {
   const pedidosData = pedidoIdsRes.data ?? []
   const pedidoIds = pedidosData.map((p: any) => p.id)
   const turnosRecientesRaw = turnosRecientesRes.data ?? []
+
+  // ── Alerta de ventas bajas en tiempo real (F9-06) ──────────────────────────
+  // dashboard_alerta_ventas_bajas() ya compara "hasta esta hora" — solo falta
+  // aplicar el umbral configurable (calcularAlertaVentasBajas, compartida con
+  // /mesas). Sin datos históricos suficientes no se muestra nada, igual que
+  // TemporadaAltaCard/ComparativoSemanaCard cuando falta historial.
+  const alertaVentasBajas = calcularAlertaVentasBajas(
+    configAlertaVentasRes.data,
+    (alertaVentasBajasRes.data as FilaAlertaVentasBajas[] | null)?.[0],
+  )
 
   // Sub-pedidos del turno — compartido por top productos, cancelaciones y descuentos.
   let subIds: number[] = []
@@ -727,6 +754,22 @@ export default async function DashboardPage() {
       <Header titulo="Dashboard" subtitulo={turnoLabel} ahora={ahora} />
 
       <div className="px-4 py-4 space-y-4">
+
+        {alertaVentasBajas && (
+          <div className="flex items-start gap-2.5 rounded-xl bg-red-50 border border-red-100 px-3.5 py-3">
+            <span className="text-[18px]">📉</span>
+            <div>
+              <p className="text-xs font-semibold text-red-700">
+                Ventas {Math.abs(alertaVentasBajas.desviacionPct).toFixed(0)}% por debajo de lo normal
+                para esta hora
+              </p>
+              <p className="mt-0.5 text-[11px] text-red-600">
+                ${fmtMoney(alertaVentasBajas.totalActual)} cobrado vs. ${fmtMoney(alertaVentasBajas.promedioHistorico)}{' '}
+                en promedio a esta hora, mismo día de la semana.
+              </p>
+            </div>
+          </div>
+        )}
 
         {pedidosAbiertos > 0 && (
           <div className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-3.5 py-2.5">

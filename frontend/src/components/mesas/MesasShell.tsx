@@ -8,6 +8,7 @@ import { SheetParaLlevar } from './SheetParaLlevar'
 import { SheetMesaExtra } from './SheetMesaExtra'
 import { abrirPedidoMostrador } from '@/app/(app)/mesas/actions'
 import type { GrupoArea, MesaUI } from '@/app/(app)/mesas/page'
+import type { AlertaVentasBajas } from '@/lib/alertaVentasBajas'
 
 interface MesasShellProps {
   grupos: GrupoArea[]
@@ -17,6 +18,9 @@ interface MesasShellProps {
   alertaActiva: boolean
   alertaMinutos: number
   tiempoMesaAlertaMinutos: number
+  // F9-06 — ya viene resuelta desde el servidor: null si está apagada, sin
+  // suficiente historial, o si no aplica para este rol (solo admin la ve).
+  alertaVentasBajas: AlertaVentasBajas | null
 }
 
 // Selector de pestaña de área para la vista de Mapa — el id real de un área,
@@ -39,6 +43,10 @@ function construirAreasMapa(mesas: MesaUI[]): { id: AreaMapaTabId; nombre: strin
     .sort((a, b) => a.orden - b.orden)
 }
 
+function fmtMoney(n: number) {
+  return n.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+}
+
 export function MesasShell({
   grupos,
   mesas,
@@ -47,6 +55,7 @@ export function MesasShell({
   alertaActiva,
   alertaMinutos,
   tiempoMesaAlertaMinutos,
+  alertaVentasBajas,
 }: MesasShellProps) {
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -138,6 +147,23 @@ export function MesasShell({
 
       {/* Cuerpo scrolleable */}
       <div className="flex-1 overflow-y-auto pb-safe">
+
+        {/* Alerta de ventas bajas en tiempo real (F9-06) — solo admin */}
+        {alertaVentasBajas && (
+          <div className="mx-3 mt-3 flex items-start gap-2.5 rounded-xl bg-red-50 border border-red-100 px-3.5 py-3">
+            <span className="text-[18px]">📉</span>
+            <div>
+              <p className="text-xs font-semibold text-red-700">
+                Ventas {Math.abs(alertaVentasBajas.desviacionPct).toFixed(0)}% por debajo de lo normal
+                para esta hora
+              </p>
+              <p className="mt-0.5 text-[11px] text-red-600">
+                ${fmtMoney(alertaVentasBajas.totalActual)} cobrado vs. ${fmtMoney(alertaVentasBajas.promedioHistorico)}{' '}
+                en promedio a esta hora, mismo día de la semana.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Banner de error */}
         {error && (

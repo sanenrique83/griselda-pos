@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
 import { MesasShell } from '@/components/mesas/MesasShell'
 import { calcularOcupacionPorMesa } from '@/lib/asientos'
+import { calcularAlertaVentasBajas, type FilaAlertaVentasBajas } from '@/lib/alertaVentasBajas'
 
 // Tipos exportados para que los componentes cliente los importen
 export type MesaUI = {
@@ -43,6 +44,18 @@ export default async function MesasPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Rol del usuario en sesión — la alerta de ventas bajas (F9-06) es una
+  // señal de negocio que solo el admin puede accionar (comp, staff, checar
+  // equipo); un mesero no tiene nada que hacer con ese dato, así que se
+  // oculta para ese rol aunque /mesas sea la pantalla donde más tiempo pasa
+  // durante el servicio.
+  const { data: perfilPropio } = await supabase
+    .from('perfiles')
+    .select('rol')
+    .eq('id', user.id)
+    .single()
+  const esAdmin = perfilPropio?.rol === 'admin'
+
   // Turno activo
   const { data: turno } = await supabase
     .from('turnos')
@@ -71,22 +84,32 @@ export default async function MesasPage() {
   // (su pedido original se cerró al unirse), así que sin esto se vería como
   // libre pese a seguir ocupada como parte del pedido destino.
   const pedidoIdsAbiertos = (pedidosAbiertos ?? []).map((p) => p.id)
-  const [{ data: pedidoMesasRaw }, { data: subpedidosRaw }, { data: config }] = await Promise.all([
-    pedidoIdsAbiertos.length > 0
-      ? supabase.from('pedido_mesas').select('mesa_id, pedido_id, orden').in('pedido_id', pedidoIdsAbiertos)
-      : Promise.resolve({ data: [] as { mesa_id: number; pedido_id: number; orden: number }[] }),
-    pedidoIdsAbiertos.length > 0
-      ? supabase
-          .from('subpedidos')
-          .select('pedido_id, estado, silla_numero, pedido_productos(estado)')
-          .in('pedido_id', pedidoIdsAbiertos)
-      : Promise.resolve({ data: [] as any[] }),
-    supabase
-      .from('config_sistema')
-      .select('alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos, tiempo_mesa_alerta_minutos')
-      .eq('id', 1)
-      .single(),
-  ])
+  const [{ data: pedidoMesasRaw }, { data: subpedidosRaw }, { data: config }, alertaVentasBajasRes] =
+    await Promise.all([
+      pedidoIdsAbiertos.length > 0
+        ? supabase.from('pedido_mesas').select('mesa_id, pedido_id, orden').in('pedido_id', pedidoIdsAbiertos)
+        : Promise.resolve({ data: [] as { mesa_id: number; pedido_id: number; orden: number }[] }),
+      pedidoIdsAbiertos.length > 0
+        ? supabase
+            .from('subpedidos')
+            .select('pedido_id, estado, silla_numero, pedido_productos(estado)')
+            .in('pedido_id', pedidoIdsAbiertos)
+        : Promise.resolve({ data: [] as any[] }),
+      supabase
+        .from('config_sistema')
+        .select(
+          'alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos, tiempo_mesa_alerta_minutos, alerta_ventas_bajas_activa, alerta_ventas_bajas_umbral_pct',
+        )
+        .eq('id', 1)
+        .single(),
+      // Solo tiene sentido pedirla si hay turno activo y quien mira es admin
+      // (ver comentario de esAdmin arriba) — nunca se corre en vano.
+      esAdmin && turno
+        ? supabase.rpc('dashboard_alerta_ventas_bajas')
+        : Promise.resolve({ data: null as FilaAlertaVentasBajas[] | null }),
+    ])
+
+  const alertaVentasBajas = calcularAlertaVentasBajas(config, alertaVentasBajasRes.data?.[0])
 
   // Nombres de los meseros en esos pedidos
   const meseroIds = [...new Set((pedidosAbiertos ?? []).map((p) => p.mesero_id))]
@@ -213,6 +236,7 @@ export default async function MesasPage() {
       alertaActiva={config?.alerta_mesa_sin_atender ?? true}
       alertaMinutos={config?.alerta_mesa_sin_atender_minutos ?? 10}
       tiempoMesaAlertaMinutos={config?.tiempo_mesa_alerta_minutos ?? 60}
+      alertaVentasBajas={alertaVentasBajas}
     />
   )
 }
