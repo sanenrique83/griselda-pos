@@ -1,5 +1,5 @@
-# Griselda POS — Estado Consolidado del Proyecto (v3)
-**Última actualización:** 31 de julio de 2026. Reemplaza la v2 — se cerraron 6 de 7 Hallazgos de Uso Real, se descartó H-07, y se construyó un feature grande no planeado originalmente (mesas unidas en cadena con geometría real, arrastre con imantado, marcadores de silla y semáforo de color).
+# Griselda POS — Estado Consolidado del Proyecto (v4)
+**Última actualización:** 1 de agosto de 2026. Reemplaza la v3 — se cerraron dos rondas completas de auditoría de código, y el bloque de "Mesas Unidas Visual" recibió varias correcciones importantes tras probarlo en el celular (área por pestañas, auto-acomodo sin colisión, tamaño de sillas, mesa extra hereda área).
 
 **Leyenda:** ✅ Hecho y confirmado · 🟡 Parcial · ⚪ Spec listo, sin implementar · 🚫 Descartado/superado · ❓ No verificado
 
@@ -116,13 +116,53 @@ Salió de una conversación sobre cómo se ven físicamente las mesas pegadas en
 | Parte | Descripción | Estado |
 |---|---|---|
 | 1 | Geometría de sillas en cadena (`calcularPosicionesSillasCadena`) — 2 cabeceras fijas + resto repartido parejo entre costados, rectángulo de lados rectos, límite de 5 mesas por cadena | ✅ Verificado a mano (2 mesas → 3 por lado, 3 mesas → 5 por lado) |
-| 2 | Arrastre con imantado en `/mas/mapa-mesas` — acercar una mesa a otra activa el mismo `unirMesas()` que ya existía, sin duplicar lógica | ✅ |
+| 2 | Arrastre con imantado — acercar una mesa a otra activa el mismo `unirMesas()` que ya existía, sin duplicar lógica | ✅ |
 | 3 | Marcadores de silla siempre visibles sobre la forma de la mesa (llenos/vacíos), reutilizando la misma geometría | ✅ |
 | 4 | Semáforo de color de la mesa completa (verde/naranja/azul/rojo), configurable y apagable desde `/mas/permisos` | ✅ Lógica centralizada en `lib/colorMesa.ts`, un solo lugar para que ninguna pantalla se desincronice |
 
 **Detalle importante del semáforo:** el rojo se definió como "cero productos en la comanda + tiempo transcurrido", **no** "nada enviado a cocina" — se descartó esa versión a propósito porque generaría falsas alarmas con pedidos simples que se comunican de viva voz sin pasar por el botón "Enviar".
 
-**Nota de alcance:** el mapa visual **sí se ve afectado** por esta feature (a diferencia de la decisión original de F7-09, donde el mapa se quedaba intacto al unir mesas) — esto fue una decisión consciente y confirmada durante el diseño, no una inconsistencia.
+### Rondas de corrección posteriores (tras probarlo en el celular)
+
+El diseño original se amplió y corrigió varias veces al usarlo de verdad — todo cerrado:
+
+- **Consolidación del mecanismo de unión** — inicialmente se pensó en un modo de "selección múltiple + botón" para abrir varias mesas libres unidas desde el inicio; se descartó a favor de un solo mecanismo de arrastre que cubre los 3 casos (libre+libre, libre+ocupada, ocupada+ocupada) con la misma lógica de fondo.
+- **Reacomodo visual persistente** — al unirse, las mesas normales (no temporales) se reposicionan visualmente pegadas a la principal, guardando su posición original en `pedido_mesas.pos_x_original/pos_y_original/rotacion_original`; al cobrar o separar, regresan solas a su lugar.
+- **Mesas extra/temporales** — botón "+ Mesa extra" en `/mesas` reutiliza `mesas.temporal` (el mismo mecanismo de "Compartir mesa"); al cobrar, se borran por completo en vez de regresar a algún lado (`liberarMesasSatelite()` ya las manejaba, no se tocó).
+- **Forma de los marcadores** — cambiaron de triángulo a medio círculo (respaldo hacia el centro de la mesa, asiento hacia afuera), con ángulo calculado a partir de la misma geometría de posiciones.
+- **Arrastre extendido a `/mesas`** — inicialmente el arrastre-con-imán solo vivía en `/mas/mapa-mesas` (el editor de Admin); se portó también a la pantalla operativa `/mesas`, con una diferencia clave: en `/mesas` nunca se persiste una reposición libre (si sueltas sin imán, regresa sola — el reacomodo de layout permanente sigue siendo exclusivo del editor de Admin).
+- **Tamaño de sillas** — subieron de 8px → 16px → **36px** (para igualar exactamente el tamaño de los círculos del picker de sillas), con `PAD_SILLA_PX` ajustado en cada paso.
+- **Auto-acomodo sin colisión** — bug real encontrado en producción: una mesa nueva ("Extra 1") caía encima de una mesa real ya posicionada, porque el auto-acomodo siempre arrancaba en un origen fijo (30,30). Corregido con `calcularYInicioAutoGrid()`: calcula el borde inferior real de las mesas ya posicionadas **de esa misma área** y arranca la cuadrícula justo después — verificado numéricamente que ya no se superponen.
+- **Pestañas de área** — el editor de Admin (`/mas/mapa-mesas`) y la pantalla operativa (`/mesas`) ahora navegan por área (tabla `areas` ya existente, reutilizando `crearArea()` de Catálogo sin duplicar lógica) — necesario porque el auto-acomodo y el arrastre deben respetar que cada área es su propio espacio de coordenadas.
+- **"+ Mesa extra" hereda el área actual** — antes siempre caía en "Sin área" sin importar qué área estuvieras viendo; ahora usa el área seleccionada en ese momento (o la última seleccionada en Mapa, si se crea desde la vista Lista).
+- **Cuadrícula de fondo más fina** — de 40px a 20px, para posicionar con más precisión en el editor de Admin.
+
+**Nota de alcance que sigue vigente:** el mapa visual **sí se ve afectado** por esta feature (a diferencia de la decisión original de F7-09, donde el mapa se quedaba intacto al unir mesas) — decisión consciente y confirmada durante el diseño, no una inconsistencia.
+
+---
+
+## Auditoría de Código — 2 rondas completas
+
+Se le pidió a Claude Code una auditoría completa (diagnóstico primero, sin tocar nada hasta revisar juntos) — usó la Management API de Supabase directo contra la base de producción, no solo el repo, lo que permitió encontrar cosas que un análisis de archivos no vería.
+
+### Ronda 1 — severidad alta
+
+| Hallazgo | Resolución |
+|---|---|
+| `ingredientes` sin RLS (hueco de seguridad real — tabla muerta funcionalmente pero con datos reales, abierta a la anon key) | ✅ Se confirmó que las 60 filas ya tenían equivalente en `insumos` (cero huérfanas) y que las 182 referencias de `opciones_modificador.ingrediente_id` ya apuntaban también a `insumo_id` — se hizo el DROP completo de la tabla en vez de solo taparla con RLS |
+| `categorias.modo_captura` — columna real sin ninguna migración | ✅ Migración escrita documentando el tipo real (texto plano, no el enum que usa `productos.modo_captura` — esa inconsistencia de tipos queda anotada, sin resolver todavía) |
+| `config_sistema` — 8 columnas `ticket_*` sin ninguna migración ni en `database.types.ts` | ✅ Migración + tipos actualizados |
+
+### Ronda 2 — severidad media/baja
+
+| Hallazgo | Resolución |
+|---|---|
+| 6 escrituras "fire-and-forget" de mayor impacto (limpieza de mesas al cobrar, inserts de comensal 1, ajuste de caja al cancelar) sin manejo de error | ✅ Se agregó log + propagación selectiva: si la operación de negocio ya se completó, solo se loguea (no confundir al usuario mostrando "falló" sobre algo que ya pasó); si nada se ha comprometido todavía (ej. insertar el comensal 1), sí se propaga el error |
+| `toggleDisponible` duplicada con comportamiento distinto entre Catálogo y Menú del día | ✅ Consolidada en una sola función |
+| `movimientos_inventario` sin política de escritura directa (intencional, todo pasa por RPCs) | ✅ Documentado con `COMMENT ON TABLE/POLICY`, para que nadie intente "arreglarlo" agregando una política directa que abra un camino paralelo a los RPCs |
+| Código muerto: `abrirPedidoMesa()` huérfana, `crearPedidoYAgregarProducto`/`crearPedidoYAgregarRapido`, ramas de "modo draft" en `PosShell.tsx` | ✅ Todo eliminado — confirmado que el único punto de entrada real (`pos/[pedidoId]/page.tsx`) siempre resuelve `pedidoId` a un número válido antes de llegar a `PosShell`, así que `pedidoId: number \| null` pasó a ser `pedidoId: number` |
+
+**Los 93 casos de solo-lectura sin manejo de error** (menor severidad) se dejaron sin tocar a propósito — se decidió adoptarlo como práctica hacia adelante, no como limpieza retroactiva masiva.
 
 ---
 
@@ -143,9 +183,10 @@ Hecho en una sesión aparte de Claude Code (no pasó por el flujo de specs de es
 | Ambiente de staging separado de producción | ⚪ Sigue sin existir — cada feature grande (rediseño de recetas, Fase 7 completa) se probó directo contra producción |
 | Reconciliación física de inventario | ⚪ Mencionado, sin spec |
 | Conciliación de terminal bancaria | ⚪ Mencionado, sin spec |
-| **Auditoría de queries contra el esquema real** | ⚪ **Nuevo** — el bug de `productos.orden` (encontrado de casualidad en H-02) sugiere que puede haber más casos similares acumulados de tantas sesiones de Claude Code en paralelo. Vale la pena una revisión sistemática en algún momento. |
-| **Modelo de permisos escalará mal** | ⚪ Cada permiso nuevo es una columna booleana más en `config_sistema` (`descuentos_mesero`, `cancelaciones_mesero`, `cancelar_pedido_mesero` — este último reutilizado para H-01 en vez de duplicado). Funciona con 3-4; conviene una tabla de permisos antes de que sean 10. |
-| **Código muerto pendiente de limpieza** | ⚪ **Nuevo** — `abrirPedidoMesa()` huérfana en `mesas/actions.ts` (sin llamadores) y las ramas de "modo draft" en `PosShell.tsx` (`isDraft` y condicionales relacionados), ambos dejados de lado tras el rediseño de H-05/H-06. Documentado en el código, no bloqueante, pero vale la pena una sesión de limpieza en algún momento. |
+| **Auditoría de queries contra el esquema real** | ✅ **Resuelta** — se hizo la auditoría completa (2 rondas) vía Management API contra la base real, no solo el repo. Encontró y cerró: `ingredientes` sin RLS (DROP completo), `categorias.modo_captura` y `config_sistema.ticket_*` sin migración, 6 fire-and-forget de alto impacto, `toggleDisponible` duplicada, y el código muerto de la fila de abajo. |
+| **Modelo de permisos escalará mal** | ⚪ Sigue igual — cada permiso nuevo es una columna booleana más en `config_sistema` (`descuentos_mesero`, `cancelaciones_mesero`, `cancelar_pedido_mesero`). Funciona con 3-4; conviene una tabla de permisos antes de que sean 10. No se tocó en la auditoría, sigue como recomendación abierta. |
+| **Código muerto pendiente de limpieza** | ✅ **Resuelto por la auditoría** — `abrirPedidoMesa()` huérfana, `crearPedidoYAgregarProducto`/`crearPedidoYAgregarRapido`, y las ramas de "modo draft" en `PosShell.tsx` ya se eliminaron por completo. |
+| **Inconsistencia de tipos: `categorias.modo_captura` (texto plano) vs. `productos.modo_captura` (enum)** | ⚪ **Nuevo** — detectado en la auditoría, documentado a propósito sin resolver (cambiar el tipo de una columna en producción es una decisión aparte, con más riesgo que solo documentarla). |
 
 ---
 
