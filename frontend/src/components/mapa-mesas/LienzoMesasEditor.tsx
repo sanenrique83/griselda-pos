@@ -26,7 +26,7 @@ import {
   type TipoUnionIman,
   type CandidatoIman,
 } from '@/lib/imanMesas'
-import { posicionAutoGrid } from '@/lib/autoAcomodoMesas'
+import { posicionAutoGrid, calcularYInicioAutoGrid } from '@/lib/autoAcomodoMesas'
 import type { MesaEditable, AreaTab } from '@/app/(app)/mas/mapa-mesas/page'
 import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
 
@@ -57,9 +57,31 @@ type Posicion = {
 // El contador de la cuadrícula es POR ÁREA (una Map por area_id/'sin_area'),
 // no global — cada área tiene su propio espacio de coordenadas
 // independiente, así que una mesa nueva en el Área 2 nunca choca con el
-// layout ya armado del Área 1, aunque ambas reutilicen los mismos (x,y).
+// layout ya armado del Área 1. Y DENTRO de cada área, la cuadrícula arranca
+// debajo de sus mesas reales (ver calcularYInicioAutoGrid) — no en (30,30)
+// fijo, que es justo lo que hacía que una mesa auto-acomodada ("Extra 1")
+// pudiera caer encima de una mesa real ("Mesa 1") ya cercana al origen.
+//
+// Dos pasadas porque el orden del arreglo (por `numero`) no garantiza que
+// las mesas reales de un área aparezcan antes que las sin posición de esa
+// misma área: primero hay que conocer TODAS las reales de cada área para
+// calcular su yInicio, y solo después repartir las sin posición.
 function posicionesIniciales(mesas: MesaEditable[]): Record<number, Posicion> {
   const posiciones: Record<number, Posicion> = {}
+
+  const realesPorArea = new Map<AreaTabId, { y: number; forma: FormaMesa; tamano: TamanoMesa }[]>()
+  for (const mesa of mesas) {
+    if (mesa.posX === null || mesa.posY === null) continue
+    const clave: AreaTabId = mesa.areaId ?? 'sin_area'
+    const arr = realesPorArea.get(clave) ?? []
+    arr.push({ y: mesa.posY, forma: mesa.forma, tamano: mesa.tamano })
+    realesPorArea.set(clave, arr)
+  }
+  const yInicioPorArea = new Map<AreaTabId, number>()
+  for (const [clave, reales] of realesPorArea) {
+    yInicioPorArea.set(clave, calcularYInicioAutoGrid(reales))
+  }
+
   const contadorPorArea = new Map<AreaTabId, number>()
   for (const mesa of mesas) {
     if (mesa.posX !== null && mesa.posY !== null) {
@@ -73,8 +95,9 @@ function posicionesIniciales(mesas: MesaEditable[]): Record<number, Posicion> {
     } else {
       const clave: AreaTabId = mesa.areaId ?? 'sin_area'
       const indice = contadorPorArea.get(clave) ?? 0
+      const yInicio = yInicioPorArea.get(clave) ?? 30
       posiciones[mesa.id] = {
-        ...posicionAutoGrid(indice),
+        ...posicionAutoGrid(indice, yInicio),
         rotacion: mesa.rotacion,
         forma: mesa.forma,
         tamano: mesa.tamano,

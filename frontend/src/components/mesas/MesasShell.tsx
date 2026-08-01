@@ -320,6 +320,7 @@ export function MesasShell({
       <SheetMesaExtra
         open={sheetMesaExtraOpen}
         onClose={() => setSheetMesaExtraOpen(false)}
+        areaId={areaMapaSeleccionada === 'sin_area' ? null : areaMapaSeleccionada}
       />
     </>
   )

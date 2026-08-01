@@ -122,7 +122,10 @@ export async function abrirPedidoMostrador(): Promise<ActionResult> {
 // el mismo esquema de sufijo. Sin pos_x/pos_y (quedan NULL) para que entre
 // directo a la cuadrícula de auto-acomodo que ya usa LienzoMesasEditor para
 // mesas sin posición — lista para arrastrarse en /mas/mapa-mesas.
-export async function crearMesaExtra(capacidad: number): Promise<{ mesaId: number } | Err> {
+export async function crearMesaExtra(
+  capacidad: number,
+  areaId: number | null,
+): Promise<{ mesaId: number } | Err> {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -162,6 +165,7 @@ export async function crearMesaExtra(capacidad: number): Promise<{ mesaId: numbe
     .insert({
       numero: 0,
       nombre,
+      area_id: areaId,
       capacidad: Math.round(capacidad),
       activa: true,
       temporal: true,

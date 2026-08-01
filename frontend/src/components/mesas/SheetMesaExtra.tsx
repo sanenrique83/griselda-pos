@@ -7,6 +7,7 @@ import { crearMesaExtra } from '@/app/(app)/mesas/actions'
 interface SheetMesaExtraProps {
   open: boolean
   onClose: () => void
+  areaId: number | null
 }
 
 // Crea una mesa temporal ad-hoc con solo la capacidad como dato — forma y
@@ -14,7 +15,11 @@ interface SheetMesaExtraProps {
 // igual que cualquier mesa recién creada desde el catálogo. Al confirmar
 // navega directo a /pos/nueva/[mesaId] (mismo flujo que tocar cualquier
 // mesa libre): el mesero elige silla inicial y abre el pedido de una vez.
-export function SheetMesaExtra({ open, onClose }: SheetMesaExtraProps) {
+//
+// `areaId` es el área que se está viendo en /mesas al momento de abrir este
+// sheet (ver MesasShell.tsx) — la mesa se crea ahí, no siempre en "Sin
+// área", para que aparezca junto a las demás mesas de esa misma área.
+export function SheetMesaExtra({ open, onClose, areaId }: SheetMesaExtraProps) {
   const router = useRouter()
   const [capacidad, setCapacidad] = useState('4')
   const [error, setError] = useState<string | null>(null)
@@ -33,7 +38,7 @@ export function SheetMesaExtra({ open, onClose }: SheetMesaExtraProps) {
     }
     setError(null)
     startTransition(async () => {
-      const result = await crearMesaExtra(num)
+      const result = await crearMesaExtra(num, areaId)
       if ('error' in result) {
         setError(result.error)
         return

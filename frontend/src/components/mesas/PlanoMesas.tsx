@@ -24,7 +24,7 @@ import {
   type TipoUnionIman,
   type CandidatoIman,
 } from '@/lib/imanMesas'
-import { posicionAutoGrid } from '@/lib/autoAcomodoMesas'
+import { posicionAutoGrid, calcularYInicioAutoGrid } from '@/lib/autoAcomodoMesas'
 import type { MesaUI } from '@/app/(app)/mesas/page'
 
 const MARGEN = 100
@@ -73,10 +73,19 @@ export function PlanoMesas({
 
   // Posición EFECTIVA de cada mesa: la real (pos_x/pos_y) si ya la tiene, o
   // la calculada por auto-acomodo si no — todas las mesas terminan con una,
-  // así que ya no hace falta una lista aparte de "sin posición".
+  // así que ya no hace falta una lista aparte de "sin posición". La
+  // cuadrícula arranca debajo de las mesas reales de este mismo conjunto
+  // (`mesas` ya viene filtrado por área desde MesasShell cuando hay más de
+  // una) — nunca en (30,30) fijo, que podía caer encima de una mesa real ya
+  // cercana al origen (ver lib/autoAcomodoMesas.ts).
   const sinPosicion = mesas.filter((m) => m.pos_x === null || m.pos_y === null)
+  const yInicioAuto = calcularYInicioAutoGrid(
+    mesas
+      .filter((m) => m.pos_x !== null && m.pos_y !== null)
+      .map((m) => ({ y: m.pos_y!, forma: m.forma, tamano: m.tamano })),
+  )
   const autoPosPorId = new Map<number, { x: number; y: number }>()
-  sinPosicion.forEach((m, idx) => autoPosPorId.set(m.id, posicionAutoGrid(idx)))
+  sinPosicion.forEach((m, idx) => autoPosPorId.set(m.id, posicionAutoGrid(idx, yInicioAuto)))
 
   function posEfectiva(mesa: MesaUI): { x: number; y: number } {
     if (mesa.pos_x !== null && mesa.pos_y !== null) return { x: mesa.pos_x, y: mesa.pos_y }
