@@ -11,6 +11,7 @@ export type MesaEditable = {
   id: number
   numero: number
   nombre: string | null
+  areaId: number | null
   areaNombre: string
   forma: FormaMesa
   tamano: TamanoMesa
@@ -27,6 +28,11 @@ export type MesaEditable = {
   algunoPagadoNoTodos: boolean
   tieneProductos: boolean
   pedidoCreatedAt: string | null
+}
+
+export type AreaTab = {
+  id: number
+  nombre: string
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -47,11 +53,11 @@ export default async function MapaMesasPage() {
 
   if (perfil?.rol !== 'admin') redirect('/mas')
 
-  const [{ data: mesasRaw }, { data: pedidosAbiertos }, { data: config }] = await Promise.all([
+  const [{ data: mesasRaw }, { data: pedidosAbiertos }, { data: config }, { data: areasRaw }] = await Promise.all([
     supabase
       .from('mesas')
       .select(
-        'id, numero, nombre, pos_x, pos_y, rotacion, forma, tamano, capacidad, asientos_horario, temporal, areas(nombre)',
+        'id, numero, nombre, area_id, pos_x, pos_y, rotacion, forma, tamano, capacidad, asientos_horario, temporal, areas(nombre)',
       )
       .eq('activa', true)
       .order('numero'),
@@ -61,7 +67,10 @@ export default async function MapaMesasPage() {
       .select('alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos')
       .eq('id', 1)
       .single(),
+    supabase.from('areas').select('id, nombre').eq('activa', true).order('orden'),
   ])
+
+  const areas: AreaTab[] = (areasRaw ?? []).map((a) => ({ id: a.id, nombre: a.nombre }))
 
   const pedidoIdsAbiertos = (pedidosAbiertos ?? []).map((p) => p.id)
   const [{ data: pedidoMesasRaw }, { data: subpedidosRaw }] = await Promise.all([
@@ -135,6 +144,7 @@ export default async function MapaMesasPage() {
       id: m.id,
       numero: m.numero,
       nombre: m.nombre,
+      areaId: m.area_id,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       areaNombre: (m.areas as any)?.nombre ?? 'Sin área',
       forma: (m.forma as FormaMesa) ?? 'rectangulo',
@@ -156,6 +166,7 @@ export default async function MapaMesasPage() {
   return (
     <LienzoMesasEditor
       mesas={mesas}
+      areas={areas}
       alertaActiva={config?.alerta_mesa_sin_atender ?? true}
       alertaMinutos={config?.alerta_mesa_sin_atender_minutos ?? 10}
     />

@@ -18,6 +18,26 @@ interface MesasShellProps {
   alertaMinutos: number
 }
 
+// Selector de pestaña de área para la vista de Mapa — el id real de un área,
+// o 'sin_area' para mesas con area_id nulo (ej. "+ Mesa extra"). Cada área
+// tiene su propio espacio de coordenadas (ver PlanoMesas/LienzoMesasEditor),
+// así que sin filtrar por pestaña el lienzo mezclaría mesas de áreas
+// distintas que pueden compartir las mismas coordenadas.
+type AreaMapaTabId = number | 'sin_area'
+
+function construirAreasMapa(mesas: MesaUI[]): { id: AreaMapaTabId; nombre: string; orden: number }[] {
+  const map = new Map<AreaMapaTabId, { nombre: string; orden: number }>()
+  for (const m of mesas) {
+    const id: AreaMapaTabId = m.area_id ?? 'sin_area'
+    if (!map.has(id)) {
+      map.set(id, { nombre: m.area_nombre, orden: m.area_id === null ? Infinity : m.area_orden })
+    }
+  }
+  return [...map.entries()]
+    .map(([id, v]) => ({ id, ...v }))
+    .sort((a, b) => a.orden - b.orden)
+}
+
 export function MesasShell({
   grupos,
   mesas,
@@ -34,6 +54,19 @@ export function MesasShell({
   // Si hay al menos una mesa posicionada, el mapa es la vista por default;
   // si no, no tiene caso mostrarlo (estaría vacío) y se arranca en lista.
   const [vista, setVista] = useState<'mapa' | 'lista'>(hayMapa ? 'mapa' : 'lista')
+
+  // Pestañas de área para la vista de Mapa — mismo criterio que
+  // /mas/mapa-mesas (ver LienzoMesasEditor), aquí solo para ver/arrastrar,
+  // sin opción de crear área nueva. Si el negocio solo tiene una área en
+  // uso, no tiene caso mostrar pestañas de una sola opción.
+  const areasMapa = construirAreasMapa(mesas)
+  const [areaMapaSeleccionada, setAreaMapaSeleccionada] = useState<AreaMapaTabId>(
+    () => areasMapa[0]?.id ?? 'sin_area',
+  )
+  const mesasParaMapa =
+    areasMapa.length > 1
+      ? mesas.filter((m) => (areaMapaSeleccionada === 'sin_area' ? m.area_id === null : m.area_id === areaMapaSeleccionada))
+      : mesas
 
   // Reloj compartido para el semáforo rojo (mesa sin atender por tiempo) —
   // un solo interval para todas las tarjetas/mesas del plano, en vez de uno
@@ -218,10 +251,29 @@ export function MesasShell({
           </div>
         )}
 
+        {/* Pestañas de área (vista de mapa, solo si hay más de una área en uso) */}
+        {grupos.length > 0 && vista === 'mapa' && hayMapa && areasMapa.length > 1 && (
+          <div className="flex overflow-x-auto scrollbar-none px-3 pt-3">
+            {areasMapa.map((a) => (
+              <button
+                key={String(a.id)}
+                onClick={() => setAreaMapaSeleccionada(a.id)}
+                className={`flex-shrink-0 mr-4 last:mr-0 border-b-2 px-1 py-2 text-[13px] font-semibold transition-colors ${
+                  areaMapaSeleccionada === a.id
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-text-3'
+                }`}
+              >
+                {a.nombre}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Vista de mapa */}
         {grupos.length > 0 && vista === 'mapa' && hayMapa && (
           <PlanoMesas
-            mesas={mesas}
+            mesas={mesasParaMapa}
             onMesaClick={handleMesaClick}
             onUnionError={setError}
             ahora={ahora}

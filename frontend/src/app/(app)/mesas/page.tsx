@@ -10,7 +10,9 @@ export type MesaUI = {
   numero: number
   nombre: string | null
   capacidad: number | null
+  area_id: number | null
   area_nombre: string
+  area_orden: number
   pos_x: number | null
   pos_y: number | null
   rotacion: number
@@ -52,7 +54,7 @@ export default async function MesasPage() {
   const { data: mesasRaw } = await supabase
     .from('mesas')
     .select(
-      'id, numero, nombre, capacidad, area_id, pos_x, pos_y, rotacion, forma, tamano, asientos_horario, areas(nombre)',
+      'id, numero, nombre, capacidad, area_id, pos_x, pos_y, rotacion, forma, tamano, asientos_horario, areas(nombre, orden)',
     )
     .eq('activa', true)
     .order('numero')
@@ -160,6 +162,8 @@ export default async function MesasPage() {
   for (const mesa of mesasUnicas) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const area_nombre = (mesa.areas as any)?.nombre ?? 'Sin área'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const area_orden = (mesa.areas as any)?.orden ?? 0
     const pedido = pedidoMap.get(mesa.id)
 
     const mesaUI: MesaUI = {
@@ -167,7 +171,9 @@ export default async function MesasPage() {
       numero: mesa.numero,
       nombre: mesa.nombre,
       capacidad: mesa.capacidad,
+      area_id: mesa.area_id,
       area_nombre,
+      area_orden,
       pos_x: mesa.pos_x,
       pos_y: mesa.pos_y,
       rotacion: mesa.rotacion ?? 0,

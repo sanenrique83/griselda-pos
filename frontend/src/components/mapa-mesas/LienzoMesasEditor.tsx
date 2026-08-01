@@ -15,6 +15,7 @@ import {
 import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
 import { MesaShape, dimensionesMesa, colorParaGrupo } from '@/components/mesas/MesaShape'
 import { guardarDisposicion } from '@/app/(app)/mas/mapa-mesas/actions'
+import { crearArea } from '@/app/(app)/mas/catalogo/actions'
 import { unirMesas, unirMesaLibreAOcupada } from '@/app/(app)/pos/[pedidoId]/actions'
 import { calcularPosicionesSillas } from '@/lib/asientos'
 import { colorSemaforoMesa } from '@/lib/colorMesa'
@@ -26,12 +27,17 @@ import {
   type CandidatoIman,
 } from '@/lib/imanMesas'
 import { posicionAutoGrid } from '@/lib/autoAcomodoMesas'
-import type { MesaEditable } from '@/app/(app)/mas/mapa-mesas/page'
+import type { MesaEditable, AreaTab } from '@/app/(app)/mas/mapa-mesas/page'
 import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
+
+// Selector de pestaña de área: el id real de una fila de `areas`, o el
+// sentinel 'sin_area' para mesas con area_id nulo (ej. "+ Mesa extra" desde
+// /mesas, que se crean sin área asignada) — nunca hay una pestaña "todas".
+type AreaTabId = number | 'sin_area'
 
 const CANVAS_W = 900
 const CANVAS_H = 1100
-const CUADRICULA_PX = 40 // tamaño de la cuadrícula de fondo, solo visual
+const CUADRICULA_PX = 20 // tamaño de la cuadrícula de fondo, solo visual
 
 type Posicion = {
   x: number
@@ -47,9 +53,14 @@ type Posicion = {
 // "Guardar disposición" persista esa posición inicial en vez de perderla al
 // recargar. (/mesas usa la misma cuadrícula pero persiste sola, sin esperar
 // a que nadie la guarde — ver PlanoMesas.tsx.)
+//
+// El contador de la cuadrícula es POR ÁREA (una Map por area_id/'sin_area'),
+// no global — cada área tiene su propio espacio de coordenadas
+// independiente, así que una mesa nueva en el Área 2 nunca choca con el
+// layout ya armado del Área 1, aunque ambas reutilicen los mismos (x,y).
 function posicionesIniciales(mesas: MesaEditable[]): Record<number, Posicion> {
   const posiciones: Record<number, Posicion> = {}
-  let indiceSinPosicion = 0
+  const contadorPorArea = new Map<AreaTabId, number>()
   for (const mesa of mesas) {
     if (mesa.posX !== null && mesa.posY !== null) {
       posiciones[mesa.id] = {
@@ -60,13 +71,15 @@ function posicionesIniciales(mesas: MesaEditable[]): Record<number, Posicion> {
         tamano: mesa.tamano,
       }
     } else {
+      const clave: AreaTabId = mesa.areaId ?? 'sin_area'
+      const indice = contadorPorArea.get(clave) ?? 0
       posiciones[mesa.id] = {
-        ...posicionAutoGrid(indiceSinPosicion),
+        ...posicionAutoGrid(indice),
         rotacion: mesa.rotacion,
         forma: mesa.forma,
         tamano: mesa.tamano,
       }
-      indiceSinPosicion++
+      contadorPorArea.set(clave, indice + 1)
     }
   }
   return posiciones
@@ -74,10 +87,12 @@ function posicionesIniciales(mesas: MesaEditable[]): Record<number, Posicion> {
 
 export function LienzoMesasEditor({
   mesas,
+  areas,
   alertaActiva,
   alertaMinutos,
 }: {
   mesas: MesaEditable[]
+  areas: AreaTab[]
   alertaActiva: boolean
   alertaMinutos: number
 }) {
@@ -99,6 +114,43 @@ export function LienzoMesasEditor({
   const [uniendo, setUniendo] = useState(false)
   const [ahora, setAhora] = useState(() => Date.now())
 
+  // Pestaña de área activa — el lienzo solo muestra/arrastra mesas de esta
+  // área. Arranca en la primera área configurada, o "Sin área" si no hay
+  // ninguna todavía.
+  const [areaSeleccionada, setAreaSeleccionada] = useState<AreaTabId>(
+    () => areas[0]?.id ?? 'sin_area',
+  )
+  const [sheetAreaOpen, setSheetAreaOpen] = useState(false)
+  const [nuevaAreaNombre, setNuevaAreaNombre] = useState('')
+  const [creandoArea, setCreandoArea] = useState(false)
+  const [errorArea, setErrorArea] = useState<string | null>(null)
+
+  function seleccionarArea(id: AreaTabId) {
+    setAreaSeleccionada(id)
+    setSeleccionId(null)
+  }
+
+  function handleCrearArea() {
+    const nombre = nuevaAreaNombre.trim()
+    if (!nombre) {
+      setErrorArea('Ingresa un nombre.')
+      return
+    }
+    setErrorArea(null)
+    setCreandoArea(true)
+    crearArea(nombre).then((result) => {
+      setCreandoArea(false)
+      if ('error' in result) {
+        setErrorArea(result.error)
+        return
+      }
+      setNuevaAreaNombre('')
+      setSheetAreaOpen(false)
+      seleccionarArea(result.id)
+      router.refresh()
+    })
+  }
+
   useEffect(() => {
     const id = setInterval(() => setAhora(Date.now()), 30_000)
     return () => clearInterval(id)
@@ -110,6 +162,12 @@ export function LienzoMesasEditor({
   )
 
   const mesaPorId = new Map(mesas.map((m) => [m.id, m]))
+
+  // Mesas de la pestaña de área actual — todo lo que se dibuja, arrastra o
+  // conecta con líneas en el lienzo sale de aquí, nunca de `mesas` completo.
+  const mesasDelArea = mesas.filter((m) =>
+    areaSeleccionada === 'sin_area' ? m.areaId === null : m.areaId === areaSeleccionada,
+  )
 
   function actualizarMesa(id: number, patch: Partial<Posicion>) {
     setPosiciones((prev) => {
@@ -135,7 +193,7 @@ export function LienzoMesasEditor({
     const { width: w, height: h } = dimensionesMesa(draggedPos.forma, draggedPos.tamano)
     const cajaArrastrada = { x: liveX, y: liveY, w, h }
 
-    const candidatos: CandidatoIman[] = mesas
+    const candidatos: CandidatoIman[] = mesasDelArea
       .map((mesa) => {
         const pos = posiciones[mesa.id]
         if (!pos) return null
@@ -317,9 +375,11 @@ export function LienzoMesasEditor({
   // Mesas unidas (mismo pedidoActivoId, vía unirMesas persistente) — conector
   // visual igual que en /mesas, calculado sobre la posición/forma EN VIVO
   // (aunque todavía no se haya guardado) para que se sienta consistente
-  // mientras se edita.
+  // mientras se edita. Acotado a la pestaña de área actual: si una cadena
+  // cruzara áreas (caso raro), la mesa que no está en esta pestaña
+  // simplemente no dibuja su tramo de línea.
   const gruposMap = new Map<number, MesaEditable[]>()
-  for (const mesa of mesas) {
+  for (const mesa of mesasDelArea) {
     if (!mesa.pedidoActivoId) continue
     const arr = gruposMap.get(mesa.pedidoActivoId) ?? []
     arr.push(mesa)
@@ -354,17 +414,51 @@ export function LienzoMesasEditor({
     }
   })
 
-  const mesaSeleccionada = seleccionId !== null ? mesas.find((m) => m.id === seleccionId) : undefined
+  const mesaSeleccionada = seleccionId !== null ? mesasDelArea.find((m) => m.id === seleccionId) : undefined
   const posicionSeleccionada = seleccionId !== null ? posiciones[seleccionId] : undefined
 
   return (
     <div className="min-h-full bg-s2">
-      <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
+      <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-0">
         <BotonRegresarMas />
-        <h1 className="mt-1 text-[20px] font-bold leading-tight">Mapa de mesas</h1>
-        <p className="mt-0.5 text-[13px] text-text-3">
+        <h1 className="mt-1 text-[20px] font-bold leading-tight pb-3">Mapa de mesas</h1>
+        <p className="pb-3 text-[13px] text-text-3">
           Arrastra cada mesa a su lugar · tócala para editar forma, tamaño y rotación
         </p>
+
+        {/* Pestañas de área — una por fila de `areas`, más "Sin área" y
+            "+ Nueva área" (crea directo desde aquí, sin ir a Catálogo). */}
+        <div className="flex overflow-x-auto scrollbar-none">
+          {areas.map((a) => (
+            <button
+              key={a.id}
+              onClick={() => seleccionarArea(a.id)}
+              className={`flex-shrink-0 px-1 py-2.5 text-[13px] font-semibold border-b-2 transition-colors mr-4 ${
+                areaSeleccionada === a.id
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-text-3'
+              }`}
+            >
+              {a.nombre}
+            </button>
+          ))}
+          <button
+            onClick={() => seleccionarArea('sin_area')}
+            className={`flex-shrink-0 px-1 py-2.5 text-[13px] font-semibold border-b-2 transition-colors mr-4 ${
+              areaSeleccionada === 'sin_area'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-text-3'
+            }`}
+          >
+            Sin área
+          </button>
+          <button
+            onClick={() => setSheetAreaOpen(true)}
+            className="flex-shrink-0 px-1 py-2.5 text-[13px] font-semibold text-blue-600"
+          >
+            + Nueva área
+          </button>
+        </div>
       </div>
 
       <div className="px-4 py-4 space-y-3">
@@ -373,6 +467,10 @@ export function LienzoMesasEditor({
             <p className="text-sm text-text-3">
               No hay mesas activas. Agrégalas desde Más → Catálogo.
             </p>
+          </div>
+        ) : mesasDelArea.length === 0 ? (
+          <div className="rounded-2xl bg-white shadow-card px-4 py-8 text-center">
+            <p className="text-sm text-text-3">No hay mesas en esta área.</p>
           </div>
         ) : (
           <>
@@ -419,7 +517,7 @@ export function LienzoMesasEditor({
                     </svg>
                   )}
 
-                  {mesas.map((mesa) => (
+                  {mesasDelArea.map((mesa) => (
                     <MesaDraggable
                       key={mesa.id}
                       mesa={mesa}
@@ -503,6 +601,59 @@ export function LienzoMesasEditor({
         )}
 
         <div className="h-2" />
+      </div>
+
+      {/* Sheet Nueva área */}
+      <div
+        className={`fixed inset-0 z-[60] bg-black/40 transition-opacity duration-200 ${
+          sheetAreaOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        onClick={() => {
+          if (creandoArea) return
+          setSheetAreaOpen(false)
+          setErrorArea(null)
+        }}
+      />
+      <div
+        className={`fixed bottom-0 left-0 right-0 z-[60] flex max-h-[85vh] flex-col rounded-t-[20px] bg-white transition-transform duration-300 ease-out ${
+          sheetAreaOpen ? 'translate-y-0' : 'translate-y-full'
+        }`}
+      >
+        <div className="mx-auto mt-3 h-1 w-10 flex-shrink-0 rounded-full bg-s3" />
+        <div className="flex-shrink-0 border-b border-[#E5E5EA] px-5 py-4">
+          <h2 className="text-[17px] font-bold">Nueva área</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">Nombre</p>
+          <input
+            type="text"
+            value={nuevaAreaNombre}
+            onChange={(e) => setNuevaAreaNombre(e.target.value)}
+            placeholder="Ej. Terraza"
+            className="w-full rounded-xl border-[1.5px] border-[#D1D1D6] px-4 py-3 text-[16px] font-semibold"
+          />
+          {errorArea && (
+            <p className="rounded-card bg-red-50 px-4 py-3 text-sm text-red-600">{errorArea}</p>
+          )}
+        </div>
+        <div className="flex-shrink-0 border-t border-[#E5E5EA] px-4 pb-[calc(env(safe-area-inset-bottom,0px)+14px)] pt-3.5 space-y-2">
+          <button
+            onClick={handleCrearArea}
+            disabled={creandoArea}
+            className="w-full rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+          >
+            {creandoArea ? 'Creando…' : 'Crear área'}
+          </button>
+          <button
+            onClick={() => {
+              setSheetAreaOpen(false)
+              setErrorArea(null)
+            }}
+            className="w-full rounded-xl bg-s2 py-[14px] text-sm font-semibold text-text-2 active:scale-[.98]"
+          >
+            Cancelar
+          </button>
+        </div>
       </div>
     </div>
   )
