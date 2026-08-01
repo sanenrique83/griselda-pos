@@ -721,6 +721,97 @@ export async function guardarComboComponentes(
   revalidatePath('/dashboard')
 }
 
+// ─── Combo (slots electivos) ────────────────────────────────────────────────
+// F7-04: a diferencia de los componentes fijos (combo_productos), un slot deja
+// que el cliente elija un producto entre varias opciones (ej. "Bebida a
+// elegir"). combo_slot_opciones tiene ON DELETE CASCADE hacia combo_slots, así
+// que borrar un slot limpia sus opciones automáticamente.
+
+export type ComboSlotData = {
+  id: number
+  nombre: string
+  requerido: boolean
+  opciones: { productoId: number; nombre: string }[]
+}
+
+export async function cargarComboSlots(
+  comboId: number,
+): Promise<{ slots: ComboSlotData[] } | Err> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('combo_slots')
+    .select('id, nombre, requerido, combo_slot_opciones(producto_id, productos(nombre))')
+    .eq('combo_id', comboId)
+    .order('id')
+  if (error) return { error: 'Error al cargar los slots del combo.' }
+  return {
+    slots: (data ?? []).map((s: any) => ({
+      id: s.id,
+      nombre: s.nombre,
+      requerido: s.requerido,
+      opciones: (s.combo_slot_opciones ?? []).map((o: any) => ({
+        productoId: o.producto_id,
+        nombre: o.productos?.nombre ?? '',
+      })),
+    })),
+  }
+}
+
+// "Set" completo, misma semántica que guardarGrupoPadres: borra todos los
+// combo_slots existentes de este combo (cascada a combo_slot_opciones) y
+// reinserta los del arreglo recibido.
+export async function guardarComboSlots(
+  comboId: number,
+  slots: { nombre: string; requerido: boolean; productoIds: number[] }[],
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  if (slots.some((s) => s.productoIds.includes(comboId))) {
+    return { error: 'Un combo no puede incluirse a sí mismo como opción de un slot.' }
+  }
+
+  const todosProductoIds = Array.from(new Set(slots.flatMap((s) => s.productoIds)))
+  if (todosProductoIds.length > 0) {
+    const { data: candidatos, error: errCandidatos } = await supabase
+      .from('productos')
+      .select('id, es_combo')
+      .in('id', todosProductoIds)
+    if (errCandidatos) return { error: 'Error al validar las opciones de los slots.' }
+    if ((candidatos ?? []).some((p) => p.es_combo)) {
+      return { error: 'Un combo no puede incluir a otro combo como opción de un slot.' }
+    }
+  }
+
+  const { error: errDelete } = await supabase
+    .from('combo_slots')
+    .delete()
+    .eq('combo_id', comboId)
+  if (errDelete) return { error: 'Error al actualizar los slots del combo.' }
+
+  for (const slot of slots) {
+    const { data: nuevo, error: errInsert } = await supabase
+      .from('combo_slots')
+      .insert({ combo_id: comboId, nombre: slot.nombre, requerido: slot.requerido })
+      .select('id')
+      .single()
+    if (errInsert || !nuevo) return { error: 'Error al guardar los slots del combo.' }
+
+    if (slot.productoIds.length > 0) {
+      const { error: errOpciones } = await supabase.from('combo_slot_opciones').insert(
+        slot.productoIds.map((productoId) => ({
+          slot_id: nuevo.id,
+          producto_id: productoId,
+        })),
+      )
+      if (errOpciones) return { error: 'Error al guardar las opciones de los slots.' }
+    }
+  }
+
+  revalidatePath('/mas/catalogo')
+  revalidatePath('/mas/recetario')
+  revalidatePath('/dashboard')
+}
+
 // ─── Costeo ───────────────────────────────────────────────────────────────────
 // Envuelven las funciones SQL costo_insumos_actual() y margen_productos()
 // (migración 20260726000005) — el cálculo vive en la BD para que el costo de

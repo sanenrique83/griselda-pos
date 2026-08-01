@@ -6,6 +6,8 @@ import {
   guardarReceta,
   cargarComboComponentes,
   guardarComboComponentes,
+  cargarComboSlots,
+  guardarComboSlots,
   obtenerCostosInsumos,
   obtenerMargenProductos,
 } from '@/app/(app)/mas/catalogo/actions'
@@ -39,12 +41,23 @@ type LineaComponente = {
   cantidad: string
 }
 
+type LineaSlot = {
+  key: string
+  nombre: string
+  requerido: boolean
+  productoIds: number[]
+}
+
 function nuevaLineaInsumo(): LineaInsumo {
   return { key: Math.random().toString(36).slice(2), insumoId: '', cantidad: '' }
 }
 
 function nuevaLineaComponente(): LineaComponente {
   return { key: Math.random().toString(36).slice(2), productoId: '', cantidad: '1' }
+}
+
+function nuevaLineaSlot(): LineaSlot {
+  return { key: Math.random().toString(36).slice(2), nombre: '', requerido: true, productoIds: [] }
 }
 
 function fmtMoney(n: number) {
@@ -83,6 +96,12 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
     Map<number, { costo: number | null; completo: boolean }>
   >(new Map())
 
+  // Combo (slots electivos)
+  const [lineasSlot, setLineasSlot] = useState<LineaSlot[]>([])
+  const [isPendingSlots, startTransitionSlots] = useTransition()
+  const [errorSlots, setErrorSlots] = useState<string | null>(null)
+  const [savedSlots, setSavedSlots] = useState(false)
+
   const insumoMap = new Map(insumos.map((i) => [i.id, i]))
   const candidatosCombo = productos.filter((p) => !p.es_combo && p.id !== producto.id)
 
@@ -90,10 +109,15 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
     setLoading(true)
     setError(null)
     setSaved(false)
+    setErrorSlots(null)
+    setSavedSlots(false)
 
     if (producto.es_combo) {
-      Promise.all([cargarComboComponentes(producto.id), obtenerMargenProductos()]).then(
-        ([comboRes, margenRes]) => {
+      Promise.all([
+        cargarComboComponentes(producto.id),
+        obtenerMargenProductos(),
+        cargarComboSlots(producto.id),
+      ]).then(([comboRes, margenRes, slotsRes]) => {
           if ('error' in comboRes) { setError(comboRes.error); setLoading(false); return }
           setLineasComponente(
             comboRes.componentes.length > 0
@@ -107,6 +131,16 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
           if (!('error' in margenRes)) {
             setCostosProducto(
               new Map(margenRes.margenes.map((m) => [m.productoId, { costo: m.costo, completo: m.costoCompleto }])),
+            )
+          }
+          if (!('error' in slotsRes)) {
+            setLineasSlot(
+              slotsRes.slots.map((s) => ({
+                key: Math.random().toString(36).slice(2),
+                nombre: s.nombre,
+                requerido: s.requerido,
+                productoIds: s.opciones.map((o) => o.productoId),
+              })),
             )
           }
           setLoading(false)
@@ -315,6 +349,28 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
     })
   }
 
+  function handleGuardarSlots() {
+    setErrorSlots(null)
+    setSavedSlots(false)
+
+    if (lineasSlot.some((s) => !s.nombre.trim())) {
+      setErrorSlots('Ingresa un nombre para cada slot.')
+      return
+    }
+
+    const items = lineasSlot.map((s) => ({
+      nombre: s.nombre.trim(),
+      requerido: s.requerido,
+      productoIds: s.productoIds,
+    }))
+
+    startTransitionSlots(async () => {
+      const result = await guardarComboSlots(producto.id, items)
+      if (result?.error) { setErrorSlots(result.error); return }
+      setSavedSlots(true)
+    })
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -417,6 +473,126 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
               >
                 {isPending ? 'Guardando…' : 'Guardar componentes'}
               </button>
+
+              {/* ── Slots electivos (F7-04): el cliente elige un producto por
+                  slot al pedir el combo — independiente de los componentes
+                  fijos de arriba. ────────────────────────────────────────── */}
+              <div className="border-t border-[#F2F2F7] pt-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                  Slots electivos (el cliente elige)
+                </p>
+
+                {errorSlots && (
+                  <div className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{errorSlots}</div>
+                )}
+
+                {candidatosCombo.length === 0 && (
+                  <p className="mb-2 text-[13px] text-text-4">
+                    No hay productos disponibles para usar como opciones — deben ser productos
+                    normales (no combos).
+                  </p>
+                )}
+
+                <div className="space-y-3">
+                  {lineasSlot.map((s) => (
+                    <div key={s.key} className="space-y-2 rounded-xl border-[1.5px] border-border bg-white p-3">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={s.nombre}
+                          onChange={(e) =>
+                            setLineasSlot((prev) =>
+                              prev.map((x) => (x.key === s.key ? { ...x, nombre: e.target.value } : x)),
+                            )
+                          }
+                          placeholder="Ej: Bebida a elegir"
+                          className="min-w-0 flex-1 rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[12px] outline-none focus:border-blue-500"
+                        />
+                        <button
+                          onClick={() => setLineasSlot((prev) => prev.filter((x) => x.key !== s.key))}
+                          className="flex-shrink-0 text-[13px] text-red-500 active:opacity-60"
+                        >
+                          ×
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-[12px] text-text-2">Requerido</span>
+                        <button
+                          onClick={() =>
+                            setLineasSlot((prev) =>
+                              prev.map((x) => (x.key === s.key ? { ...x, requerido: !x.requerido } : x)),
+                            )
+                          }
+                          className={`relative h-[24px] w-[42px] rounded-full transition-colors duration-200 ${
+                            s.requerido ? 'bg-blue-600' : 'bg-[#D1D1D6]'
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-[3px] h-[18px] w-[18px] rounded-full bg-white shadow transition-transform duration-200 ${
+                              s.requerido ? 'translate-x-[21px]' : 'translate-x-[3px]'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-[11px] text-text-3">Opciones que puede elegir</label>
+                        <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border-[1.5px] border-border bg-s2 p-2">
+                          {candidatosCombo.map((p) => (
+                            <label key={p.id} className="flex items-center gap-2 px-1 py-1 text-[12px]">
+                              <input
+                                type="checkbox"
+                                checked={s.productoIds.includes(p.id)}
+                                onChange={() =>
+                                  setLineasSlot((prev) =>
+                                    prev.map((x) =>
+                                      x.key === s.key
+                                        ? {
+                                            ...x,
+                                            productoIds: x.productoIds.includes(p.id)
+                                              ? x.productoIds.filter((id) => id !== p.id)
+                                              : [...x.productoIds, p.id],
+                                          }
+                                        : x,
+                                    ),
+                                  )
+                                }
+                                className="h-4 w-4 rounded border-border"
+                              />
+                              <span className="text-text-2">{p.nombre}</span>
+                            </label>
+                          ))}
+                        </div>
+                        {s.productoIds.length < 2 && (
+                          <p className="mt-1 text-[11px] text-amber-600">
+                            ⚠ Con menos de 2 opciones, este slot no le da ninguna opción real al cliente.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setLineasSlot((prev) => [...prev, nuevaLineaSlot()])}
+                  className="mt-2 w-full rounded-lg border-[1.5px] border-dashed border-[#D1D1D6] py-2 text-[12px] font-semibold text-text-3 active:bg-s2"
+                >
+                  + Agregar slot electivo
+                </button>
+
+                {savedSlots && (
+                  <p className="mt-2 text-[12px] font-medium text-green-600">Slots guardados.</p>
+                )}
+
+                <button
+                  onClick={handleGuardarSlots}
+                  disabled={isPendingSlots}
+                  className="mt-2 w-full rounded-xl bg-blue-600 py-2.5 text-[13px] font-bold text-white active:opacity-80 disabled:opacity-40"
+                >
+                  {isPendingSlots ? 'Guardando…' : 'Guardar slots'}
+                </button>
+              </div>
             </>
           ) : (
             <>
