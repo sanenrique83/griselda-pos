@@ -147,6 +147,10 @@ export interface Producto {
   activo: boolean
   orden: number
   created_at: string
+  // Disponibilidad automática por horario (F9-04), independiente del toggle
+  // manual `disponible` — NULL en ambos = sin restricción.
+  horario_desde: string | null
+  horario_hasta: string | null
 }
 
 export interface ComboProducto {
@@ -198,6 +202,10 @@ export interface OpcionModificador {
   precio_extra: number
   orden: number
   activa: boolean
+  // Disponibilidad automática por horario (F9-04), independiente del
+  // horario del producto que la contiene — NULL en ambos = sin restricción.
+  horario_desde: string | null
+  horario_hasta: string | null
 }
 
 export interface Turno {

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { imprimirTicket, type ItemCancelacion } from '@/lib/print'
 import { anularPedido } from '@/app/(app)/cobro/[pedidoId]/actions'
 import { columnaOrden } from '@/lib/ordenCatalogo'
+import { horaActualMX, dentroDeHorario } from '@/lib/horarioDisponibilidad'
 
 type Err = { error: string }
 
@@ -16,6 +17,9 @@ export type OpcionMod = {
   activa: boolean
   insumo_id: number | null
   orden: number
+  // Disponibilidad automática por horario (F9-04) — NULL en ambos = sin restricción.
+  horario_desde: string | null
+  horario_hasta: string | null
 }
 
 export type GrupoMod = {
@@ -47,9 +51,14 @@ export type GrupoRapido = {
 }
 
 // ─── Cargar modificadores (modo estándar) ─────────────────────────────────────
+// soloDisponiblesAhora=true (default, uso en POS) también excluye opciones
+// fuera de su ventana horaria (F9-04). El editor de Catálogo llama con
+// false para poder ver/editar opciones aunque esté fuera de su horario.
 export async function cargarModificadores(
   productoId: number,
+  opts: { soloDisponiblesAhora?: boolean } = {},
 ): Promise<{ grupos: GrupoMod[] } | Err> {
+  const soloDisponiblesAhora = opts.soloDisponiblesAhora ?? true
   console.log('[cargarModificadores] start → productoId:', productoId, typeof productoId)
   const supabase = await createClient()
 
@@ -63,7 +72,7 @@ export async function cargarModificadores(
   const { data, error } = await supabase
     .from('grupos_modificadores')
     .select(
-      'id, nombre, requerido, minimo, maximo, orden, mostrar_en_rapido, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, orden, insumos!insumo_id(disponible)), grupo_modificador_padres!grupo_id(opcion_id)',
+      'id, nombre, requerido, minimo, maximo, orden, mostrar_en_rapido, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, orden, horario_desde, horario_hasta, insumos!insumo_id(disponible)), grupo_modificador_padres!grupo_id(opcion_id)',
     )
     .eq('producto_id', productoId)
     .eq('activo', true)
@@ -83,6 +92,8 @@ export async function cargarModificadores(
     return { error: `Error al cargar modificadores: ${error.message}` }
   }
 
+  const horaActual = horaActualMX()
+
   const grupos: GrupoMod[] = (data ?? []).map((gr: any) => ({
     id: gr.id,
     nombre: gr.nombre,
@@ -93,7 +104,12 @@ export async function cargarModificadores(
     opciones_padre: (gr.grupo_modificador_padres ?? []).map((p: any) => p.opcion_id),
     mostrar_en_rapido: gr.mostrar_en_rapido ?? false,
     opciones: (gr.opciones_modificador ?? [])
-      .filter((o: any) => o.activa && (o.insumos == null || o.insumos.disponible !== false))
+      .filter(
+        (o: any) =>
+          o.activa &&
+          (o.insumos == null || o.insumos.disponible !== false) &&
+          (!soloDisponiblesAhora || dentroDeHorario(o.horario_desde, o.horario_hasta, horaActual)),
+      )
       .map((o: any) => ({
         id: o.id,
         nombre: o.nombre,
@@ -101,6 +117,8 @@ export async function cargarModificadores(
         activa: o.activa,
         insumo_id: o.insumo_id ?? null,
         orden: o.orden ?? 0,
+        horario_desde: o.horario_desde ?? null,
+        horario_hasta: o.horario_hasta ?? null,
       })),
   }))
 
@@ -144,10 +162,12 @@ export async function cargarGuisados(
 
   const grupoIds = gruposData.map((g: any) => g.id)
 
-  // Query 2: opciones activas de esos grupos (excluye eliminadas e insumos agotados)
+  // Query 2: opciones activas de esos grupos (excluye eliminadas, insumos
+  // agotados, y fuera de su ventana horaria — F9-04, siempre aplica aquí
+  // porque este action es exclusivo de POS, nunca del editor de Catálogo)
   const { data: opcionesData, error: opcionesErr } = await supabase
     .from('opciones_modificador')
-    .select('id, grupo_id, nombre, precio_extra, activa, insumos!insumo_id(disponible)')
+    .select('id, grupo_id, nombre, precio_extra, activa, horario_desde, horario_hasta, insumos!insumo_id(disponible)')
     .in('grupo_id', grupoIds)
     .is('activa', true)
     .order(ordenOpciones.column, { ascending: ordenOpciones.ascending })
@@ -159,12 +179,19 @@ export async function cargarGuisados(
 
   console.log('[cargarGuisados] opciones raw:', JSON.stringify(opcionesData))
 
+  const horaActual = horaActualMX()
+
   // Combinar en código
   const grupos: GrupoRapido[] = gruposData.map((gr: any) => ({
     id: gr.id,
     nombre: gr.nombre,
     opciones: (opcionesData ?? [])
-      .filter((o: any) => o.grupo_id === gr.id && (o.insumos == null || o.insumos.disponible !== false))
+      .filter(
+        (o: any) =>
+          o.grupo_id === gr.id &&
+          (o.insumos == null || o.insumos.disponible !== false) &&
+          dentroDeHorario(o.horario_desde, o.horario_hasta, horaActual),
+      )
       .map((o: any) => ({
         id: o.id,
         nombre: o.nombre,

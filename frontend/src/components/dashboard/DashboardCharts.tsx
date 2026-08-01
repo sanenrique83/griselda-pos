@@ -133,6 +133,10 @@ interface DashboardChartsProps {
   propinaPorMetodo: MetodoPagoData[]
   turnosRecientes: TurnoRecienteData[]
   rendimientoRecetas: RendimientoRecetaData[]
+  /** Ventas del turno agrupadas por categorías.nombre (F9-05) */
+  ventasPorCategoria: PersonaMonto[]
+  /** Ventas del turno agrupadas por categorias.grupo_impresora_id → nombre (F9-05) */
+  ventasPorZona: PersonaMonto[]
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -244,10 +248,14 @@ export function DashboardCharts({
   propinaPorMetodo,
   turnosRecientes,
   rendimientoRecetas,
+  ventasPorCategoria,
+  ventasPorZona,
 }: DashboardChartsProps) {
   const [seleccionado, setSeleccionado] = useState<TopProducto | null>(null)
   const hayHoras = ventasPorHora.some((v) => v.total > 0)
   const hayProd = topProductos.length > 0
+  const hayCategorias = ventasPorCategoria.length > 0
+  const hayZonas = ventasPorZona.length > 0
   const hayMetodos = metodosPago.some((m) => m.monto > 0)
   const hayTipos = tiposPedido.some((t) => t.count > 0)
   const hayDiaSemana = ventasPorDiaSemana.some((v) => v.turnos > 0)
@@ -368,6 +376,28 @@ export function DashboardCharts({
             <p className="px-4 pb-3 text-[10px] text-text-3">
               💡 Toca una barra en azul fuerte para ver el desglose por variante
             </p>
+          )}
+        </div>
+      )}
+
+      {/* ── (b.2) Ventas por categoría y por zona de preparación ────────────── */}
+      {(hayCategorias || hayZonas) && (
+        <div className="grid grid-cols-1 gap-3">
+          {hayCategorias && (
+            <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+              <SectionHeader title="Ventas por categoría" />
+              <div className="px-4 py-3.5">
+                <ListaPersonaMonto items={ventasPorCategoria} color="#3b82f6" />
+              </div>
+            </div>
+          )}
+          {hayZonas && (
+            <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+              <SectionHeader title="Ventas por zona de preparación" />
+              <div className="px-4 py-3.5">
+                <ListaPersonaMonto items={ventasPorZona} color="#10b981" />
+              </div>
+            </div>
           )}
         </div>
       )}

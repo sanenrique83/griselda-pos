@@ -4,6 +4,7 @@ import { PosShell } from '@/components/pos/PosShell'
 import type { MesaOcupada } from '@/components/pos/SheetUnirMesa'
 import type { MesaLibre } from '@/components/pos/SheetMoverMesa'
 import { columnaOrden } from '@/lib/ordenCatalogo'
+import { horaActualMX, dentroDeHorario } from '@/lib/horarioDisponibilidad'
 import type { TicketConfig } from '@/lib/print'
 import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
 
@@ -58,6 +59,8 @@ export type ProductoCatalogo = {
   descripcion: string | null
   precio: number
   emoji: string | null
+  // Ya combina el toggle manual con la ventana horaria del producto (F9-04)
+  // — si cualquiera de las dos lo marca no disponible, esto es false.
   disponible: boolean
   modo_captura: 'estandar' | 'rapido'
   categoria_id: number
@@ -246,7 +249,7 @@ export default async function PosPage({
     supabase
       .from('productos')
       .select(
-        'id, nombre, descripcion, precio, emoji, disponible, modo_captura, categoria_id, es_combo',
+        'id, nombre, descripcion, precio, emoji, disponible, modo_captura, categoria_id, es_combo, horario_desde, horario_hasta',
       )
       .eq('activo', true)
       .order(ordenProductos.column, { ascending: ordenProductos.ascending }),
@@ -350,13 +353,15 @@ export default async function PosPage({
         : 'Para llevar'
 
   const categorias: CategoriaPOS[] = rawCategorias ?? []
+  const horaActual = horaActualMX()
   const productos: ProductoCatalogo[] = (rawProductos ?? []).map((p: any) => ({
     id: p.id,
     nombre: p.nombre,
     descripcion: p.descripcion ?? null,
     precio: p.precio,
     emoji: p.emoji ?? null,
-    disponible: p.disponible,
+    disponible:
+      p.disponible && dentroDeHorario(p.horario_desde ?? null, p.horario_hasta ?? null, horaActual),
     modo_captura: p.modo_captura ?? 'estandar',
     categoria_id: p.categoria_id,
     es_combo: p.es_combo ?? false,

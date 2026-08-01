@@ -15,6 +15,7 @@ import type {
   TurnoRecienteData,
   RendimientoPunto,
   RendimientoRecetaData,
+  PersonaMonto,
 } from '@/components/dashboard/DashboardCharts'
 
 // ─── Fechas de temporada alta (puentes / fines de semana largo) ──────────────
@@ -390,13 +391,17 @@ export default async function DashboardPage() {
   const promedioTicket = pedidosCerrados > 0 ? totalCobrado / pedidosCerrados : 0
 
   // ── Top 10 productos (con desglose por variante/modificador) ─────────────
+  // También alimenta el desglose por categoría (F9-05) y por zona de
+  // preparación (F9-05), del mismo turno — sin query adicional.
   let topProductos: TopProducto[] = []
+  let ventasPorCategoria: PersonaMonto[] = []
+  let ventasPorZona: PersonaMonto[] = []
 
   if (subIds.length > 0) {
     const { data: rawProds } = await supabase
       .from('pedido_productos')
       .select(
-        'cantidad, precio_unit, productos(id, nombre, emoji), pedido_producto_opciones(precio_extra, opciones_modificador(nombre))',
+        'cantidad, precio_unit, productos(id, nombre, emoji, categorias(nombre, grupos_impresora(nombre))), pedido_producto_opciones(precio_extra, opciones_modificador(nombre))',
       )
       .in('subpedido_id', subIds)
       .neq('estado', 'cancelado')
@@ -404,6 +409,8 @@ export default async function DashboardPage() {
     const topMap = new Map<number, TopProducto>()
     // variantesMap: producto_id -> Map<nombreVariante, {vendidos, total}>
     const variantesMap = new Map<number, Map<string, { vendidos: number; total: number }>>()
+    const categoriaMap = new Map<string, { count: number; monto: number }>()
+    const zonaMap = new Map<string, { count: number; monto: number }>()
 
     for (const pp of rawProds ?? []) {
       const prod = (pp as any).productos
@@ -440,6 +447,22 @@ export default async function DashboardPage() {
         total: varEntry.total + lineTotal,
       })
       variantesMap.set(prod.id, varMap)
+
+      // Por categoría (F9-05)
+      const categoriaNombre = prod.categorias?.nombre ?? 'Sin categoría'
+      const catEntry = categoriaMap.get(categoriaNombre) ?? { count: 0, monto: 0 }
+      categoriaMap.set(categoriaNombre, {
+        count: catEntry.count + cantidad,
+        monto: catEntry.monto + lineTotal,
+      })
+
+      // Por zona de preparación (F9-05) — categorías.grupo_impresora_id
+      const zonaNombre = prod.categorias?.grupos_impresora?.nombre ?? 'Sin zona asignada'
+      const zonaEntry = zonaMap.get(zonaNombre) ?? { count: 0, monto: 0 }
+      zonaMap.set(zonaNombre, {
+        count: zonaEntry.count + cantidad,
+        monto: zonaEntry.monto + lineTotal,
+      })
     }
 
     topProductos = [...topMap.entries()]
@@ -455,6 +478,14 @@ export default async function DashboardPage() {
       })
       .sort((a, b) => b.vendidos - a.vendidos)
       .slice(0, 10)
+
+    ventasPorCategoria = [...categoriaMap.entries()]
+      .map(([nombre, v]) => ({ nombre, count: v.count, monto: v.monto }))
+      .sort((a, b) => b.monto - a.monto)
+
+    ventasPorZona = [...zonaMap.entries()]
+      .map(([nombre, v]) => ({ nombre, count: v.count, monto: v.monto }))
+      .sort((a, b) => b.monto - a.monto)
   }
 
   // ── Ventas por franja horaria ─────────────────────────────────────────────
@@ -761,6 +792,8 @@ export default async function DashboardPage() {
             propinaPorMetodo={propinaPorMetodo}
             turnosRecientes={turnosRecientes}
             rendimientoRecetas={rendimientoRecetas}
+            ventasPorCategoria={ventasPorCategoria}
+            ventasPorZona={ventasPorZona}
           />
         ) : (
           <div className="rounded-2xl border border-[#E5E5EA] bg-white px-4 py-8 text-center">

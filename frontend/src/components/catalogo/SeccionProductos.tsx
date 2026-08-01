@@ -32,6 +32,8 @@ type OpcionLocal = {
   precio_extra: number
   activa: boolean
   insumo_id: number | null
+  horario_desde: string | null
+  horario_hasta: string | null
 }
 
 type GrupoLocal = {
@@ -91,6 +93,9 @@ export function SeccionProductos({
   const [formCat, setFormCat] = useState<number>(categorias[0]?.id ?? 0)
   const [formModo, setFormModo] = useState<'estandar' | 'rapido'>('estandar')
   const [formEsCombo, setFormEsCombo] = useState(false)
+  // Disponibilidad automática por horario (F9-04) — '' = sin restricción
+  const [formHorarioDesde, setFormHorarioDesde] = useState('')
+  const [formHorarioHasta, setFormHorarioHasta] = useState('')
 
   // Imagen
   const [imgFile, setImgFile] = useState<File | null>(null)
@@ -120,6 +125,9 @@ export function SeccionProductos({
   const [foNombre, setFoNombre] = useState('')
   const [foPrecio, setFoPrecio] = useState('')
   const [foInsumoId, setFoInsumoId] = useState<number | null>(null)
+  // Disponibilidad automática por horario (F9-04) — '' = sin restricción
+  const [foHorarioDesde, setFoHorarioDesde] = useState('')
+  const [foHorarioHasta, setFoHorarioHasta] = useState('')
 
   // ── Abrir / cerrar sheet ───────────────────────────────────────────────────
 
@@ -142,12 +150,16 @@ export function SeccionProductos({
       setFormCat(mode.prod.categoria_id)
       setFormModo(mode.prod.modo_captura)
       setFormEsCombo(mode.prod.es_combo)
+      setFormHorarioDesde(mode.prod.horario_desde?.slice(0, 5) ?? '')
+      setFormHorarioHasta(mode.prod.horario_hasta?.slice(0, 5) ?? '')
       setExistingFotoUrl(mode.prod.foto_url ?? null)
       setImgPreview(mode.prod.foto_url ?? null)
 
-      // Cargar grupos del producto
+      // Cargar grupos del producto — soloDisponiblesAhora: false para que el
+      // editor muestre también opciones fuera de su horario (F9-04), en vez
+      // de esconderlas como hace la vista de POS.
       setLoadingGrupos(true)
-      cargarModificadores(mode.prod.id).then((result) => {
+      cargarModificadores(mode.prod.id, { soloDisponiblesAhora: false }).then((result) => {
         if ('error' in result) { setLoadingGrupos(false); return }
         setGrupos(
           result.grupos.map((g) => ({
@@ -171,6 +183,8 @@ export function SeccionProductos({
       setFormCat(filtroCat ?? categorias[0]?.id ?? 0)
       setFormModo('estandar')
       setFormEsCombo(false)
+      setFormHorarioDesde('')
+      setFormHorarioHasta('')
       setExistingFotoUrl(null)
       setLoadingGrupos(false)
     }
@@ -203,7 +217,13 @@ export function SeccionProductos({
     if (!formNombre.trim()) { setError('Ingresa un nombre.'); return }
     const precio = parseFloat(formPrecio)
     if (isNaN(precio) || precio < 0) { setError('Precio inválido.'); return }
+    if (!!formHorarioDesde !== !!formHorarioHasta) {
+      setError('Para restringir por horario, define tanto "desde" como "hasta".')
+      return
+    }
     setError(null)
+    const horarioDesde = formHorarioDesde || null
+    const horarioHasta = formHorarioHasta || null
 
     if (sheet.tipo === 'nuevo') {
       startTransition(async () => {
@@ -224,6 +244,8 @@ export function SeccionProductos({
           foto_url: fotoUrl,
           modo_captura: formModo,
           es_combo: formEsCombo,
+          horario_desde: horarioDesde,
+          horario_hasta: horarioHasta,
         })
         if ('error' in result) { setError(result.error); return }
         router.refresh()
@@ -249,6 +271,8 @@ export function SeccionProductos({
           categoria_id: formCat,
           modo_captura: formModo,
           es_combo: formEsCombo,
+          horario_desde: horarioDesde,
+          horario_hasta: horarioHasta,
         })
         if (result?.error) { setError(result.error); return }
         const catNombre = categorias.find((c) => c.id === formCat)?.nombre ?? ''
@@ -266,6 +290,8 @@ export function SeccionProductos({
                   categoria_nombre: catNombre,
                   modo_captura: formModo,
                   es_combo: formEsCombo,
+                  horario_desde: horarioDesde,
+                  horario_hasta: horarioHasta,
                 }
               : p,
           ),
@@ -462,6 +488,8 @@ export function SeccionProductos({
     setFoNombre('')
     setFoPrecio('')
     setFoInsumoId(null)
+    setFoHorarioDesde('')
+    setFoHorarioHasta('')
     setGrupoError(null)
   }
 
@@ -471,17 +499,30 @@ export function SeccionProductos({
     setFoNombre(opcion.nombre)
     setFoPrecio(opcion.precio_extra ? opcion.precio_extra.toString() : '')
     setFoInsumoId(null)
+    setFoHorarioDesde(opcion.horario_desde?.slice(0, 5) ?? '')
+    setFoHorarioHasta(opcion.horario_hasta?.slice(0, 5) ?? '')
     setGrupoError(null)
   }
 
   function handleGuardarOpcion(grupoId: number) {
     if (!foNombre.trim()) return
+    if (!!foHorarioDesde !== !!foHorarioHasta) {
+      setGrupoError('Para restringir por horario, define tanto "desde" como "hasta".')
+      return
+    }
+    const horarioDesde = foHorarioDesde || null
+    const horarioHasta = foHorarioHasta || null
     if (opEditandoId) {
       const id = opEditandoId
       const nombre = foNombre.trim()
       const precio_extra = parseFloat(foPrecio) || 0
       startGrupoTransition(async () => {
-        const result = await actualizarOpcion(id, { nombre, precio_extra })
+        const result = await actualizarOpcion(id, {
+          nombre,
+          precio_extra,
+          horario_desde: horarioDesde,
+          horario_hasta: horarioHasta,
+        })
         if (result?.error) { setGrupoError(result.error); return }
         setGrupos((prev) =>
           prev.map((g) =>
@@ -489,7 +530,9 @@ export function SeccionProductos({
               ? {
                   ...g,
                   opciones: g.opciones.map((o) =>
-                    o.id === id ? { ...o, nombre, precio_extra } : o,
+                    o.id === id
+                      ? { ...o, nombre, precio_extra, horario_desde: horarioDesde, horario_hasta: horarioHasta }
+                      : o,
                   ),
                 }
               : g,
@@ -498,6 +541,8 @@ export function SeccionProductos({
         setFoNombre('')
         setFoPrecio('')
         setFoInsumoId(null)
+        setFoHorarioDesde('')
+        setFoHorarioHasta('')
         setOpFormId(null)
         setOpEditandoId(null)
       })
@@ -508,12 +553,20 @@ export function SeccionProductos({
 
   function handleCrearOpcion(grupoId: number) {
     if (!foNombre.trim()) return
+    if (!!foHorarioDesde !== !!foHorarioHasta) {
+      setGrupoError('Para restringir por horario, define tanto "desde" como "hasta".')
+      return
+    }
+    const horarioDesde = foHorarioDesde || null
+    const horarioHasta = foHorarioHasta || null
     startGrupoTransition(async () => {
       const result = await crearOpcion({
         grupoId,
         nombre: foNombre.trim(),
         precio_extra: parseFloat(foPrecio) || 0,
         insumoId: foInsumoId,
+        horario_desde: horarioDesde,
+        horario_hasta: horarioHasta,
       })
       if ('error' in result) { setGrupoError(result.error); return }
       setGrupos((prev) =>
@@ -529,6 +582,8 @@ export function SeccionProductos({
                     precio_extra: parseFloat(foPrecio) || 0,
                     activa: true,
                     insumo_id: foInsumoId,
+                    horario_desde: horarioDesde,
+                    horario_hasta: horarioHasta,
                   },
                 ],
               }
@@ -538,6 +593,8 @@ export function SeccionProductos({
       setFoNombre('')
       setFoPrecio('')
       setFoInsumoId(null)
+      setFoHorarioDesde('')
+      setFoHorarioHasta('')
       setOpFormId(null)
     })
   }
@@ -885,6 +942,41 @@ export function SeccionProductos({
             </button>
           </div>
 
+          {/* Disponibilidad automática por horario (F9-04) */}
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-3">
+              Horario de disponibilidad (opcional)
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="time"
+                value={formHorarioDesde}
+                onChange={(e) => setFormHorarioDesde(e.target.value)}
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+              />
+              <span className="text-text-3">–</span>
+              <input
+                type="time"
+                value={formHorarioHasta}
+                onChange={(e) => setFormHorarioHasta(e.target.value)}
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+              />
+              {(formHorarioDesde || formHorarioHasta) && (
+                <button
+                  type="button"
+                  onClick={() => { setFormHorarioDesde(''); setFormHorarioHasta('') }}
+                  className="flex-shrink-0 text-[12px] font-medium text-red-500 active:opacity-60"
+                >
+                  Quitar
+                </button>
+              )}
+            </div>
+            <p className="mt-1 text-[11px] text-text-4">
+              Fuera de este rango el producto se muestra como agotado en el POS, sin importar el
+              toggle de disponible. Vacío = sin restricción de horario.
+            </p>
+          </div>
+
           {/* ── Modificadores (solo en editar) ──────────────────────────── */}
           {sheet.tipo === 'editar' && (
             <div className="border-t border-[#E5E5EA] pt-4">
@@ -1035,30 +1127,56 @@ export function SeccionProductos({
                           placeholder="Nombre de la opción"
                           className="w-full rounded-lg border-[1.5px] border-border bg-white px-3 py-2 text-[13px] outline-none focus:border-blue-500"
                         />
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-[11px] text-text-3">
-                              +$
-                            </span>
+                        <div className="relative flex-1">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-[11px] text-text-3">
+                            +$
+                          </span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            min={0}
+                            step="0.50"
+                            value={foPrecio}
+                            onChange={(e) => setFoPrecio(e.target.value)}
+                            placeholder="0.00"
+                            className="w-full rounded-lg border-[1.5px] border-border bg-white py-2 pl-8 pr-3 font-mono text-[13px] outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        {/* Disponibilidad automática por horario (F9-04) */}
+                        <div>
+                          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                            Horario de disponibilidad (opcional)
+                          </label>
+                          <div className="flex items-center gap-1.5">
                             <input
-                              type="number"
-                              inputMode="decimal"
-                              min={0}
-                              step="0.50"
-                              value={foPrecio}
-                              onChange={(e) => setFoPrecio(e.target.value)}
-                              placeholder="0.00"
-                              className="w-full rounded-lg border-[1.5px] border-border bg-white py-2 pl-8 pr-3 font-mono text-[13px] outline-none focus:border-blue-500"
+                              type="time"
+                              value={foHorarioDesde}
+                              onChange={(e) => setFoHorarioDesde(e.target.value)}
+                              className="w-full rounded-lg border-[1.5px] border-border bg-white px-2 py-2 text-[13px] outline-none focus:border-blue-500"
+                            />
+                            <span className="text-text-3">–</span>
+                            <input
+                              type="time"
+                              value={foHorarioHasta}
+                              onChange={(e) => setFoHorarioHasta(e.target.value)}
+                              className="w-full rounded-lg border-[1.5px] border-border bg-white px-2 py-2 text-[13px] outline-none focus:border-blue-500"
                             />
                           </div>
+                        </div>
+                        <div className="flex gap-2">
                           <button
                             onClick={() => handleGuardarOpcion(grupo.id)}
-                            className="rounded-lg bg-blue-600 px-3 py-2 text-[13px] font-semibold text-white active:opacity-80"
+                            className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-[13px] font-semibold text-white active:opacity-80"
                           >
                             {opEditandoId ? 'Guardar' : 'Agregar'}
                           </button>
                           <button
-                            onClick={() => { setOpFormId(null); setOpEditandoId(null) }}
+                            onClick={() => {
+                              setOpFormId(null)
+                              setOpEditandoId(null)
+                              setFoHorarioDesde('')
+                              setFoHorarioHasta('')
+                            }}
                             className="rounded-lg bg-s2 px-3 py-2 text-[13px] font-semibold text-text-3 active:opacity-80"
                           >
                             ✕

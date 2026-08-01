@@ -165,6 +165,8 @@ export async function crearProducto(data: {
   foto_url?: string | null
   modo_captura?: 'estandar' | 'rapido'
   es_combo?: boolean
+  horario_desde?: string | null
+  horario_hasta?: string | null
 }): Promise<{ id: number } | Err> {
   const supabase = await createClient()
   const { data: prod, error } = await supabase
@@ -178,6 +180,8 @@ export async function crearProducto(data: {
       foto_url: data.foto_url ?? null,
       modo_captura: data.modo_captura ?? 'estandar',
       es_combo: data.es_combo ?? false,
+      horario_desde: data.horario_desde ?? null,
+      horario_hasta: data.horario_hasta ?? null,
       activo: true,
       disponible: true,
       orden: 99,
@@ -224,6 +228,8 @@ export async function actualizarProducto(
     categoria_id?: number
     modo_captura?: 'estandar' | 'rapido'
     es_combo?: boolean
+    horario_desde?: string | null
+    horario_hasta?: string | null
   },
 ): Promise<Err | undefined> {
   const supabase = await createClient()
@@ -355,6 +361,8 @@ export async function crearOpcion(data: {
   precio_extra?: number
   orden?: number
   insumoId?: number | null
+  horario_desde?: string | null
+  horario_hasta?: string | null
 }): Promise<{ id: number } | Err> {
   const supabase = await createClient()
   const { data: op, error } = await supabase
@@ -365,6 +373,8 @@ export async function crearOpcion(data: {
       precio_extra: data.precio_extra ?? 0,
       orden: data.orden ?? 99,
       insumo_id: data.insumoId ?? null,
+      horario_desde: data.horario_desde ?? null,
+      horario_hasta: data.horario_hasta ?? null,
     })
     .select('id')
     .single()
@@ -374,7 +384,13 @@ export async function crearOpcion(data: {
 
 export async function actualizarOpcion(
   id: number,
-  patch: { nombre?: string; precio_extra?: number; orden?: number },
+  patch: {
+    nombre?: string
+    precio_extra?: number
+    orden?: number
+    horario_desde?: string | null
+    horario_hasta?: string | null
+  },
 ): Promise<Err | undefined> {
   const supabase = await createClient()
   const { error } = await supabase
