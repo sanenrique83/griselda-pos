@@ -5,6 +5,7 @@ import { imprimirTicket, type ItemCancelacion } from '@/lib/print'
 import { anularPedido } from '@/app/(app)/cobro/[pedidoId]/actions'
 import { columnaOrden } from '@/lib/ordenCatalogo'
 import { horaActualMX, dentroDeHorario } from '@/lib/horarioDisponibilidad'
+import { liberarUnaMesaSatelite } from '@/lib/mesasSatelite'
 
 type Err = { error: string }
 
@@ -823,6 +824,69 @@ export async function moverPedidoDeMesa(
 
   await supabase.rpc('set_estado_mesa', { p_mesa_id: mesaOrigenId, p_estado: 'libre' })
   await supabase.rpc('set_estado_mesa', { p_mesa_id: mesaDestinoId, p_estado: 'ocupada' })
+}
+
+// ─── Separar una mesa de una cadena unida (F9-01) ─────────────────────────────
+// A diferencia de moverPedidoDeMesa (reasigna TODA la mesa principal del
+// pedido), esto deshace parcialmente una unión: una sola mesa satélite deja
+// de pertenecer a la cadena y vuelve a estar libre, sin tocar el resto del
+// pedido ni sus ítems — los productos ya consumidos se quedan en el pedido
+// original, esta acción no reparte nada.
+export async function separarMesaUnida(
+  pedidoId: number,
+  mesaSateliteId: number,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { data: pedido } = await supabase
+    .from('pedidos')
+    .select('estado')
+    .eq('id', pedidoId)
+    .single()
+  if (!pedido) return { error: 'Pedido no encontrado.' }
+  if (pedido.estado !== 'abierto') return { error: 'El pedido no está abierto.' }
+
+  const { data: fila } = await supabase
+    .from('pedido_mesas')
+    .select('orden, pos_x_original, pos_y_original, rotacion_original')
+    .eq('pedido_id', pedidoId)
+    .eq('mesa_id', mesaSateliteId)
+    .maybeSingle()
+  if (!fila) return { error: 'Esa mesa no está unida a este pedido.' }
+
+  const { data: mesaInfo } = await supabase
+    .from('mesas')
+    .select('temporal')
+    .eq('id', mesaSateliteId)
+    .single()
+
+  // Mesas satélite que quedaban después en el orden — cierran el hueco
+  // retrocediendo una posición, para que la cadena siga siendo continua.
+  const { data: siguientes } = await supabase
+    .from('pedido_mesas')
+    .select('mesa_id, orden')
+    .eq('pedido_id', pedidoId)
+    .gt('orden', fila.orden)
+    .order('orden')
+
+  const { error: delError } = await supabase
+    .from('pedido_mesas')
+    .delete()
+    .eq('pedido_id', pedidoId)
+    .eq('mesa_id', mesaSateliteId)
+  if (delError) return { error: 'Error al separar la mesa.' }
+
+  for (const s of siguientes ?? []) {
+    const { error: reordError } = await supabase
+      .from('pedido_mesas')
+      .update({ orden: s.orden - 1 })
+      .eq('pedido_id', pedidoId)
+      .eq('mesa_id', s.mesa_id)
+    if (reordError) return { error: 'La mesa se separó, pero hubo un error al reordenar la cadena.' }
+  }
+
+  const { error: libError } = await liberarUnaMesaSatelite(supabase, mesaSateliteId, mesaInfo?.temporal ?? false, fila)
+  if (libError) return { error: 'La mesa se separó, pero hubo un error al liberarla. Revisa su estado manualmente.' }
 }
 
 // ─── Compartir mesa (crear mesa temporal con su propio pedido) ────────────────

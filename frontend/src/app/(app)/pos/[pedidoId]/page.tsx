@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PosShell } from '@/components/pos/PosShell'
 import type { MesaOcupada } from '@/components/pos/SheetUnirMesa'
 import type { MesaLibre } from '@/components/pos/SheetMoverMesa'
+import type { MesaSatelite } from '@/components/pos/SheetSepararMesa'
 import { columnaOrden } from '@/lib/ordenCatalogo'
 import { horaActualMX, dentroDeHorario } from '@/lib/horarioDisponibilidad'
 import type { TicketConfig } from '@/lib/print'
@@ -327,12 +328,14 @@ export default async function PosPage({
   // ── Mesas satélite unidas (cadena) ──────────────────────────────────────────
   // Solo aplica a pedidos tipo 'mesa'. Si no hay ninguna, mesasCadena queda
   // null y el diagrama de sillas se comporta exactamente igual que antes
-  // (mesa individual, sin cambios).
+  // (mesa individual, sin cambios). mesasSatelite (F9-02) es la misma
+  // consulta con id+label, para el picker de "Separar mesa".
   let mesasCadena: MesaCadenaItem[] | null = null
+  let mesasSatelite: MesaSatelite[] = []
   if (pedido.tipo === 'mesa' && mesa) {
     const { data: satelites } = await supabase
       .from('pedido_mesas')
-      .select('orden, mesas(capacidad)')
+      .select('orden, mesa_id, mesas(numero, nombre, capacidad)')
       .eq('pedido_id', pedidoId)
       .order('orden')
 
@@ -341,6 +344,10 @@ export default async function PosPage({
         { capacidad: mesa.capacidad ?? 1 },
         ...satelites.map((s: any) => ({ capacidad: s.mesas?.capacidad ?? 1 })),
       ]
+      mesasSatelite = satelites.map((s: any) => ({
+        id: s.mesa_id,
+        mesaLabel: s.mesas?.nombre ?? `Mesa ${s.mesas?.numero ?? s.mesa_id}`,
+      }))
     }
   }
 
@@ -379,6 +386,7 @@ export default async function PosPage({
       productos={productos}
       mesasOcupadas={mesasOcupadas}
       mesasLibres={mesasLibres}
+      mesasSatelite={mesasSatelite}
       puedesCancelar={puedesCancelar}
       puedeAnularPedido={puedeAnularPedido}
       meseroNombre={meseroNombre}

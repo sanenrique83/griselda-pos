@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { liberarUnaMesaSatelite } from '@/lib/mesasSatelite'
 
 // ─── Liberar mesas satélite (pedido_mesas) de un pedido que se cierra ────────
 // Mesas unidas vía unirMesas() se quedan 'ocupada' hasta que el pedido al que
@@ -51,40 +52,14 @@ async function liberarMesasSatelite(supabase: SupabaseClient, pedidoId: number):
           error: pmErr.message,
         })
       }
-      const { error: nullErr } = await supabase.from('pedidos').update({ mesa_id: null }).eq('mesa_id', mesa.id)
-      if (nullErr) {
-        console.error('[liberarMesasSatelite] error limpiando mesa_id en pedidos:', {
-          pedidoId,
-          mesaId: mesa.id,
-          error: nullErr.message,
-        })
-      }
-      const { error: delErr } = await supabase.from('mesas').delete().eq('id', mesa.id)
-      if (delErr) {
-        console.error('[liberarMesasSatelite] error borrando mesa temporal:', {
-          pedidoId,
-          mesaId: mesa.id,
-          error: delErr.message,
-        })
-      }
-    } else {
-      const orig = origPorMesa.get(mesa.id)
-      const patch: { estado: 'libre'; pos_x?: number | null; pos_y?: number | null; rotacion?: number | null } = {
-        estado: 'libre',
-      }
-      if (orig?.pos_x_original !== null && orig?.pos_x_original !== undefined) {
-        patch.pos_x = orig.pos_x_original
-        patch.pos_y = orig.pos_y_original
-        patch.rotacion = orig.rotacion_original
-      }
-      const { error: updErr } = await supabase.from('mesas').update(patch).eq('id', mesa.id)
-      if (updErr) {
-        console.error('[liberarMesasSatelite] error liberando mesa:', {
-          pedidoId,
-          mesaId: mesa.id,
-          error: updErr.message,
-        })
-      }
+    }
+    const { error } = await liberarUnaMesaSatelite(supabase, mesa.id, mesa.temporal, origPorMesa.get(mesa.id))
+    if (error) {
+      console.error('[liberarMesasSatelite] error liberando mesa:', {
+        pedidoId,
+        mesaId: mesa.id,
+        error,
+      })
     }
   }
 }

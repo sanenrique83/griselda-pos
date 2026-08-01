@@ -9,6 +9,7 @@ import { SheetCapturaPida, type ConfirmarRapidoPayload } from './SheetCapturaPid
 import { SheetComboSlots, type ConfirmarComboPayload } from './SheetComboSlots'
 import { SheetUnirMesa, type MesaOcupada } from './SheetUnirMesa'
 import { SheetMoverMesa, type MesaLibre } from './SheetMoverMesa'
+import { SheetSepararMesa, type MesaSatelite } from './SheetSepararMesa'
 import { SheetProductoLibre } from './SheetProductoLibre'
 import {
   agregarProducto,
@@ -41,6 +42,7 @@ interface PosShellProps {
   productos: ProductoCatalogo[]
   mesasOcupadas?: MesaOcupada[]
   mesasLibres?: MesaLibre[]
+  mesasSatelite?: MesaSatelite[]
   puedesCancelar?: boolean
   puedeAnularPedido?: boolean
   meseroNombre?: string
@@ -62,6 +64,7 @@ export function PosShell({
   productos,
   mesasOcupadas = [],
   mesasLibres = [],
+  mesasSatelite = [],
   puedesCancelar = false,
   puedeAnularPedido = false,
   meseroNombre = 'Mesero',
@@ -87,6 +90,7 @@ export function PosShell({
   const [comprobandoComboId, setComprobandoComboId] = useState<number | null>(null)
   const [sheetUnirOpen, setSheetUnirOpen] = useState(false)
   const [sheetMoverOpen, setSheetMoverOpen] = useState(false)
+  const [sheetSepararOpen, setSheetSepararOpen] = useState(false)
   const [sheetLibreOpen, setSheetLibreOpen] = useState(false)
   const [errorAccion, setErrorAccion] = useState<string | null>(null)
   const [isPendingCompartir, setIsPendingCompartir] = useState(false)
@@ -293,6 +297,15 @@ export function PosShell({
                 Mover
               </button>
             )}
+            {mesasSatelite.length > 0 && (
+              <button
+                onClick={() => setSheetSepararOpen(true)}
+                className="px-1 py-1 text-[12px] font-medium text-text-3 active:opacity-60"
+                title="Separar mesa de la cadena"
+              >
+                Separar
+              </button>
+            )}
             <button
               onClick={() => router.push(`/cobro/${pedidoId}`)}
               className="px-1 py-1 text-[13px] font-semibold text-green-600 whitespace-nowrap active:opacity-60"
@@ -408,6 +421,12 @@ export function PosShell({
         pedidoId={pedidoId}
         mesasLibres={mesasLibres}
         onClose={() => setSheetMoverOpen(false)}
+      />
+      <SheetSepararMesa
+        open={sheetSepararOpen}
+        pedidoId={pedidoId}
+        mesasSatelite={mesasSatelite}
+        onClose={() => setSheetSepararOpen(false)}
       />
       <SheetProductoLibre
         open={sheetLibreOpen}
