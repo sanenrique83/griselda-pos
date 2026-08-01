@@ -16,6 +16,7 @@ interface MesasShellProps {
   turnoId: number | null
   alertaActiva: boolean
   alertaMinutos: number
+  tiempoMesaAlertaMinutos: number
 }
 
 // Selector de pestaña de área para la vista de Mapa — el id real de un área,
@@ -45,6 +46,7 @@ export function MesasShell({
   turnoId,
   alertaActiva,
   alertaMinutos,
+  tiempoMesaAlertaMinutos,
 }: MesasShellProps) {
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -279,6 +281,7 @@ export function MesasShell({
             ahora={ahora}
             alertaActiva={alertaActiva}
             alertaMinutos={alertaMinutos}
+            tiempoMesaAlertaMinutos={tiempoMesaAlertaMinutos}
           />
         )}
 
@@ -301,6 +304,7 @@ export function MesasShell({
                     isPending={false}
                     alertaActiva={alertaActiva}
                     alertaMinutos={alertaMinutos}
+                    tiempoMesaAlertaMinutos={tiempoMesaAlertaMinutos}
                   />
                 ))}
               </div>

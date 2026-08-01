@@ -13,6 +13,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { MesaShape, dimensionesMesa, colorParaGrupo } from './MesaShape'
+import { TiempoMesa } from './TiempoMesa'
 import { calcularPosicionesSillas } from '@/lib/asientos'
 import { colorSemaforoMesa, ESTILO_COLOR_MESA } from '@/lib/colorMesa'
 import { unirMesas, unirMesaLibreAOcupada } from '@/app/(app)/pos/[pedidoId]/actions'
@@ -52,6 +53,7 @@ export function PlanoMesas({
   ahora,
   alertaActiva,
   alertaMinutos,
+  tiempoMesaAlertaMinutos,
 }: {
   mesas: MesaUI[]
   onMesaClick: (mesa: MesaUI) => void
@@ -59,6 +61,7 @@ export function PlanoMesas({
   ahora: number
   alertaActiva: boolean
   alertaMinutos: number
+  tiempoMesaAlertaMinutos: number
 }) {
   const router = useRouter()
   const [magnetTarget, setMagnetTarget] = useState<{ targetId: number; tipo: TipoUnionIman } | null>(
@@ -323,6 +326,7 @@ export function PlanoMesas({
                   }
                   colorEstado={color}
                   marcadores={marcadores}
+                  tiempoMesaAlertaMinutos={tiempoMesaAlertaMinutos}
                 />
               )
             })}
@@ -340,6 +344,7 @@ function MesaArrastrable({
   anilloColor,
   colorEstado,
   marcadores,
+  tiempoMesaAlertaMinutos,
 }: {
   mesa: MesaUI
   posicion: { x: number; y: number }
@@ -347,6 +352,7 @@ function MesaArrastrable({
   anilloColor?: string
   colorEstado: ReturnType<typeof colorSemaforoMesa>
   marcadores: { x: number; y: number; anguloDeg: number; ocupada: boolean }[]
+  tiempoMesaAlertaMinutos: number
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(mesa.id),
@@ -380,10 +386,17 @@ function MesaArrastrable({
           {mesa.nombre ?? mesa.numero}
         </span>
         {mesa.pedido_activo && (
-          <span
-            className="h-1.5 w-1.5 rounded-full"
-            style={{ backgroundColor: ESTILO_COLOR_MESA[colorEstado].dot }}
-          />
+          <>
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: ESTILO_COLOR_MESA[colorEstado].dot }}
+            />
+            <TiempoMesa
+              desde={mesa.pedido_activo.created_at}
+              umbralMinutos={tiempoMesaAlertaMinutos}
+              className="text-[9px] leading-none"
+            />
+          </>
         )}
       </MesaShape>
     </button>

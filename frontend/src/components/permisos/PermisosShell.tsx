@@ -11,6 +11,7 @@ import {
   actualizarOrdenModificadores,
   actualizarAlertaMesaMinutos,
   actualizarModificadoresPorLinea,
+  actualizarTiempoMesaAlerta,
 } from '@/app/(app)/mas/permisos/actions'
 import type { ConfigPermisos } from '@/app/(app)/mas/permisos/page'
 
@@ -126,6 +127,11 @@ export function PermisosShell({ config }: PermisosShellProps) {
   const [savingModsPorLinea, setSavingModsPorLinea] = useState(false)
   const [modsPorLineaBanner, setModsPorLineaBanner] = useState<string | null>(null)
 
+  // Temporizador de mesa en vivo (F9-03)
+  const [tiempoMesaMin, setTiempoMesaMin] = useState(config.tiempo_mesa_alerta_minutos.toString())
+  const [savingTiempoMesa, setSavingTiempoMesa] = useState(false)
+  const [tiempoMesaBanner, setTiempoMesaBanner] = useState<string | null>(null)
+
   function handleToggle(campo: keyof ConfigPermisos, valor: boolean) {
     // Optimistic update
     setPermisos((prev) => ({ ...prev, [campo]: valor }))
@@ -226,6 +232,24 @@ export function PermisosShell({ config }: PermisosShellProps) {
     } else {
       setModsPorLineaBanner('Guardado ✓')
       setTimeout(() => setModsPorLineaBanner(null), 3000)
+    }
+  }
+
+  async function handleGuardarTiempoMesa() {
+    const minutos = parseInt(tiempoMesaMin, 10)
+    if (isNaN(minutos) || minutos < 1) {
+      setTiempoMesaBanner('Ingresa un número de minutos válido (1 o más).')
+      return
+    }
+    setSavingTiempoMesa(true)
+    setTiempoMesaBanner(null)
+    const result = await actualizarTiempoMesaAlerta(minutos)
+    setSavingTiempoMesa(false)
+    if (result?.error) {
+      setTiempoMesaBanner(result.error)
+    } else {
+      setTiempoMesaBanner('Guardado ✓')
+      setTimeout(() => setTiempoMesaBanner(null), 3000)
     }
   }
 
@@ -478,6 +502,48 @@ export function PermisosShell({ config }: PermisosShellProps) {
               className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
             >
               {savingAlerta ? 'Guardando…' : 'Guardar minutos de alerta'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Temporizador de mesa en vivo (F9-03) ──────────────────────────── */}
+        <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+          <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+              Temporizador de mesa
+            </p>
+          </div>
+          <div className="px-4 py-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-3">
+                Minutos para alerta ámbar/roja
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={1}
+                value={tiempoMesaMin}
+                onChange={(e) => setTiempoMesaMin(e.target.value)}
+                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-blue-500"
+              />
+            </div>
+            <p className="text-xs text-text-3">
+              El tiempo transcurrido desde que se abrió el pedido, que se muestra junto a cada mesa
+              ocupada en /mesas y el mapa de mesas, se colorea en ámbar al llegar a este umbral y en
+              rojo a partir de 1.5x. Independiente del semáforo de color de la mesa.
+            </p>
+            {tiempoMesaBanner && (
+              <p className={`text-xs font-semibold ${tiempoMesaBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+                {tiempoMesaBanner}
+              </p>
+            )}
+            <button
+              onClick={handleGuardarTiempoMesa}
+              disabled={savingTiempoMesa}
+              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+            >
+              {savingTiempoMesa ? 'Guardando…' : 'Guardar umbral de temporizador'}
             </button>
           </div>
         </div>

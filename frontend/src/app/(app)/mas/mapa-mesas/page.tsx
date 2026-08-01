@@ -64,7 +64,7 @@ export default async function MapaMesasPage() {
     supabase.from('pedidos').select('id, mesa_id, created_at').eq('estado', 'abierto').not('mesa_id', 'is', null),
     supabase
       .from('config_sistema')
-      .select('alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos')
+      .select('alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos, tiempo_mesa_alerta_minutos')
       .eq('id', 1)
       .single(),
     supabase.from('areas').select('id, nombre').eq('activa', true).order('orden'),
@@ -169,6 +169,7 @@ export default async function MapaMesasPage() {
       areas={areas}
       alertaActiva={config?.alerta_mesa_sin_atender ?? true}
       alertaMinutos={config?.alerta_mesa_sin_atender_minutos ?? 10}
+      tiempoMesaAlertaMinutos={config?.tiempo_mesa_alerta_minutos ?? 60}
     />
   )
 }

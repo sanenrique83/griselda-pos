@@ -72,6 +72,19 @@ export async function actualizarModificadoresPorLinea(
   if (error) return { error: 'Error al actualizar los modificadores por línea.' }
 }
 
+export async function actualizarTiempoMesaAlerta(
+  minutos: number,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('config_sistema')
+    .update({ tiempo_mesa_alerta_minutos: minutos })
+    .eq('id', 1)
+
+  if (error) return { error: 'Error al actualizar el umbral del temporizador de mesa.' }
+}
+
 export async function actualizarAlertaMesaMinutos(
   minutos: number,
 ): Promise<Err | undefined> {

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PosShell } from '@/components/pos/PosShell'
 import type { MesaOcupada } from '@/components/pos/SheetUnirMesa'
+import type { MesaLibre } from '@/components/pos/SheetMoverMesa'
 import { columnaOrden } from '@/lib/ordenCatalogo'
 import type { TicketConfig } from '@/lib/print'
 import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
@@ -175,6 +176,22 @@ export default async function PosPage({
       pedidoId: p.id,
       mesaLabel: p.mesas?.nombre ?? `Mesa ${p.mesas?.numero ?? p.mesa_id}`,
       numComensales: p.num_comensales ?? 1,
+    }))
+  }
+
+  // ── Mesas libres (para mover el pedido sin unir — F9-01) ──────────────────
+  let mesasLibres: MesaLibre[] = []
+  if (pedido.tipo === 'mesa' && pedido.mesa_id) {
+    const { data: libres } = await supabase
+      .from('mesas')
+      .select('id, numero, nombre')
+      .eq('activa', true)
+      .eq('estado', 'libre')
+      .order('numero')
+
+    mesasLibres = (libres ?? []).map((m) => ({
+      id: m.id,
+      mesaLabel: m.nombre ?? `Mesa ${m.numero}`,
     }))
   }
 
@@ -356,6 +373,7 @@ export default async function PosPage({
       categorias={categorias}
       productos={productos}
       mesasOcupadas={mesasOcupadas}
+      mesasLibres={mesasLibres}
       puedesCancelar={puedesCancelar}
       puedeAnularPedido={puedeAnularPedido}
       meseroNombre={meseroNombre}

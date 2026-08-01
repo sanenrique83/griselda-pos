@@ -60,6 +60,10 @@ export interface ConfigSistema {
   orden_modificadores: 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
   alerta_mesa_sin_atender: boolean
   alerta_mesa_sin_atender_minutos: number
+  // Temporizador de mesa en vivo (F9-03): umbral (minutos) a partir del cual
+  // se colorea el texto del tiempo transcurrido — independiente del
+  // semáforo de arriba (ese es por falta de captura, esto es el tiempo en sí).
+  tiempo_mesa_alerta_minutos: number
   // Texto del ticket impreso (TicketConfigShell, /mas/configuracion) — ya
   // existían en la base antes de tener migración propia, ver
   // 20260801000005_config_sistema_ticket_columnas_existentes.sql.

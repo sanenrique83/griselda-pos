@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { MesaUI } from '@/app/(app)/mesas/page'
 import { colorSemaforoMesa, type ColorMesa } from '@/lib/colorMesa'
+import { TiempoMesa } from './TiempoMesa'
 
 interface TarjetaMesaProps {
   mesa: MesaUI
@@ -10,6 +11,7 @@ interface TarjetaMesaProps {
   isPending: boolean
   alertaActiva: boolean
   alertaMinutos: number
+  tiempoMesaAlertaMinutos: number
 }
 
 const ESTILO_TARJETA: Record<ColorMesa, { border: string; bg: string; badgeBg: string; badgeText: string; label: string }> = {
@@ -19,7 +21,14 @@ const ESTILO_TARJETA: Record<ColorMesa, { border: string; bg: string; badgeBg: s
   rojo:    { border: 'border-[#FCA5A5]', bg: 'bg-[#FEF2F2]', badgeBg: 'bg-red-50',    badgeText: 'text-red-600',    label: '● Sin atender' },
 }
 
-export function TarjetaMesa({ mesa, onClick, isPending, alertaActiva, alertaMinutos }: TarjetaMesaProps) {
+export function TarjetaMesa({
+  mesa,
+  onClick,
+  isPending,
+  alertaActiva,
+  alertaMinutos,
+  tiempoMesaAlertaMinutos,
+}: TarjetaMesaProps) {
   const ocupada = mesa.pedido_activo !== null
 
   // Reevalúa el semáforo cada 30s — el color depende del tiempo transcurrido
@@ -84,34 +93,14 @@ export function TarjetaMesa({ mesa, onClick, isPending, alertaActiva, alertaMinu
           <div className="mt-1 text-[11px] text-text-3">
             {mesa.pedido_activo.mesero_nombre} · {mesa.pedido_activo.num_comensales} com.
           </div>
-          <TiempoTranscurrido desde={mesa.pedido_activo.created_at} />
+          <div className="mt-0.5 text-xs">
+            <TiempoMesa
+              desde={mesa.pedido_activo.created_at}
+              umbralMinutos={tiempoMesaAlertaMinutos}
+            />
+          </div>
         </>
       )}
     </button>
   )
-}
-
-// Timer que actualiza cada minuto
-// Inicializamos con '' para evitar mismatch de hidratación (Date.now() difiere server vs client)
-function TiempoTranscurrido({ desde }: { desde: string }) {
-  const [texto, setTexto] = useState('')
-
-  useEffect(() => {
-    setTexto(formatearTiempo(desde))
-    const id = setInterval(() => setTexto(formatearTiempo(desde)), 60_000)
-    return () => clearInterval(id)
-  }, [desde])
-
-  if (!texto) return null
-
-  return (
-    <div className="mt-0.5 font-mono text-xs text-amber-600">{texto}</div>
-  )
-}
-
-function formatearTiempo(desde: string): string {
-  const diff = Date.now() - new Date(desde).getTime()
-  const h = Math.floor(diff / 3_600_000)
-  const m = Math.floor((diff % 3_600_000) / 60_000)
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }

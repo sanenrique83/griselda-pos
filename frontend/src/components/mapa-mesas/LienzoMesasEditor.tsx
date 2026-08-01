@@ -14,6 +14,7 @@ import {
 } from '@dnd-kit/core'
 import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
 import { MesaShape, dimensionesMesa, colorParaGrupo } from '@/components/mesas/MesaShape'
+import { TiempoMesa } from '@/components/mesas/TiempoMesa'
 import { guardarDisposicion } from '@/app/(app)/mas/mapa-mesas/actions'
 import { crearArea } from '@/app/(app)/mas/catalogo/actions'
 import { unirMesas, unirMesaLibreAOcupada } from '@/app/(app)/pos/[pedidoId]/actions'
@@ -113,11 +114,13 @@ export function LienzoMesasEditor({
   areas,
   alertaActiva,
   alertaMinutos,
+  tiempoMesaAlertaMinutos,
 }: {
   mesas: MesaEditable[]
   areas: AreaTab[]
   alertaActiva: boolean
   alertaMinutos: number
+  tiempoMesaAlertaMinutos: number
 }) {
   const router = useRouter()
   const [posiciones, setPosiciones] = useState<Record<number, Posicion>>(() =>
@@ -562,6 +565,8 @@ export function LienzoMesasEditor({
                         ahora,
                       )}
                       onSelect={() => setSeleccionId(mesa.id)}
+                      pedidoCreatedAt={mesa.pedidoCreatedAt}
+                      tiempoMesaAlertaMinutos={tiempoMesaAlertaMinutos}
                     />
                   ))}
                 </div>
@@ -690,6 +695,8 @@ function MesaDraggable({
   magnetActivo = false,
   colorEstado = 'verde',
   onSelect,
+  pedidoCreatedAt,
+  tiempoMesaAlertaMinutos,
 }: {
   mesa: MesaEditable
   posicion: Posicion
@@ -698,6 +705,8 @@ function MesaDraggable({
   magnetActivo?: boolean
   colorEstado?: 'verde' | 'naranja' | 'azul' | 'rojo'
   onSelect: () => void
+  pedidoCreatedAt: string | null
+  tiempoMesaAlertaMinutos: number
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(mesa.id),
@@ -738,6 +747,13 @@ function MesaDraggable({
         marcadores={marcadores}
       >
         <span className="text-[12px] font-bold leading-none">{mesa.nombre ?? mesa.numero}</span>
+        {pedidoCreatedAt && (
+          <TiempoMesa
+            desde={pedidoCreatedAt}
+            umbralMinutos={tiempoMesaAlertaMinutos}
+            className="text-[9px] leading-none"
+          />
+        )}
       </MesaShape>
     </div>
   )

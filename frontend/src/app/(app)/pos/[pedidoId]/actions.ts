@@ -733,6 +733,71 @@ export async function anularPedidoCompleto(
   return result?.error ? { error: result.error } : {}
 }
 
+// ─── Mover pedido a otra mesa (sin unir) ───────────────────────────────────────
+// F9-01: a diferencia de unirMesas() (fusiona dos pedidos, mueve comensales de
+// uno a otro y cierra el origen), esto solo reasigna pedidos.mesa_id — mismo
+// pedido, mismos comensales, nueva mesa principal. Si el pedido ya tenía mesas
+// satélite (unión previa vía pedido_mesas), esas NO se tocan: siguen
+// apuntando a este mismo pedido_id, solo cambia cuál es la mesa principal.
+export async function moverPedidoDeMesa(
+  pedidoId: number,
+  mesaDestinoId: number,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { data: pedido } = await supabase
+    .from('pedidos')
+    .select('mesa_id, estado')
+    .eq('id', pedidoId)
+    .single()
+  if (!pedido) return { error: 'Pedido no encontrado.' }
+  if (pedido.estado !== 'abierto') return { error: 'El pedido no está abierto.' }
+  if (!pedido.mesa_id) return { error: 'Este pedido no tiene mesa asignada.' }
+  if (pedido.mesa_id === mesaDestinoId) return { error: 'El pedido ya está en esa mesa.' }
+
+  // Mismo chequeo que abrirPedidoMesa()/abrirPedidoMesaCombinada(): la mesa
+  // destino no debe tener ya un pedido abierto propio...
+  const { data: pedidoEnDestino } = await supabase
+    .from('pedidos')
+    .select('id')
+    .eq('mesa_id', mesaDestinoId)
+    .eq('estado', 'abierto')
+    .maybeSingle()
+  if (pedidoEnDestino) return { error: 'La mesa destino ya está ocupada.' }
+
+  // ...ni ser satélite de otro pedido abierto (unida vía pedido_mesas).
+  const { data: satelitesDestino } = await supabase
+    .from('pedido_mesas')
+    .select('pedido_id, pedidos!inner(estado)')
+    .eq('mesa_id', mesaDestinoId)
+    .eq('pedidos.estado', 'abierto')
+    .limit(1)
+  if (satelitesDestino && satelitesDestino.length > 0) {
+    return { error: 'La mesa destino ya está ocupada (unida a otro pedido).' }
+  }
+
+  // Protección contra condición de carrera: el estado guardado en la mesa es
+  // la fuente final de verdad además de los dos chequeos de arriba.
+  const { data: mesaDestino } = await supabase
+    .from('mesas')
+    .select('estado')
+    .eq('id', mesaDestinoId)
+    .single()
+  if (!mesaDestino) return { error: 'Mesa destino no encontrada.' }
+  if (mesaDestino.estado === 'ocupada') return { error: 'La mesa destino ya está ocupada.' }
+
+  const mesaOrigenId = pedido.mesa_id
+
+  const { error } = await supabase
+    .from('pedidos')
+    .update({ mesa_id: mesaDestinoId })
+    .eq('id', pedidoId)
+  if (error) return { error: 'Error al mover el pedido.' }
+
+  await supabase.rpc('set_estado_mesa', { p_mesa_id: mesaOrigenId, p_estado: 'libre' })
+  await supabase.rpc('set_estado_mesa', { p_mesa_id: mesaDestinoId, p_estado: 'ocupada' })
+}
+
 // ─── Compartir mesa (crear mesa temporal con su propio pedido) ────────────────
 export async function compartirMesa(
   pedidoOrigenId: number,

@@ -83,7 +83,7 @@ export default async function MesasPage() {
       : Promise.resolve({ data: [] as any[] }),
     supabase
       .from('config_sistema')
-      .select('alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos')
+      .select('alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos, tiempo_mesa_alerta_minutos')
       .eq('id', 1)
       .single(),
   ])
@@ -212,6 +212,7 @@ export default async function MesasPage() {
       turnoId={turno?.id ?? null}
       alertaActiva={config?.alerta_mesa_sin_atender ?? true}
       alertaMinutos={config?.alerta_mesa_sin_atender_minutos ?? 10}
+      tiempoMesaAlertaMinutos={config?.tiempo_mesa_alerta_minutos ?? 60}
     />
   )
 }
