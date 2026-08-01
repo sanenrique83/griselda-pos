@@ -10,6 +10,7 @@ import {
   actualizarOrdenProductos,
   actualizarOrdenModificadores,
   actualizarAlertaMesaMinutos,
+  actualizarModificadoresPorLinea,
 } from '@/app/(app)/mas/permisos/actions'
 import type { ConfigPermisos } from '@/app/(app)/mas/permisos/page'
 
@@ -120,6 +121,11 @@ export function PermisosShell({ config }: PermisosShellProps) {
   const [savingAlerta, setSavingAlerta] = useState(false)
   const [alertaBanner, setAlertaBanner] = useState<string | null>(null)
 
+  // Modificadores por línea en tickets impresos
+  const [modsPorLinea, setModsPorLinea] = useState(config.modificadores_por_linea.toString())
+  const [savingModsPorLinea, setSavingModsPorLinea] = useState(false)
+  const [modsPorLineaBanner, setModsPorLineaBanner] = useState<string | null>(null)
+
   function handleToggle(campo: keyof ConfigPermisos, valor: boolean) {
     // Optimistic update
     setPermisos((prev) => ({ ...prev, [campo]: valor }))
@@ -202,6 +208,24 @@ export function PermisosShell({ config }: PermisosShellProps) {
     } else {
       setAlertaBanner('Guardado ✓')
       setTimeout(() => setAlertaBanner(null), 3000)
+    }
+  }
+
+  async function handleGuardarModsPorLinea() {
+    const cantidad = parseInt(modsPorLinea, 10)
+    if (isNaN(cantidad) || cantidad < 1) {
+      setModsPorLineaBanner('Ingresa un número de 1 o más.')
+      return
+    }
+    setSavingModsPorLinea(true)
+    setModsPorLineaBanner(null)
+    const result = await actualizarModificadoresPorLinea(cantidad)
+    setSavingModsPorLinea(false)
+    if (result?.error) {
+      setModsPorLineaBanner(result.error)
+    } else {
+      setModsPorLineaBanner('Guardado ✓')
+      setTimeout(() => setModsPorLineaBanner(null), 3000)
     }
   }
 
@@ -454,6 +478,47 @@ export function PermisosShell({ config }: PermisosShellProps) {
               className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
             >
               {savingAlerta ? 'Guardando…' : 'Guardar minutos de alerta'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Modificadores por línea en tickets impresos ──────────────────── */}
+        <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+          <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+              Tickets impresos
+            </p>
+          </div>
+          <div className="px-4 py-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-3">
+                Modificadores por línea
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={1}
+                value={modsPorLinea}
+                onChange={(e) => setModsPorLinea(e.target.value)}
+                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-blue-500"
+              />
+            </div>
+            <p className="text-xs text-text-3">
+              Cuántos modificadores caben en una sola línea del ticket (cocina y cliente), unidos
+              con &quot;+&quot; — ahorra papel cuando hay muchos. Usa 1 para uno por línea.
+            </p>
+            {modsPorLineaBanner && (
+              <p className={`text-xs font-semibold ${modsPorLineaBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+                {modsPorLineaBanner}
+              </p>
+            )}
+            <button
+              onClick={handleGuardarModsPorLinea}
+              disabled={savingModsPorLinea}
+              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+            >
+              {savingModsPorLinea ? 'Guardando…' : 'Guardar modificadores por línea'}
             </button>
           </div>
         </div>

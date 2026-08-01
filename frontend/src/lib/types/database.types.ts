@@ -71,6 +71,9 @@ export interface ConfigSistema {
   ticket_linea2: string | null
   ticket_pie: string | null
   ticket_pie2: string | null
+  // Cuántos modificadores caben por línea en tickets impresos (cocina y
+  // cliente) — 1 = uno por línea (comportamiento de siempre).
+  modificadores_por_linea: number
 }
 
 export interface Area {

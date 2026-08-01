@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PosShell } from '@/components/pos/PosShell'
 import type { MesaOcupada } from '@/components/pos/SheetUnirMesa'
 import { columnaOrden } from '@/lib/ordenCatalogo'
+import type { TicketConfig } from '@/lib/print'
 import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
 
 // ─── Tipos exportados (usados por PosShell y sub-componentes) ─────────────────
@@ -180,7 +181,15 @@ export default async function PosPage({
   // ── Permiso de cancelación ────────────────────────────────────────────────
   const { data: { user } } = await supabase.auth.getUser()
   const [{ data: config }, { data: perfil }] = await Promise.all([
-    supabase.from('config_sistema').select('cancelaciones_mesero, cancelar_pedido_mesero, orden_productos').eq('id', 1).single(),
+    supabase
+      .from('config_sistema')
+      .select(
+        'cancelaciones_mesero, cancelar_pedido_mesero, orden_productos, ' +
+          'ticket_nombre, ticket_direccion, ticket_telefono, ticket_rfc, ' +
+          'ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea',
+      )
+      .eq('id', 1)
+      .single(),
     user ? supabase.from('perfiles').select('rol, nombre').eq('id', user.id).single() : Promise.resolve({ data: null }),
   ])
   const esAdmin = (perfil as any)?.rol === 'admin'
@@ -194,6 +203,21 @@ export default async function PosPage({
   const rol: 'admin' | 'mesero' = (perfil as any)?.rol === 'admin' ? 'admin' : 'mesero'
   const tipoMesa: 'mesa' | 'llevar' | 'mostrador' =
     pedido.tipo === 'mesa' ? 'mesa' : pedido.tipo === 'mostrador' ? 'mostrador' : 'llevar'
+
+  // Ticket de cocina: antes no necesitaba nada de config_sistema (su
+  // encabezado usa mesa/mesero/orden/rol) — ahora sí, solo para que
+  // _seccion_comensal() pueda leer modificadores_por_linea.
+  const ticketConfig: TicketConfig = {
+    nombre: (config as any)?.ticket_nombre ?? 'La Menuderia',
+    direccion: (config as any)?.ticket_direccion ?? '',
+    telefono: (config as any)?.ticket_telefono ?? '',
+    rfc: (config as any)?.ticket_rfc ?? '',
+    linea1: (config as any)?.ticket_linea1 ?? '',
+    linea2: (config as any)?.ticket_linea2 ?? '',
+    pie: (config as any)?.ticket_pie ?? 'Gracias por su visita!',
+    pie2: (config as any)?.ticket_pie2 ?? '',
+    modificadores_por_linea: (config as any)?.modificadores_por_linea ?? 1,
+  }
 
   // ── Catálogo: categorías + productos ──────────────────────────────────────
   const [{ data: rawCategorias }, { data: rawProductos }] = await Promise.all([
@@ -339,6 +363,7 @@ export default async function PosPage({
       tipoMesa={tipoMesa}
       mesaSillas={mesaSillas}
       mesasCadena={mesasCadena}
+      ticketConfig={ticketConfig}
     />
   )
 }

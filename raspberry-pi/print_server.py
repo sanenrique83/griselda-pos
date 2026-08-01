@@ -126,14 +126,26 @@ def _pie_cliente(config: dict, con_corte: bool = True) -> bytes:
     return b
 
 
-def _item_cliente(nombre: str, cantidad: int, precio_unit: float, modificadores: list = None) -> bytes:
+def _item_cliente(nombre: str, cantidad: int, precio_unit: float, modificadores: list = None,
+                   modificadores_por_linea: int = 1) -> bytes:
     linea     = f'{cantidad}x {nombre}'
     monto_str = f'${precio_unit * cantidad:.2f}'
     espacios  = COL - len(linea) - len(monto_str)
     b = _encode(linea + ' ' * max(1, espacios) + monto_str) + CMD_LF
-    for mod in (modificadores or []):
-        b += _encode(f'  + {mod}') + CMD_LF
+    for grupo in _agrupar_modificadores(modificadores or [], modificadores_por_linea):
+        b += _encode(f'  + {grupo}') + CMD_LF
     return b
+
+
+def _agrupar_modificadores(modificadores: list, por_linea: int) -> list:
+    """Agrupa `modificadores` de `por_linea` en `por_linea` por línea, unidos
+    con ' + ' — ahorra espacio de papel cuando hay muchos. por_linea=1 (el
+    default) reproduce el comportamiento de siempre: uno por línea."""
+    por_linea = max(1, int(por_linea or 1))
+    return [
+        ' + '.join(modificadores[i:i + por_linea])
+        for i in range(0, len(modificadores), por_linea)
+    ]
 
 
 def _fila(label: str, valor: str, bold: bool = False, doble: bool = False) -> bytes:
@@ -178,7 +190,9 @@ def _encabezado_cocina(titulo: str, orden: str, mesa: str, mesero: str,
     return b
 
 
-def _seccion_comensal(com: dict, con_encabezado_comensal: bool = True) -> bytes:
+def _seccion_comensal(com: dict, con_encabezado_comensal: bool = True, config: dict = None) -> bytes:
+    config = config or {}
+    modificadores_por_linea = config.get('modificadores_por_linea', 1)
     label = com.get('comensal', 'Comensal')
     b = b''
     if con_encabezado_comensal:
@@ -194,8 +208,8 @@ def _seccion_comensal(com: dict, con_encabezado_comensal: bool = True) -> bytes:
         b += _encode(f'{cantidad} x {nombre}') + CMD_LF
         b += CMD_BOLD_OFF + CMD_FONT_NORMAL
         b += CMD_FONT_MEDIO
-        for mod in mods:
-            b += _encode(f'  + {mod}') + CMD_LF
+        for grupo in _agrupar_modificadores(mods, modificadores_por_linea):
+            b += _encode(f'  + {grupo}') + CMD_LF
         if nota:
             b += _encode(f'  * {nota}') + CMD_LF
         b += CMD_FONT_NORMAL
@@ -212,6 +226,7 @@ def _build_cocina(payload: dict) -> bytes:
     tipo_mesa   = payload.get('tipoMesa', 'mesa')
     comensales  = payload.get('comensales', [])
     reimpresion = bool(payload.get('reimpresion', False))
+    config      = payload.get('config', {})
 
     # Un solo comensal sin nota real (nombre "Comensal 1" por defecto) → no repetir
     # la etiqueta "=== Comensal N ===" si solo hay una comanda, para no alargar
@@ -233,14 +248,14 @@ def _build_cocina(payload: dict) -> bytes:
     if comensales_comida:
         b += _encabezado_cocina('Cocina', orden, mesa, mesero, rol, tipo_mesa, reimpresion)
         for com in comensales_comida:
-            b += _seccion_comensal(com, mostrar_encabezado_comensal)
+            b += _seccion_comensal(com, mostrar_encabezado_comensal, config)
         b += CMD_LF * 2
         b += CMD_CUT
 
     if comensales_bebida:
         b += _encabezado_cocina('Bebidas', orden, mesa, mesero, rol, tipo_mesa, reimpresion)
         for com in comensales_bebida:
-            b += _seccion_comensal(com, mostrar_encabezado_comensal)
+            b += _seccion_comensal(com, mostrar_encabezado_comensal, config)
         b += CMD_LF * 2
         b += CMD_CUT
 
@@ -270,7 +285,8 @@ def _build_cliente(payload: dict) -> bytes:
         for item in items:
             b += _item_cliente(
                 item.get('nombre', ''), item.get('cantidad', 1),
-                float(item.get('precio', 0.0)), item.get('modificadores') or []
+                float(item.get('precio', 0.0)), item.get('modificadores') or [],
+                config.get('modificadores_por_linea', 1)
             )
         b += _encode('-' * COL) + CMD_LF
         b += _fila('Subtotal', f'${subtotal:.2f}')
@@ -287,7 +303,8 @@ def _build_cliente(payload: dict) -> bytes:
         for item in items:
             b += _item_cliente(
                 item.get('nombre', ''), item.get('cantidad', 1),
-                float(item.get('precio', 0.0)), item.get('modificadores') or []
+                float(item.get('precio', 0.0)), item.get('modificadores') or [],
+                config.get('modificadores_por_linea', 1)
             )
         b += _encode('-' * COL) + CMD_LF
         b += _fila('Subtotal', f'${subtotal:.2f}')
@@ -320,7 +337,8 @@ def _build_cliente(payload: dict) -> bytes:
             for item in com_items:
                 b += _item_cliente(
                     item.get('nombre', ''), item.get('cantidad', 1),
-                    float(item.get('precio', 0.0)), item.get('modificadores') or []
+                    float(item.get('precio', 0.0)), item.get('modificadores') or [],
+                    config.get('modificadores_por_linea', 1)
                 )
             b += _encode('-' * COL) + CMD_LF
             b += _fila('Subtotal', f'${com_subtotal:.2f}')
@@ -347,7 +365,8 @@ def _build_cliente(payload: dict) -> bytes:
         for item in items:
             b += _item_cliente(
                 item.get('nombre', ''), item.get('cantidad', 1),
-                float(item.get('precio', 0.0)), item.get('modificadores') or []
+                float(item.get('precio', 0.0)), item.get('modificadores') or [],
+                config.get('modificadores_por_linea', 1)
             )
         b += _encode('-' * COL) + CMD_LF
         b += _fila('Subtotal', f'${subtotal:.2f}')

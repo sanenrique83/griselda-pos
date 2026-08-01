@@ -63,6 +63,10 @@ export type TicketConfig = {
   linea2: string
   pie: string
   pie2: string
+  // Cuántos modificadores caben por línea (cocina y cliente) — 1 = uno por
+  // línea. Nombre en snake_case a propósito: se envía tal cual al servidor
+  // de impresión, que lo lee como config.get('modificadores_por_linea', 1).
+  modificadores_por_linea: number
 }
 
 export type ItemCancelacion = {
@@ -107,6 +111,11 @@ export type PrintPayload =
       comensales: ComensalCocina[]
       /** true = reimpresión de items ya enviados (no un envío nuevo) */
       reimpresion?: boolean
+      // Antes no viajaba ningún `config` en el ticket de cocina (el
+      // encabezado usa mesa/mesero/orden/rol, no datos del negocio) — se
+      // agrega solo para que _seccion_comensal() pueda leer
+      // modificadores_por_linea, igual que ya hace el ticket de cliente.
+      config: TicketConfig
     }
   | {
       tipo: 'cancelacion'

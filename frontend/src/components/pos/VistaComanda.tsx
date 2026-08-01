@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ItemComandaRow } from './ItemComanda'
 import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem, eliminarProductoPendiente, moverProducto, dividirProducto, anularPedidoCompleto, asignarSilla } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { SubpedidoPOS, ItemComanda, MesaSillas, MesaCadenaItem } from '@/app/(app)/pos/[pedidoId]/page'
-import { imprimirTicket } from '@/lib/print'
+import { imprimirTicket, type TicketConfig } from '@/lib/print'
 import { SheetAsientos } from './SheetAsientos'
 import { siguienteSillaLibre } from '@/lib/asientos'
 
@@ -31,6 +31,7 @@ interface VistaComandaProps {
   tipoMesa?: 'mesa' | 'llevar' | 'mostrador'
   mesaSillas?: MesaSillas
   mesasCadena?: MesaCadenaItem[] | null
+  ticketConfig: TicketConfig
 }
 
 export function VistaComanda({
@@ -48,6 +49,7 @@ export function VistaComanda({
   tipoMesa = 'mesa',
   mesaSillas = null,
   mesasCadena = null,
+  ticketConfig,
 }: VistaComandaProps) {
   const router = useRouter()
   const [isPendingEnviar, startEnviar] = useTransition()
@@ -122,6 +124,7 @@ export function VistaComanda({
           rol,
           tipoMesa,
           comensales,
+          config: ticketConfig,
         })
         if (!printOk) setPrintError(true)
       }
@@ -157,6 +160,7 @@ export function VistaComanda({
           tipoMesa,
           comensales,
           reimpresion: true,
+          config: ticketConfig,
         })
         if (!printOk) setPrintError(true)
       }

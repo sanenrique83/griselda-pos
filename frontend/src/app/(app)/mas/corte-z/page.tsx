@@ -95,7 +95,7 @@ export default async function CorteZPage({
       .select(`
         impresion_activa,
         ticket_nombre, ticket_direccion, ticket_telefono, ticket_rfc,
-        ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2
+        ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea
       `)
       .eq('id', 1)
       .single(),
@@ -110,6 +110,7 @@ export default async function CorteZPage({
     linea2: (config as any)?.ticket_linea2 ?? '',
     pie: (config as any)?.ticket_pie ?? 'Gracias por su visita!',
     pie2: (config as any)?.ticket_pie2 ?? '',
+    modificadores_por_linea: (config as any)?.modificadores_por_linea ?? 1,
   }
   const impresionActiva = (config as any)?.impresion_activa ?? false
 

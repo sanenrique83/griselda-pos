@@ -20,6 +20,7 @@ import {
   type ComboSlot,
 } from '@/app/(app)/pos/[pedidoId]/actions'
 import { siguienteSillaLibre } from '@/lib/asientos'
+import type { TicketConfig } from '@/lib/print'
 import type {
   SubpedidoPOS,
   ProductoCatalogo,
@@ -45,6 +46,7 @@ interface PosShellProps {
   tipoMesa?: 'mesa' | 'llevar' | 'mostrador'
   mesaSillas?: MesaSillas
   mesasCadena?: MesaCadenaItem[] | null
+  ticketConfig: TicketConfig
 }
 
 export function PosShell({
@@ -63,6 +65,7 @@ export function PosShell({
   rol = 'mesero',
   tipoMesa = 'mesa',
   mesaSillas = null,
+  ticketConfig,
   mesasCadena = null,
 }: PosShellProps) {
   const router = useRouter()
@@ -355,6 +358,7 @@ export function PosShell({
             tipoMesa={tipoMesa}
             mesaSillas={mesaSillas}
             mesasCadena={mesasCadena}
+            ticketConfig={ticketConfig}
           />
         )}
       </div>

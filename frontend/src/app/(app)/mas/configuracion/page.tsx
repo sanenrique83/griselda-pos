@@ -20,7 +20,7 @@ export default async function ConfiguracionPage() {
   const { data: config } = await supabase
     .from('config_sistema')
     .select(
-      'ticket_nombre, ticket_direccion, ticket_telefono, ticket_rfc, ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2',
+      'ticket_nombre, ticket_direccion, ticket_telefono, ticket_rfc, ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea',
     )
     .eq('id', 1)
     .single()
@@ -34,6 +34,7 @@ export default async function ConfiguracionPage() {
     linea2: (config as any)?.ticket_linea2 ?? '',
     pie: (config as any)?.ticket_pie ?? 'Gracias por su visita!',
     pie2: (config as any)?.ticket_pie2 ?? '',
+    modificadores_por_linea: (config as any)?.modificadores_por_linea ?? 1,
   }
 
   return <TicketConfigShell initialConfig={ticketConfig} />
