@@ -1,5 +1,5 @@
-# Griselda POS — Estado Consolidado del Proyecto (v4)
-**Última actualización:** 1 de agosto de 2026. Reemplaza la v3 — se cerraron dos rondas completas de auditoría de código, y el bloque de "Mesas Unidas Visual" recibió varias correcciones importantes tras probarlo en el celular (área por pestañas, auto-acomodo sin colisión, tamaño de sillas, mesa extra hereda área).
+# Griselda POS — Estado Consolidado del Proyecto (v5)
+**Última actualización:** 1 de agosto de 2026. Reemplaza la v4 — **Fase 9 completa** (los 8 puntos: F7-04 combos electivos + F9-01 a F9-08), se creó `CLAUDE.md` para instrucciones persistentes, y se hizo un repaso completo de pendientes sueltos de fases anteriores nunca cerrados.
 
 **Leyenda:** ✅ Hecho y confirmado · 🟡 Parcial · ⚪ Spec listo, sin implementar · 🚫 Descartado/superado · ❓ No verificado
 
@@ -73,19 +73,25 @@ Todos los huecos identificados en estas 3 rondas ya están consolidados en el **
 
 ---
 
-## Fase 9 — Combos Electivos + Hallazgos de Benchmarking (spec listo, nada implementado)
+## Fase 9 — Combos Electivos + Hallazgos de Benchmarking — **COMPLETA**
 
 | Código | Descripción | Estado |
 |---|---|---|
-| F7-04 | Combos electivos (actualizado al motor nuevo) | ⚪ |
-| F9-01 | Mover pedido a otra mesa sin unir | ⚪ |
-| F9-02 | Dividir/deshacer una unión de mesas | ⚪ |
-| F9-03 | Temporizador de mesa en vivo | ⚪ |
-| F9-04 | Alertas automáticas de variación de ventas | ⚪ |
-| F9-05 | Reporte por categoría y por zona | ⚪ |
-| F9-06 | Disponibilidad de menú automática por horario | ⚪ |
-| F9-07 | Mermas como concepto propio | ⚪ |
-| F9-08 | Reloj de entrada/salida + exportación de horas | ⚪ |
+| F7-04 | Combos electivos (`combo_slots`/`combo_slot_opciones`, consumo vía recursión existente, desglose en ticket) + UI de administración en `SeccionReceta.tsx` | ✅ |
+| F9-01 | Mover pedido a otra mesa sin unir (`moverPedidoDeMesa`) | ✅ |
+| F9-02 | Separar una mesa de una cadena unida (`separarMesaUnida`) — cierra el hueco de `orden`, restaura posición si no es temporal | ✅ |
+| F9-03 | Temporizador de mesa en vivo (`TiempoMesa.tsx`), umbral configurable en `/mas/permisos` | ✅ |
+| F9-04 | Alerta de ventas bajas en tiempo real (`dashboard_alerta_ventas_bajas()`, compara contra el mismo día de la semana a la misma hora) — visible en Dashboard y en `/mesas` solo para admin | ✅ |
+| F9-05 | Reporte por categoría y por zona de preparación en el Dashboard | ✅ |
+| F9-06 | Disponibilidad automática por horario — a nivel producto **y** a nivel opción de modificador individual, independiente de `turnos` | ✅ |
+| F9-07 | Mermas como concepto propio (`mermas`, `registrar_merma()`, reutiliza el valor `'merma'` del enum que ya existía sin usar) | ✅ |
+| F9-08 | Reloj de entrada/salida + exportación CSV de horas/ventas/propina por mesero (sin nómina integrada) | ✅ |
+
+---
+
+## `CLAUDE.md` — instrucciones persistentes para Claude Code
+
+Se creó en la raíz del repo (no existía antes) — se carga automáticamente en cada sesión de Claude Code, a diferencia de este documento (`ESTADO_PROYECTO.md`), que **no** se lee ni actualiza solo sin que se le pida explícitamente. Cubre: recordatorio de actualizar este documento al terminar una tarea, el flujo de despliegue manual del print server (nunca se actualiza solo en la Pi), el hábito de verificar contra la base real antes de reportar algo como "no existe", dónde viven las cosas (`/mas/permisos` vs `/mas/configuracion`), los patrones ya establecidos que hay que reutilizar en vez de duplicar, y el modelo de recetas actual (para que ninguna sesión futura confunda el diseño de dos niveles con versiones anteriores descartadas).
 
 ## Hallazgos de Uso Real (H-01 a H-07) — **6 de 7 cerrados, H-07 descartada**
 
@@ -172,21 +178,42 @@ Hecho en una sesión aparte de Claude Code (no pasó por el flujo de specs de es
 
 ---
 
-## Recomendaciones abiertas — actualizado
+## Recomendaciones Abiertas — Repaso Completo de Pendientes de Todas las Fases
+
+Con Fase 9 cerrada, se hizo un repaso deliberado de qué quedó pendiente de fases anteriores que nunca se cerró — organizado por urgencia real, no por antigüedad.
+
+### Lo más urgente — repetido varias veces en esta conversación, nunca resuelto
 
 | Tema | Estado |
 |---|---|
-| Contraseña del admin | ❓ Sigue sin confirmar si se cambió — señalada desde el primerísimo análisis |
-| RLS de tablas de caja legible por cualquier autenticado | ❓ Sigue sin confirmar si se cerró |
-| **Backup automático de Supabase** | ⚪ **El pendiente más urgente de todo el documento**, sin cambios desde la v1 — cada semana que pasa hay más inventario/recetas/costeo en juego |
-| Proceso de migraciones sin registro | 🟡 **Parcialmente resuelto** — se confirmó que el proyecto ya está vinculado al Supabase CLI (`supabase db push` funcionó correctamente y detectó qué migraciones ya estaban aplicadas), aunque el flujo del día a día sigue siendo mixto (a veces SQL Editor a mano). Vale la pena estandarizar en usar siempre el CLI de aquí en adelante. |
-| Ambiente de staging separado de producción | ⚪ Sigue sin existir — cada feature grande (rediseño de recetas, Fase 7 completa) se probó directo contra producción |
-| Reconciliación física de inventario | ⚪ Mencionado, sin spec |
-| Conciliación de terminal bancaria | ⚪ Mencionado, sin spec |
-| **Auditoría de queries contra el esquema real** | ✅ **Resuelta** — se hizo la auditoría completa (2 rondas) vía Management API contra la base real, no solo el repo. Encontró y cerró: `ingredientes` sin RLS (DROP completo), `categorias.modo_captura` y `config_sistema.ticket_*` sin migración, 6 fire-and-forget de alto impacto, `toggleDisponible` duplicada, y el código muerto de la fila de abajo. |
-| **Modelo de permisos escalará mal** | ⚪ Sigue igual — cada permiso nuevo es una columna booleana más en `config_sistema` (`descuentos_mesero`, `cancelaciones_mesero`, `cancelar_pedido_mesero`). Funciona con 3-4; conviene una tabla de permisos antes de que sean 10. No se tocó en la auditoría, sigue como recomendación abierta. |
-| **Código muerto pendiente de limpieza** | ✅ **Resuelto por la auditoría** — `abrirPedidoMesa()` huérfana, `crearPedidoYAgregarProducto`/`crearPedidoYAgregarRapido`, y las ramas de "modo draft" en `PosShell.tsx` ya se eliminaron por completo. |
-| **Inconsistencia de tipos: `categorias.modo_captura` (texto plano) vs. `productos.modo_captura` (enum)** | ⚪ **Nuevo** — detectado en la auditoría, documentado a propósito sin resolver (cambiar el tipo de una columna en producción es una decisión aparte, con más riesgo que solo documentarla). |
+| **Backup automático de Supabase (F2-11)** | ⚪ **El pendiente más urgente de todo el documento**, sin cambios desde la v1 — cada semana que pasa hay más inventario/recetas/costeo en juego. |
+| **Operación sin internet / resiliencia offline** | ⚪ El sistema depende 100% de conexión. Señalado desde el análisis original de todo el proyecto; nunca se ha atacado con ningún spec. |
+| **RLS de tablas de caja legible por cualquier autenticado** | ❓ Señalado desde el primerísimo análisis. La auditoría de código cerró el caso de `ingredientes`, pero **no se confirmó explícitamente si este otro caso (tablas de caja/`movimientos_caja` y similares) sigue abierto o ya se resolvió de paso** — vale la pena una verificación puntual antes de asumir cualquier cosa. |
+| **Contraseña del admin** | ❓ Nunca se confirmó si de verdad se cambió del default original. |
+
+### Huecos genuinos sin fase asignada
+
+| Tema | Estado |
+|---|---|
+| **F4-03 — Cambiar el mesero asignado a una mesa activa** | ⚪ Identificado desde el spec original de marzo, nunca asignado a ninguna fase posterior. Sigue sin construirse. |
+| **Fase 8 completa** (F8-01 heatmap de horas pico, F8-02 scatter margen vs. volumen, F8-03 predicción de demanda) | ⚪ Especificada hace tiempo, nunca implementada — el proyecto se desvió hacia el rediseño de recetas y luego Fase 9. **Dato a favor:** F9-04 (alerta de ventas bajas) ya construyó el mismo patrón de comparación "mismo día de la semana a la misma hora" que necesita F8-03 — implementarla ahora sería más barato que antes de que existiera ese precedente. |
+| **F5-00 — Verificar nombres de perfiles** | ❓ Pendiente chico, nunca confirmado, arrastrado desde Fase 5. |
+
+### Deuda técnica que sigue creciendo
+
+| Tema | Estado |
+|---|---|
+| **Modelo de permisos escalará mal** | ⚪ Cada feature nueva agrega otra columna booleana a `config_sistema` — ya son varias (`descuentos_mesero`, `cancelaciones_mesero`, `cancelar_pedido_mesero`, `alerta_mesa_sin_atender`/`_minutos`, `tiempo_mesa_alerta_minutos`, `modificadores_por_linea`, `alerta_ventas_bajas_activa`/`_umbral_pct`, `orden_productos`/`orden_modificadores`...). Cada vez más urgente considerar una tabla de permisos en vez de seguir agregando columnas — el argumento de "esperar a que sean 10" ya se cumplió de sobra. |
+| **Inconsistencia de tipos: `categorias.modo_captura` (texto plano) vs. `productos.modo_captura` (enum)** | ⚪ Detectado en la auditoría, documentado a propósito sin resolver (cambiar el tipo de una columna en producción es una decisión aparte, con más riesgo que solo documentarla). |
+| **Ambiente de staging separado de producción** | ⚪ Sigue sin existir — todo lo grande de esta conversación (rediseño de recetas, Fase 7, mesas unidas visual, Fase 9 completa) se probó directo contra producción. |
+| Proceso de migraciones | 🟡 Resuelto en la práctica — el proyecto está vinculado al Supabase CLI y se ha usado consistentemente (`supabase db push`) en toda la Fase 9. |
+| Reconciliación física de inventario | ⚪ Mencionado hace tiempo, sin spec todavía. |
+| Conciliación de terminal bancaria | ⚪ Mencionado hace tiempo, sin spec todavía. |
+
+### Ya resuelto — sin acción pendiente
+
+- ✅ Auditoría de queries contra el esquema real (2 rondas completas).
+- ✅ Código muerto identificado en la auditoría (todo eliminado).
 
 ---
 
