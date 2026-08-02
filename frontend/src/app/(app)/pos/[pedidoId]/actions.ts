@@ -6,6 +6,7 @@ import { anularPedido } from '@/app/(app)/cobro/[pedidoId]/actions'
 import { columnaOrden } from '@/lib/ordenCatalogo'
 import { horaActualMX, dentroDeHorario } from '@/lib/horarioDisponibilidad'
 import { liberarUnaMesaSatelite } from '@/lib/mesasSatelite'
+import { primerNombreValido } from '@/lib/nombreUsuario'
 
 type Err = { error: string }
 
@@ -708,7 +709,7 @@ export async function anularPedidoCompleto(
   }
 
   // 2. Enviados: revertir inventario uno por uno y registrar la cancelación.
-  const meseroNombre = (perfil as any)?.nombre ?? user.email?.split('@')[0] ?? 'Mesero'
+  const meseroNombre = primerNombreValido((perfil as any)?.nombre, user.email?.split('@')[0])
   const itemsTicket: ItemCancelacion[] = []
 
   for (const it of enviados) {
@@ -1128,8 +1129,7 @@ export async function cancelarItem(
     (pedido as any).tipo === 'mesa'
       ? (mesaData?.nombre ?? `Mesa ${mesaData?.numero ?? sub.pedido_id}`)
       : 'Para llevar'
-  const meseroNombre =
-    (perfil as any)?.nombre ?? user.email?.split('@')[0] ?? 'Mesero'
+  const meseroNombre = primerNombreValido((perfil as any)?.nombre, user.email?.split('@')[0])
 
   void imprimirTicket(
     {

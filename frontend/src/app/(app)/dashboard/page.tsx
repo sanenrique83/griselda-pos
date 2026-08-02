@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { Perfil } from '@/lib/types/database.types'
 import { DashboardCharts } from '@/components/dashboard/DashboardCharts'
 import { calcularAlertaVentasBajas, type FilaAlertaVentasBajas } from '@/lib/alertaVentasBajas'
+import { primerNombreValido } from '@/lib/nombreUsuario'
 import type {
   VentaHora,
   TopProducto,
@@ -367,14 +368,14 @@ export default async function DashboardPage() {
       : { data: [] as { id: string; nombre: string }[] }
   const nombrePorUsuario = new Map((perfilesData ?? []).map((p) => [p.id, p.nombre]))
   const nombreMesero = (usuarioId: string | null) =>
-    usuarioId ? nombrePorUsuario.get(usuarioId) ?? 'Desconocido' : 'Sin usuario'
+    primerNombreValido(usuarioId ? nombrePorUsuario.get(usuarioId) : undefined)
 
   // cerrado_por: NULL en turnos cerrados antes de que se empezara a registrar.
   const turnosRecientes: TurnoRecienteData[] = turnosRecientesRaw.map((t) => ({
     id: t.id,
     fechaCierre: t.cerrado_en ? fmtFechaHora(t.cerrado_en) : '—',
     diferencia: t.diferencia,
-    cerradoPor: t.cerrado_por ? nombreMesero(t.cerrado_por) : 'Sin registrar',
+    cerradoPor: nombreMesero(t.cerrado_por),
   }))
 
   // ── Totales ──────────────────────────────────────────────────────────────

@@ -40,13 +40,14 @@ const METODO_LABEL: Record<PagoResumen['metodo'], string> = {
 // ─── CSV Export ───────────────────────────────────────────────────────────────
 
 function exportarCSV(recibos: ReciboData[], turnoId: number | null) {
-  const header = 'ID,Hora,Mesa,Total,Efectivo recibido,Cambio,Métodos'
+  const header = 'ID,Hora,Mesa,Mesero,Total,Efectivo recibido,Cambio,Métodos'
   const rows = recibos.map((r) => {
     const metodos = r.pagos.map((p) => `${p.metodo}:$${p.monto.toFixed(2)}`).join(' | ')
     return [
       r.id,
       new Date(r.createdAt).toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }),
       `"${r.mesaLabel}"`,
+      `"${r.meseroNombre}"`,
       r.total.toFixed(2),
       r.efectivoRecibido !== null ? r.efectivoRecibido.toFixed(2) : '',
       r.cambio !== null ? r.cambio.toFixed(2) : '',
@@ -236,7 +237,7 @@ function ReciboRow({
       <div className="min-w-0">
         <p className="text-[14px] font-semibold leading-tight">{r.mesaLabel}</p>
         <p className="mt-0.5 text-[12px] text-text-3">
-          #{r.id} · {fmtHora(r.createdAt)}
+          #{r.id} · {fmtHora(r.createdAt)} · {r.meseroNombre}
           {r.pagos.length > 1 && ' · Mixto'}
           {r.pagos.length === 1 && ` · ${METODO_LABEL[r.pagos[0].metodo]}`}
         </p>
@@ -326,7 +327,7 @@ function ReciboSheet({
           <div>
             <p className="text-[18px] font-bold">{r.mesaLabel}</p>
             <p className="text-[13px] text-text-3">
-              Recibo #{r.id} · {fmtHora(r.createdAt)}
+              Recibo #{r.id} · {fmtHora(r.createdAt)} · {r.meseroNombre}
             </p>
           </div>
 

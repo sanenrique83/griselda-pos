@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { Perfil } from '@/lib/types/database.types'
 import type { TicketConfig } from '@/lib/print'
 import { CorteZShell } from '@/components/corte-z/CorteZShell'
+import { primerNombreValido } from '@/lib/nombreUsuario'
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -269,7 +270,7 @@ export default async function CorteZPage({
     aperturaIso: t.abierto_en,
     cierreIso: t.cerrado_en,
     estado: t.estado,
-    cajeroNombre: nombrePorUsuario.get(t.cerrado_por ?? t.usuario_id) ?? 'Desconocido',
+    cajeroNombre: primerNombreValido(nombrePorUsuario.get(t.cerrado_por ?? t.usuario_id)),
     ventas: ventasPorTurno.get(t.id) ?? 0,
   }))
 

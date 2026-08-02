@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { HistorialShell } from '@/components/historial/HistorialShell'
+import { primerNombreValido } from '@/lib/nombreUsuario'
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -13,6 +14,7 @@ export type ReciboData = {
   id: number           // movimiento_id
   createdAt: string
   mesaLabel: string
+  meseroNombre: string
   total: number
   efectivoRecibido: number | null
   cambio: number | null
@@ -39,7 +41,7 @@ async function cargarRecibos(supabase: Awaited<ReturnType<typeof import('@/lib/s
          subpedidos(
            pedido_id,
            pedidos(
-             tipo, mesa_id,
+             tipo, mesa_id, mesero_id,
              mesas(numero, nombre)
            )
          )
@@ -49,7 +51,24 @@ async function cargarRecibos(supabase: Awaited<ReturnType<typeof import('@/lib/s
     .eq('tipo', 'cobro')
     .order('created_at', { ascending: false })
 
-  return (movimientos ?? []).map((m: any) => {
+  const rows = movimientos ?? []
+
+  // Nombre del mesero dueño del pedido de cada recibo (F5-00: antes esta
+  // pantalla no mostraba ningún nombre de usuario).
+  const meseroIds = Array.from(
+    new Set(
+      rows
+        .map((m: any) => m.cobro_subpedidos?.[0]?.subpedidos?.pedidos?.mesero_id as string | undefined)
+        .filter((id: string | undefined): id is string => !!id),
+    ),
+  )
+  const { data: perfilesData } =
+    meseroIds.length > 0
+      ? await supabase.from('perfiles').select('id, nombre').in('id', meseroIds)
+      : { data: [] as { id: string; nombre: string }[] }
+  const nombrePorUsuario = new Map((perfilesData ?? []).map((p) => [p.id, p.nombre]))
+
+  return rows.map((m: any) => {
     const primerSubpedido = (m.cobro_subpedidos ?? [])[0]
     const pedido = primerSubpedido?.subpedidos?.pedidos
 
@@ -72,6 +91,7 @@ async function cargarRecibos(supabase: Awaited<ReturnType<typeof import('@/lib/s
       id: m.id,
       createdAt: m.created_at,
       mesaLabel,
+      meseroNombre: primerNombreValido(pedido?.mesero_id ? nombrePorUsuario.get(pedido.mesero_id) : undefined),
       total: m.monto,
       efectivoRecibido: m.efectivo_recibido,
       cambio: m.cambio,

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { UnidadMedida, HistorialPrecioItem, ModoObtencionInsumo, MermaItem, MermaFiltros } from './page'
 import { mapHistorialRow } from './mappers'
 import { sumarDiasFecha, inicioDiaMxUtc } from '@/lib/fechaMx'
+import { primerNombreValido } from '@/lib/nombreUsuario'
 
 type Err = { error: string }
 
@@ -364,7 +365,7 @@ export async function obtenerMermas(filtros: MermaFiltros): Promise<MermaItem[] 
     unidadMedida: (m.insumos?.unidad_medida ?? 'pieza') as UnidadMedida,
     cantidad: m.cantidad,
     motivo: m.motivo,
-    usuarioNombre: m.usuario_id ? nombrePorUsuario.get(m.usuario_id) ?? 'Desconocido' : 'Sin usuario',
+    usuarioNombre: primerNombreValido(m.usuario_id ? nombrePorUsuario.get(m.usuario_id) : undefined),
     createdAt: m.created_at,
   }))
 }

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { inicioDiaMxUtc, sumarDiasFecha } from '@/lib/fechaMx'
+import { primerNombreValido } from '@/lib/nombreUsuario'
 import type { AsistenciaFiltros, AsistenciaRow } from './page'
 
 type Err = { error: string }
@@ -91,7 +92,7 @@ export async function obtenerHistorialAsistencia(
   return (data ?? []).map((a) => ({
     id: a.id,
     usuarioId: a.usuario_id,
-    usuarioNombre: nombrePorUsuario.get(a.usuario_id) ?? 'Desconocido',
+    usuarioNombre: primerNombreValido(nombrePorUsuario.get(a.usuario_id)),
     entrada: a.entrada,
     salida: a.salida,
   }))
@@ -205,7 +206,7 @@ export async function exportarAsistenciaCSV(filtros: AsistenciaFiltros): Promise
     const horas = f.salida
       ? ((new Date(f.salida).getTime() - new Date(f.entrada).getTime()) / 3_600_000).toFixed(2)
       : ''
-    const nombre = nombrePorUsuario.get(f.usuario_id) ?? 'Desconocido'
+    const nombre = primerNombreValido(nombrePorUsuario.get(f.usuario_id))
     lineas.push(
       [csvEscape(nombre), f.entrada, f.salida ?? '', horas, ventas.toFixed(2), propina.toFixed(2)].join(','),
     )

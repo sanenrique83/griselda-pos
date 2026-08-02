@@ -4,6 +4,7 @@ import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
 import { MesasShell } from '@/components/mesas/MesasShell'
 import { calcularOcupacionPorMesa } from '@/lib/asientos'
 import { calcularAlertaVentasBajas, type FilaAlertaVentasBajas } from '@/lib/alertaVentasBajas'
+import { primerNombreValido } from '@/lib/nombreUsuario'
 
 // Tipos exportados para que los componentes cliente los importen
 export type MesaUI = {
@@ -209,7 +210,7 @@ export default async function MesasPage() {
             id: pedido.id,
             created_at: pedido.created_at,
             num_comensales: pedido.num_comensales,
-            mesero_nombre: perfilMap.get(pedido.mesero_id) ?? 'Mesero',
+            mesero_nombre: primerNombreValido(perfilMap.get(pedido.mesero_id)),
             algunoPagadoNoTodos: algunoPagadoNoTodosPorPedido.get(pedido.id) ?? false,
             tieneProductos: tieneProductosPorPedido.get(pedido.id) ?? false,
           }

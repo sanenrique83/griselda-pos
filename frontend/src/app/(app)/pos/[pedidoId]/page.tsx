@@ -6,6 +6,7 @@ import type { MesaLibre } from '@/components/pos/SheetMoverMesa'
 import type { MesaSatelite } from '@/components/pos/SheetSepararMesa'
 import { columnaOrden } from '@/lib/ordenCatalogo'
 import { horaActualMX, dentroDeHorario } from '@/lib/horarioDisponibilidad'
+import { primerNombreValido } from '@/lib/nombreUsuario'
 import type { TicketConfig } from '@/lib/print'
 import type { FormaMesa, TamanoMesa } from '@/lib/types/database.types'
 
@@ -219,8 +220,7 @@ export default async function PosPage({
   const puedeAnularPedido =
     esAdmin || (config as any)?.cancelar_pedido_mesero === true
   const ordenProductos = columnaOrden((config as any)?.orden_productos)
-  const meseroNombre: string =
-    (perfil as any)?.nombre ?? user?.email?.split('@')[0] ?? 'Mesero'
+  const meseroNombre: string = primerNombreValido((perfil as any)?.nombre, user?.email?.split('@')[0])
   const rol: 'admin' | 'mesero' = (perfil as any)?.rol === 'admin' ? 'admin' : 'mesero'
   const tipoMesa: 'mesa' | 'llevar' | 'mostrador' =
     pedido.tipo === 'mesa' ? 'mesa' : pedido.tipo === 'mostrador' ? 'mostrador' : 'llevar'

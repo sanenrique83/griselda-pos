@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Perfil } from '@/lib/types/database.types'
 import Link from 'next/link'
+import { primerNombreValido } from '@/lib/nombreUsuario'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,7 +40,7 @@ export default async function MasPage() {
     .single<Pick<Perfil, 'rol' | 'nombre'>>()
 
   const isAdmin = perfil?.rol === 'admin'
-  const nombre = perfil?.nombre ?? 'Usuario'
+  const nombre = primerNombreValido(perfil?.nombre)
 
   // Turno activo (solo para admin)
   let turnoActivo: { id: number; abierto_en: string } | null = null

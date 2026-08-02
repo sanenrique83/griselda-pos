@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { Perfil } from '@/lib/types/database.types'
 import { CancelacionesShell } from '@/components/cancelaciones/CancelacionesShell'
 import { fechaHoyMX, sumarDiasFecha, inicioDiaMxUtc } from '@/lib/fechaMx'
+import { primerNombreValido } from '@/lib/nombreUsuario'
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -137,7 +138,7 @@ export default async function CancelacionesPage({
       id: c.id,
       createdAt: c.created_at,
       mesaLabel,
-      meseroNombre: c.usuario_id ? nombrePorUsuario.get(c.usuario_id) ?? 'Desconocido' : 'Sin usuario',
+      meseroNombre: primerNombreValido(c.usuario_id ? nombrePorUsuario.get(c.usuario_id) : undefined),
       productoNombre: pp?.nombre_libre || pp?.productos?.nombre || 'Producto eliminado',
       modificadores,
       motivo: c.motivo,
