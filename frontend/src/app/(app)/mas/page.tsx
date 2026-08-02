@@ -118,6 +118,7 @@ export default async function MasPage() {
 
         {/* ── Sección: General (todos los roles) ──────────────────────────── */}
         <Section title="General">
+          <MenuRow label="Asistencia" href="/mas/asistencia" isLast={false} />
           <MenuRow label="Recetario" href="/mas/recetario" isLast />
         </Section>
 
