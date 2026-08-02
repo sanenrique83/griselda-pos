@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { InventarioShell } from '@/components/inventario/InventarioShell'
 import { mapHistorialRow } from './mappers'
+import { obtenerMermas } from './actions'
+import { fechaHoyMX, sumarDiasFecha } from '@/lib/fechaMx'
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -72,6 +74,25 @@ export type CategoriaConRecetas = {
   productos: RecetaProductoItem[]
 }
 
+// ─── Mermas ───────────────────────────────────────────────────────────────────
+
+export type MermaItem = {
+  id: number
+  insumoId: number
+  insumoNombre: string
+  unidadMedida: UnidadMedida
+  cantidad: number
+  motivo: string
+  usuarioNombre: string
+  createdAt: string
+}
+
+export type MermaFiltros = {
+  desde: string
+  hasta: string
+  insumoId: number | null
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function InventarioPage() {
@@ -88,6 +109,13 @@ export default async function InventarioPage() {
 
   if (perfil?.rol !== 'admin') redirect('/mesas')
 
+  const hoy = fechaHoyMX()
+  const mermaFiltrosIniciales: MermaFiltros = {
+    desde: sumarDiasFecha(hoy, -30),
+    hasta: hoy,
+    insumoId: null,
+  }
+
   const [
     { data: rawInsumos },
     { data: rawProveedores },
@@ -100,6 +128,7 @@ export default async function InventarioPage() {
     { data: rawGrupos },
     { data: rawOpciones },
     { data: rawTiposInsumo },
+    mermasResult,
   ] = await Promise.all([
     supabase
       .from('insumos')
@@ -126,7 +155,10 @@ export default async function InventarioPage() {
     supabase.from('grupos_modificadores').select('id, producto_id, requerido').eq('activo', true),
     supabase.from('opciones_modificador').select('id, grupo_id, insumo_id').eq('activa', true),
     supabase.from('tipos_insumo').select('id, nombre, orden').order('orden'),
+    obtenerMermas(mermaFiltrosIniciales),
   ])
+
+  const mermas: MermaItem[] = Array.isArray(mermasResult) ? mermasResult : []
 
   const insumos: InsumoInventario[] = (rawInsumos ?? []).map((i: any) => ({
     id: i.id,
@@ -231,6 +263,8 @@ export default async function InventarioPage() {
       historial={historial}
       categoriasConRecetas={categoriasConRecetas}
       tiposInsumo={tiposInsumo}
+      mermas={mermas}
+      mermaFiltrosIniciales={mermaFiltrosIniciales}
     />
   )
 }

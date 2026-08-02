@@ -8,25 +8,29 @@ import { SeccionProveedores } from './SeccionProveedores'
 import { SeccionCompras } from './SeccionCompras'
 import { SeccionRecetas } from './SeccionRecetas'
 import { SeccionInsumosDerivados } from './SeccionInsumosDerivados'
+import { SeccionMermas } from './SeccionMermas'
 import type {
   InsumoInventario,
   ProveedorInventario,
   HistorialPrecioItem,
   CategoriaConRecetas,
   TipoInsumo,
+  MermaItem,
+  MermaFiltros,
 } from '@/app/(app)/mas/inventario/page'
 
-type Tab = 'insumos' | 'proveedores' | 'compras' | 'recetas'
+type Tab = 'insumos' | 'proveedores' | 'compras' | 'recetas' | 'mermas'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'insumos', label: 'Insumos' },
   { id: 'proveedores', label: 'Proveedores' },
   { id: 'compras', label: 'Compras' },
   { id: 'recetas', label: 'Recetas' },
+  { id: 'mermas', label: 'Mermas' },
 ]
 
 function esTabValida(v: string | null): v is Tab {
-  return v === 'insumos' || v === 'proveedores' || v === 'compras' || v === 'recetas'
+  return v === 'insumos' || v === 'proveedores' || v === 'compras' || v === 'recetas' || v === 'mermas'
 }
 
 interface InventarioShellProps {
@@ -35,6 +39,8 @@ interface InventarioShellProps {
   historial: HistorialPrecioItem[]
   categoriasConRecetas: CategoriaConRecetas[]
   tiposInsumo: TipoInsumo[]
+  mermas: MermaItem[]
+  mermaFiltrosIniciales: MermaFiltros
 }
 
 export function InventarioShell(props: InventarioShellProps) {
@@ -51,6 +57,8 @@ function InventarioShellInner({
   historial,
   categoriasConRecetas,
   tiposInsumo,
+  mermas,
+  mermaFiltrosIniciales,
 }: InventarioShellProps) {
   const searchParams = useSearchParams()
   const tabInicial = searchParams.get('tab')
@@ -89,6 +97,9 @@ function InventarioShellInner({
             <SeccionRecetas categorias={categoriasConRecetas} />
             <SeccionInsumosDerivados insumos={insumos} />
           </div>
+        )}
+        {tab === 'mermas' && (
+          <SeccionMermas insumos={insumos} mermas={mermas} filtrosIniciales={mermaFiltrosIniciales} />
         )}
       </div>
     </div>

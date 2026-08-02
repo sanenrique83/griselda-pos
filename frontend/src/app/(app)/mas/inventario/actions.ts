@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import type { UnidadMedida, HistorialPrecioItem, ModoObtencionInsumo } from './page'
+import type { UnidadMedida, HistorialPrecioItem, ModoObtencionInsumo, MermaItem, MermaFiltros } from './page'
 import { mapHistorialRow } from './mappers'
+import { sumarDiasFecha, inicioDiaMxUtc } from '@/lib/fechaMx'
 
 type Err = { error: string }
 
@@ -308,4 +309,62 @@ export async function registrarProduccionInsumo(data: {
       diferenciaPct: r.diferencia_pct,
     },
   }
+}
+
+// ─── Mermas ─────────────────────────────────────────────────────────────────
+// Único punto de escritura: registrar_merma() (SECURITY DEFINER, valida
+// es_admin() internamente) — inserta la fila en mermas + el movimiento en
+// movimientos_inventario (tipo='merma', cantidad negativa) y descuenta
+// insumos.stock_actual, todo en una sola transacción.
+
+export async function registrarMerma(data: {
+  insumoId: number
+  cantidad: number
+  motivo: string
+}): Promise<{ id: number } | Err> {
+  const supabase = await createClient()
+  const { data: mermaId, error } = await supabase.rpc('registrar_merma', {
+    p_insumo_id: data.insumoId,
+    p_cantidad: data.cantidad,
+    p_motivo: data.motivo,
+  })
+  if (error) return { error: error.message || 'Error al registrar la merma.' }
+  revalidatePath('/mas/inventario')
+  return { id: mermaId as number }
+}
+
+export async function obtenerMermas(filtros: MermaFiltros): Promise<MermaItem[] | Err> {
+  const supabase = await createClient()
+
+  let query = supabase
+    .from('mermas')
+    .select('id, insumo_id, cantidad, motivo, created_at, usuario_id, insumos(nombre, unidad_medida)')
+    .gte('created_at', inicioDiaMxUtc(filtros.desde))
+    .lt('created_at', inicioDiaMxUtc(sumarDiasFecha(filtros.hasta, 1)))
+    .order('created_at', { ascending: false })
+
+  if (filtros.insumoId) query = query.eq('insumo_id', filtros.insumoId)
+
+  const { data, error } = await query
+  if (error) return { error: 'Error al cargar las mermas.' }
+
+  const usuarioIds = Array.from(
+    new Set((data ?? []).map((m: any) => m.usuario_id as string | null).filter((id): id is string => !!id)),
+  )
+  const { data: perfilesData } =
+    usuarioIds.length > 0
+      ? await supabase.from('perfiles').select('id, nombre').in('id', usuarioIds)
+      : { data: [] as { id: string; nombre: string }[] }
+  const nombrePorUsuario = new Map((perfilesData ?? []).map((p) => [p.id, p.nombre]))
+
+  return (data ?? []).map((m: any) => ({
+    id: m.id,
+    insumoId: m.insumo_id,
+    insumoNombre: m.insumos?.nombre ?? 'Insumo eliminado',
+    unidadMedida: (m.insumos?.unidad_medida ?? 'pieza') as UnidadMedida,
+    cantidad: m.cantidad,
+    motivo: m.motivo,
+    usuarioNombre: m.usuario_id ? nombrePorUsuario.get(m.usuario_id) ?? 'Desconocido' : 'Sin usuario',
+    createdAt: m.created_at,
+  }))
 }

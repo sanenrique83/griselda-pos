@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Perfil } from '@/lib/types/database.types'
 import { CancelacionesShell } from '@/components/cancelaciones/CancelacionesShell'
+import { fechaHoyMX, sumarDiasFecha, inicioDiaMxUtc } from '@/lib/fechaMx'
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -27,31 +28,6 @@ export type CancelacionesFiltros = {
   meseroId: string | null
   motivo: string | null
   productoId: string | null
-}
-
-// ─── Helpers de fecha ─────────────────────────────────────────────────────────
-
-/** Fecha calendario 'YYYY-MM-DD' de hoy en America/Mexico_City */
-function fechaHoyMX(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
-}
-
-function sumarDiasFecha(fecha: string, dias: number): string {
-  const [y, m, d] = fecha.split('-').map(Number)
-  const dt = new Date(Date.UTC(y, m - 1, d))
-  dt.setUTCDate(dt.getUTCDate() + dias)
-  return dt.toISOString().slice(0, 10)
-}
-
-/**
- * Inicio de un día calendario 'YYYY-MM-DD' en America/Mexico_City, como ISO
- * UTC. México fijó su huso a UTC-6 sin horario de verano desde 2022 (salvo
- * la franja fronteriza norte, que no aplica a Mexico_City), así que es
- * seguro hardcodear el offset sin depender de una librería de zonas horarias.
- */
-function inicioDiaMxUtc(fecha: string): string {
-  const [y, m, d] = fecha.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, d, 6, 0, 0)).toISOString()
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
