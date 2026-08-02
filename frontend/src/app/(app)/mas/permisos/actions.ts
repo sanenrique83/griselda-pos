@@ -111,6 +111,19 @@ export async function actualizarAlertaVentasBajasUmbral(
   if (error) return { error: 'Error al actualizar el umbral de alerta de ventas bajas.' }
 }
 
+export async function actualizarTurnoDiferenciaAlerta(
+  monto: number,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('config_sistema')
+    .update({ turno_diferencia_alerta_monto: monto })
+    .eq('id', 1)
+
+  if (error) return { error: 'Error al actualizar el umbral de diferencia de turno.' }
+}
+
 type ModoOrden = 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
 
 export async function actualizarOrdenProductos(

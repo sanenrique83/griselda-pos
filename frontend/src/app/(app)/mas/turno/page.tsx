@@ -54,17 +54,22 @@ export default async function TurnoPage() {
   if (perfil?.rol !== 'admin') redirect('/mas')
 
   // ── Turno activo ──────────────────────────────────────────────────────────
-  const { data: turno } = await supabase
-    .from('turnos')
-    .select('id, fondo_inicial, abierto_en')
-    .eq('estado', 'abierto')
-    .order('abierto_en', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const [{ data: turno }, { data: config }] = await Promise.all([
+    supabase
+      .from('turnos')
+      .select('id, fondo_inicial, abierto_en')
+      .eq('estado', 'abierto')
+      .order('abierto_en', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase.from('config_sistema').select('turno_diferencia_alerta_monto').eq('id', 1).single(),
+  ])
+
+  const diferenciaAlertaMonto = (config as any)?.turno_diferencia_alerta_monto ?? 50
 
   // Sin turno activo → mostrar form de apertura
   if (!turno) {
-    return <TurnoShell turnoActivo={null} />
+    return <TurnoShell turnoActivo={null} diferenciaAlertaMonto={diferenciaAlertaMonto} />
   }
 
   // ── Métricas del turno activo ──────────────────────────────────────────────
@@ -163,5 +168,5 @@ export default async function TurnoPage() {
     movimientos: (movsFondoRetiroRes.data ?? []) as MovimientoCajaItem[],
   }
 
-  return <TurnoShell turnoActivo={turnoResumen} />
+  return <TurnoShell turnoActivo={turnoResumen} diferenciaAlertaMonto={diferenciaAlertaMonto} />
 }

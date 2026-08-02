@@ -13,6 +13,7 @@ import {
   actualizarModificadoresPorLinea,
   actualizarTiempoMesaAlerta,
   actualizarAlertaVentasBajasUmbral,
+  actualizarTurnoDiferenciaAlerta,
 } from '@/app/(app)/mas/permisos/actions'
 import type { ConfigPermisos } from '@/app/(app)/mas/permisos/page'
 
@@ -137,6 +138,13 @@ export function PermisosShell({ config }: PermisosShellProps) {
   const [ventasBajasPct, setVentasBajasPct] = useState(config.alerta_ventas_bajas_umbral_pct.toString())
   const [savingVentasBajas, setSavingVentasBajas] = useState(false)
   const [ventasBajasBanner, setVentasBajasBanner] = useState<string | null>(null)
+
+  // Umbral de diferencia de efectivo al cerrar turno
+  const [turnoDiferenciaMonto, setTurnoDiferenciaMonto] = useState(
+    config.turno_diferencia_alerta_monto.toString(),
+  )
+  const [savingTurnoDiferencia, setSavingTurnoDiferencia] = useState(false)
+  const [turnoDiferenciaBanner, setTurnoDiferenciaBanner] = useState<string | null>(null)
 
   function handleToggle(campo: keyof ConfigPermisos, valor: boolean) {
     // Optimistic update
@@ -274,6 +282,24 @@ export function PermisosShell({ config }: PermisosShellProps) {
     } else {
       setVentasBajasBanner('Guardado ✓')
       setTimeout(() => setVentasBajasBanner(null), 3000)
+    }
+  }
+
+  async function handleGuardarTurnoDiferencia() {
+    const monto = parseFloat(turnoDiferenciaMonto)
+    if (isNaN(monto) || monto < 0) {
+      setTurnoDiferenciaBanner('Ingresa un monto válido (0 o más).')
+      return
+    }
+    setSavingTurnoDiferencia(true)
+    setTurnoDiferenciaBanner(null)
+    const result = await actualizarTurnoDiferenciaAlerta(monto)
+    setSavingTurnoDiferencia(false)
+    if (result?.error) {
+      setTurnoDiferenciaBanner(result.error)
+    } else {
+      setTurnoDiferenciaBanner('Guardado ✓')
+      setTimeout(() => setTurnoDiferenciaBanner(null), 3000)
     }
   }
 
@@ -577,6 +603,51 @@ export function PermisosShell({ config }: PermisosShellProps) {
               className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
             >
               {savingVentasBajas ? 'Guardando…' : 'Guardar umbral de alerta'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Diferencia de efectivo al cerrar turno ────────────────────────── */}
+        <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+          <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+              Diferencia de efectivo al cerrar turno
+            </p>
+          </div>
+          <div className="px-4 py-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-3">
+                Monto de diferencia que dispara la advertencia
+              </label>
+              <div className="relative w-32">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-text-3">$</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="1"
+                  value={turnoDiferenciaMonto}
+                  onChange={(e) => setTurnoDiferenciaMonto(e.target.value)}
+                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-3 pl-7 pr-3.5 text-center font-mono text-lg font-bold outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-text-3">
+              Si el efectivo contado difiere del teórico por más de este monto (de sobra o de
+              faltante), la pantalla de cierre de turno pide una segunda confirmación explícita
+              antes de proceder — no bloquea el cierre, solo avisa.
+            </p>
+            {turnoDiferenciaBanner && (
+              <p className={`text-xs font-semibold ${turnoDiferenciaBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+                {turnoDiferenciaBanner}
+              </p>
+            )}
+            <button
+              onClick={handleGuardarTurnoDiferencia}
+              disabled={savingTurnoDiferencia}
+              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+            >
+              {savingTurnoDiferencia ? 'Guardando…' : 'Guardar umbral de diferencia'}
             </button>
           </div>
         </div>

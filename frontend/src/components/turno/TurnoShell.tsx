@@ -10,6 +10,7 @@ import type { TurnoResumen, MovimientoCajaItem } from '@/app/(app)/mas/turno/pag
 
 interface TurnoShellProps {
   turnoActivo: TurnoResumen | null
+  diferenciaAlertaMonto: number
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -39,7 +40,7 @@ function round2(n: number) {
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
-export function TurnoShell({ turnoActivo }: TurnoShellProps) {
+export function TurnoShell({ turnoActivo, diferenciaAlertaMonto }: TurnoShellProps) {
   return (
     <div>
       {/* Header */}
@@ -57,7 +58,7 @@ export function TurnoShell({ turnoActivo }: TurnoShellProps) {
 
       <div className="px-4 py-4 space-y-4">
         {turnoActivo ? (
-          <TurnoActivo turno={turnoActivo} />
+          <TurnoActivo turno={turnoActivo} diferenciaAlertaMonto={diferenciaAlertaMonto} />
         ) : (
           <AbrirTurnoForm />
         )}
@@ -159,12 +160,21 @@ function AbrirTurnoForm() {
 
 // ─── Subcomponente: Turno activo + cierre ─────────────────────────────────────
 
-function TurnoActivo({ turno }: { turno: TurnoResumen }) {
+function TurnoActivo({
+  turno,
+  diferenciaAlertaMonto,
+}: {
+  turno: TurnoResumen
+  diferenciaAlertaMonto: number
+}) {
   const router = useRouter()
   const [efectivoContado, setEfectivoContado] = useState('')
   const [notas, setNotas] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  // Advertencia no bloqueante: si la diferencia supera el umbral configurado,
+  // pide una segunda confirmación explícita antes de cerrar de verdad.
+  const [confirmandoCierre, setConfirmandoCierre] = useState(false)
 
   // Movimientos de caja
   const [sheetMovimiento, setSheetMovimiento] = useState<'fondo' | 'retiro' | null>(null)
@@ -201,11 +211,19 @@ function TurnoActivo({ turno }: { turno: TurnoResumen }) {
   const numContado = efectivoContado === '' ? 0 : parseFloat(efectivoContado)
   const diferencia =
     !isNaN(numContado) ? round2(numContado - turno.efectivoTeorico) : null
+  const diferenciaExcedeUmbral = diferencia !== null && Math.abs(diferencia) > diferenciaAlertaMonto
 
   function handleCerrar() {
     setError(null)
     if (isNaN(numContado) || numContado < 0) {
       setError('Ingresa el efectivo contado en caja.')
+      return
+    }
+    // No bloqueante: la primera vez que se dispara con la diferencia por
+    // encima del umbral, solo muestra la advertencia y pide un segundo tap
+    // explícito — no cierra todavía.
+    if (diferenciaExcedeUmbral && !confirmandoCierre) {
+      setConfirmandoCierre(true)
       return
     }
     startTransition(async () => {
@@ -214,7 +232,10 @@ function TurnoActivo({ turno }: { turno: TurnoResumen }) {
         efectivoContado: numContado,
         notas: notas.trim() || null,
       })
-      if (result?.error) setError(result.error)
+      if (result?.error) {
+        setError(result.error)
+        setConfirmandoCierre(false)
+      }
     })
   }
 
@@ -566,6 +587,25 @@ function TurnoActivo({ turno }: { turno: TurnoResumen }) {
         </div>
       )}
 
+      {/* Advertencia no bloqueante: diferencia por encima del umbral configurado */}
+      {confirmandoCierre && diferenciaExcedeUmbral && diferencia !== null && (
+        <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3.5 space-y-2">
+          <p className="text-sm font-bold text-amber-800">
+            ⚠️ Diferencia de ${fmtMoney(Math.abs(diferencia))} {diferencia > 0 ? '(sobrante)' : '(faltante)'}
+          </p>
+          <p className="text-xs text-amber-700">
+            Supera el umbral de ${fmtMoney(diferenciaAlertaMonto)} configurado en Permisos. Puedes cerrar
+            de todas formas, o cancelar y revisar el conteo antes de continuar.
+          </p>
+          <button
+            onClick={() => setConfirmandoCierre(false)}
+            className="w-full rounded-xl bg-white border border-amber-300 py-2.5 text-sm font-semibold text-amber-800 active:scale-[.98]"
+          >
+            Revisar de nuevo
+          </button>
+        </div>
+      )}
+
       {/* Botón de cierre */}
       <button
         onClick={handleCerrar}
@@ -576,7 +616,11 @@ function TurnoActivo({ turno }: { turno: TurnoResumen }) {
         }
         className="w-full rounded-xl bg-red-600 py-[18px] text-base font-bold text-white shadow-[0_4px_14px_rgba(220,38,38,.25)] active:scale-[.98] disabled:opacity-40"
       >
-        {isPending ? 'Cerrando turno…' : '⏹ Cerrar turno'}
+        {isPending
+          ? 'Cerrando turno…'
+          : confirmandoCierre && diferenciaExcedeUmbral
+            ? 'Sí, cerrar de todas formas'
+            : '⏹ Cerrar turno'}
       </button>
 
       <p className="text-center text-[11px] text-text-4 pb-2">
