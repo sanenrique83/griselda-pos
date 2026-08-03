@@ -19,6 +19,7 @@ const ESTILO_TARJETA: Record<ColorMesa, { border: string; bg: string; badgeBg: s
   naranja: { border: 'border-[#FDE68A]', bg: 'bg-[#FFFDF0]', badgeBg: 'bg-amber-50',  badgeText: 'text-amber-600',  label: '● Ocupada' },
   azul:    { border: 'border-[#BFDBFE]', bg: 'bg-[#EFF6FF]', badgeBg: 'bg-blue-50',   badgeText: 'text-blue-600',   label: '● Cobro parcial' },
   rojo:    { border: 'border-[#FCA5A5]', bg: 'bg-[#FEF2F2]', badgeBg: 'bg-red-50',    badgeText: 'text-red-600',    label: '● Sin atender' },
+  gris:    { border: 'border-[#D1D5DB]', bg: 'bg-[#F3F4F6]', badgeBg: 'bg-gray-200',  badgeText: 'text-gray-600',   label: '🔧 Fuera de servicio' },
 }
 
 export function TarjetaMesa({
@@ -48,6 +49,7 @@ export function TarjetaMesa({
       pedidoCreatedAt: mesa.pedido_activo?.created_at ?? null,
       alertaActiva,
       alertaMinutos,
+      fueraDeServicio: mesa.fuera_de_servicio,
     },
     ahora ?? undefined,
   )

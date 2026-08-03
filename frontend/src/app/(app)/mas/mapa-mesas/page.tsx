@@ -20,6 +20,7 @@ export type MesaEditable = {
   posY: number | null
   capacidad: number | null
   asientosHorario: boolean
+  fueraDeServicio: boolean
   temporal: boolean
   ocupadas: number
   // Pedido abierto que ocupa esta mesa (como principal o como satélite unida
@@ -57,7 +58,7 @@ export default async function MapaMesasPage() {
     supabase
       .from('mesas')
       .select(
-        'id, numero, nombre, area_id, pos_x, pos_y, rotacion, forma, tamano, capacidad, asientos_horario, temporal, areas(nombre)',
+        'id, numero, nombre, area_id, pos_x, pos_y, rotacion, forma, tamano, capacidad, asientos_horario, fuera_de_servicio, temporal, areas(nombre)',
       )
       .eq('activa', true)
       .order('numero'),
@@ -154,6 +155,7 @@ export default async function MapaMesasPage() {
       posY: m.pos_y,
       capacidad: m.capacidad,
       asientosHorario: m.asientos_horario ?? true,
+      fueraDeServicio: m.fuera_de_servicio ?? false,
       temporal: m.temporal ?? false,
       ocupadas: ocupacionPorMesa.get(m.id) ?? 0,
       pedidoActivoId,

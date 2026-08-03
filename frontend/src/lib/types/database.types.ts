@@ -110,6 +110,7 @@ export interface Mesa {
   forma: FormaMesa | null
   tamano: TamanoMesa | null
   asientos_horario: boolean
+  fuera_de_servicio: boolean
 }
 
 export interface Impresora {

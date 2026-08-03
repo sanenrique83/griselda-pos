@@ -11,6 +11,10 @@ export type CambioMesa = {
   rotacion: number
   forma: FormaMesa
   tamano: TamanoMesa
+  // Opcional: PlanoMesas.tsx (auto-guardado de posición en /mesas) no manda
+  // este campo — solo el editor de /mas/mapa-mesas lo trae, para no pisar
+  // el valor existente cuando no se está editando el toggle.
+  fueraDeServicio?: boolean
 }
 
 export async function guardarDisposicion(
@@ -26,18 +30,24 @@ export async function guardarDisposicion(
   if (!user) return { error: 'Sin sesión.' }
 
   const resultados = await Promise.all(
-    cambios.map((c) =>
-      supabase
-        .from('mesas')
-        .update({
-          pos_x: c.posX,
-          pos_y: c.posY,
-          rotacion: c.rotacion,
-          forma: c.forma,
-          tamano: c.tamano,
-        })
-        .eq('id', c.id),
-    ),
+    cambios.map((c) => {
+      const patch: {
+        pos_x: number
+        pos_y: number
+        rotacion: number
+        forma: FormaMesa
+        tamano: TamanoMesa
+        fuera_de_servicio?: boolean
+      } = {
+        pos_x: c.posX,
+        pos_y: c.posY,
+        rotacion: c.rotacion,
+        forma: c.forma,
+        tamano: c.tamano,
+      }
+      if (c.fueraDeServicio !== undefined) patch.fuera_de_servicio = c.fueraDeServicio
+      return supabase.from('mesas').update(patch).eq('id', c.id)
+    }),
   )
 
   if (resultados.some((r) => r.error)) {

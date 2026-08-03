@@ -19,7 +19,7 @@ import { guardarDisposicion } from '@/app/(app)/mas/mapa-mesas/actions'
 import { crearArea } from '@/app/(app)/mas/catalogo/actions'
 import { unirMesas, unirMesaLibreAOcupada } from '@/app/(app)/pos/[pedidoId]/actions'
 import { calcularPosicionesSillas } from '@/lib/asientos'
-import { colorSemaforoMesa } from '@/lib/colorMesa'
+import { colorSemaforoMesa, type ColorMesa } from '@/lib/colorMesa'
 import {
   COLOR_IMAN,
   buscarCandidatoIman as buscarCandidatoImanBase,
@@ -46,6 +46,7 @@ type Posicion = {
   rotacion: number
   forma: FormaMesa
   tamano: TamanoMesa
+  fueraDeServicio: boolean
 }
 
 // Mesas sin pos_x/pos_y (nunca se han colocado en el mapa) se acomodan en
@@ -92,6 +93,7 @@ function posicionesIniciales(mesas: MesaEditable[]): Record<number, Posicion> {
         rotacion: mesa.rotacion,
         forma: mesa.forma,
         tamano: mesa.tamano,
+        fueraDeServicio: mesa.fueraDeServicio,
       }
     } else {
       const clave: AreaTabId = mesa.areaId ?? 'sin_area'
@@ -102,6 +104,7 @@ function posicionesIniciales(mesas: MesaEditable[]): Record<number, Posicion> {
         rotacion: mesa.rotacion,
         forma: mesa.forma,
         tamano: mesa.tamano,
+        fueraDeServicio: mesa.fueraDeServicio,
       }
       contadorPorArea.set(clave, indice + 1)
     }
@@ -387,6 +390,7 @@ export function LienzoMesasEditor({
       rotacion: posiciones[id].rotacion,
       forma: posiciones[id].forma,
       tamano: posiciones[id].tamano,
+      fueraDeServicio: posiciones[id].fueraDeServicio,
     }))
     const res = await guardarDisposicion(cambios)
     setGuardando(false)
@@ -561,6 +565,7 @@ export function LienzoMesasEditor({
                           pedidoCreatedAt: mesa.pedidoCreatedAt,
                           alertaActiva,
                           alertaMinutos,
+                          fueraDeServicio: posiciones[mesa.id]?.fueraDeServicio ?? mesa.fueraDeServicio,
                         },
                         ahora,
                       )}
@@ -613,6 +618,31 @@ export function LienzoMesasEditor({
                 >
                   ⟳ Rotar 90° ({posicionSeleccionada.rotacion}°)
                 </button>
+
+                <div className="flex items-center justify-between border-t border-[#F2F2F7] pt-3">
+                  <div className="min-w-0 pr-3">
+                    <p className="text-[13px] text-text-2">🔧 Fuera de servicio</p>
+                    <p className="text-[11px] text-text-4">
+                      No aparece libre para abrir pedido nuevo, ni cuenta como ocupada.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      actualizarMesa(mesaSeleccionada.id, {
+                        fueraDeServicio: !posicionSeleccionada.fueraDeServicio,
+                      })
+                    }
+                    className={`relative flex-shrink-0 h-[26px] w-[46px] rounded-full transition-colors duration-200 ${
+                      posicionSeleccionada.fueraDeServicio ? 'bg-blue-600' : 'bg-[#D1D1D6]'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-[3px] h-[20px] w-[20px] rounded-full bg-white shadow transition-transform duration-200 ${
+                        posicionSeleccionada.fueraDeServicio ? 'translate-x-[22px]' : 'translate-x-[3px]'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
             )}
 
@@ -703,7 +733,7 @@ function MesaDraggable({
   seleccionada: boolean
   anilloColor?: string
   magnetActivo?: boolean
-  colorEstado?: 'verde' | 'naranja' | 'azul' | 'rojo'
+  colorEstado?: ColorMesa
   onSelect: () => void
   pedidoCreatedAt: string | null
   tiempoMesaAlertaMinutos: number
@@ -747,6 +777,7 @@ function MesaDraggable({
         marcadores={marcadores}
       >
         <span className="text-[12px] font-bold leading-none">{mesa.nombre ?? mesa.numero}</span>
+        {posicion.fueraDeServicio && <span className="text-[10px] leading-none">🔧</span>}
         {pedidoCreatedAt && (
           <TiempoMesa
             desde={pedidoCreatedAt}

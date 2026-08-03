@@ -110,6 +110,13 @@ export function MesasShell({
       return
     }
 
+    // Fuera de servicio (y sin pedido activo) → no es seleccionable para
+    // abrir un pedido nuevo.
+    if (mesa.fuera_de_servicio) {
+      setError('Esta mesa está fuera de servicio.')
+      return
+    }
+
     // Sin turno activo → mostrar aviso
     if (!turnoId) {
       setError('No hay turno activo. Ve a Más → Turno para abrir uno.')

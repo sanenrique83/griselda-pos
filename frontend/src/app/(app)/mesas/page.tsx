@@ -21,6 +21,7 @@ export type MesaUI = {
   forma: FormaMesa
   tamano: TamanoMesa
   asientos_horario: boolean
+  fuera_de_servicio: boolean
   // Cuántos de los asientos de ESTA mesa física están tomados (repartidos
   // desde la cadena si la mesa está unida — ver calcularOcupacionPorMesa).
   ocupadas: number
@@ -68,7 +69,7 @@ export default async function MesasPage() {
   const { data: mesasRaw } = await supabase
     .from('mesas')
     .select(
-      'id, numero, nombre, capacidad, area_id, pos_x, pos_y, rotacion, forma, tamano, asientos_horario, areas(nombre, orden)',
+      'id, numero, nombre, capacidad, area_id, pos_x, pos_y, rotacion, forma, tamano, asientos_horario, fuera_de_servicio, areas(nombre, orden)',
     )
     .eq('activa', true)
     .order('numero')
@@ -204,6 +205,7 @@ export default async function MesasPage() {
       forma: (mesa.forma as FormaMesa) ?? 'rectangulo',
       tamano: (mesa.tamano as TamanoMesa) ?? 'medio',
       asientos_horario: mesa.asientos_horario ?? true,
+      fuera_de_servicio: mesa.fuera_de_servicio ?? false,
       ocupadas: ocupacionPorMesa.get(mesa.id) ?? 0,
       pedido_activo: pedido
         ? {

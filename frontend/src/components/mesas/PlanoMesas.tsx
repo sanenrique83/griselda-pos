@@ -306,6 +306,7 @@ export function PlanoMesas({
                   pedidoCreatedAt: mesa.pedido_activo?.created_at ?? null,
                   alertaActiva,
                   alertaMinutos,
+                  fueraDeServicio: mesa.fuera_de_servicio,
                 },
                 ahora,
               )
@@ -385,6 +386,7 @@ function MesaArrastrable({
         <span className="text-[13px] font-bold leading-none">
           {mesa.nombre ?? mesa.numero}
         </span>
+        {mesa.fuera_de_servicio && <span className="text-[11px] leading-none">🔧</span>}
         {mesa.pedido_activo && (
           <>
             <span
