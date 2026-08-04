@@ -28,7 +28,12 @@ export type UsuarioOpcion = {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default async function AsistenciaPage() {
+export default async function AsistenciaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ usuarioId?: string }>
+}) {
+  const { usuarioId: usuarioIdParam } = await searchParams
   const supabase = await createClient()
 
   const {
@@ -55,8 +60,10 @@ export default async function AsistenciaPage() {
   // ── Historial + filtro por usuario (solo admin) ─────────────────────────────
   let historialInicial: AsistenciaRow[] = []
   let usuariosOpciones: UsuarioOpcion[] = []
+  // Deep-link desde /mas/usuarios ("Ver historial de asistencia" de un
+  // usuario específico) — ?usuarioId=<uuid> preselecciona el filtro.
   let filtrosIniciales: AsistenciaFiltros = {
-    usuarioId: null,
+    usuarioId: usuarioIdParam ?? null,
     desde: sumarDiasFecha(fechaHoyMX(), -30),
     hasta: fechaHoyMX(),
   }

@@ -31,6 +31,8 @@ export interface Perfil {
   rol: RolUsuario
   activo: boolean
   created_at: string
+  telefono: string | null
+  fecha_contratacion: string | null // DATE — 'YYYY-MM-DD'
 }
 
 export interface ConfigSistema {
