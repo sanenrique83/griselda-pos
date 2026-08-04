@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
-import { crearUsuario, actualizarUsuario } from '@/app/(app)/mas/usuarios/actions'
+import { crearUsuario, actualizarUsuario, actualizarPin, quitarPin } from '@/app/(app)/mas/usuarios/actions'
 import type { UsuarioRow } from '@/app/(app)/mas/usuarios/page'
 import type { RolUsuario } from '@/lib/types/database.types'
 
@@ -41,8 +41,18 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
   const [fFechaContratacion, setFFechaContratacion] = useState('')
   const [fActivo, setFActivo] = useState(true)
 
+  // PIN rápido (/cambiar-usuario) — acción propia, separada de "Guardar
+  // cambios", porque pega a un endpoint distinto (actualizarPin/quitarPin).
+  const [fPin, setFPin] = useState('')
+  const [pinPending, startPinTransition] = useTransition()
+  const [pinError, setPinError] = useState<string | null>(null)
+  const [pinBanner, setPinBanner] = useState<string | null>(null)
+
   function abrirSheet(mode: SheetMode) {
     setFormError(null)
+    setFPin('')
+    setPinError(null)
+    setPinBanner(null)
     if (mode.tipo === 'editar') {
       setFNombre(mode.usuario.nombre)
       setFRol(mode.usuario.rol)
@@ -100,6 +110,7 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
               activo: true,
               telefono: fTelefono.trim() || null,
               fechaContratacion: fFechaContratacion || null,
+              tienePin: false,
             },
           ].sort((a, b) => a.nombre.localeCompare(b.nombre)),
         )
@@ -136,6 +147,46 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
     }
   }
 
+  function handleGuardarPin() {
+    if (sheet.tipo !== 'editar') return
+    if (!/^\d{4}$/.test(fPin)) {
+      setPinError('El PIN debe ser de 4 dígitos.')
+      return
+    }
+    const usuarioId = sheet.usuario.id
+    setPinError(null)
+    setPinBanner(null)
+    startPinTransition(async () => {
+      const result = await actualizarPin(usuarioId, fPin)
+      if (result?.error) {
+        setPinError(result.error)
+        return
+      }
+      setUsuarios((prev) => prev.map((u) => (u.id === usuarioId ? { ...u, tienePin: true } : u)))
+      setFPin('')
+      setPinBanner('PIN guardado ✓')
+      setTimeout(() => setPinBanner(null), 3000)
+    })
+  }
+
+  function handleQuitarPin() {
+    if (sheet.tipo !== 'editar') return
+    const usuarioId = sheet.usuario.id
+    setPinError(null)
+    setPinBanner(null)
+    startPinTransition(async () => {
+      const result = await quitarPin(usuarioId)
+      if (result?.error) {
+        setPinError(result.error)
+        return
+      }
+      setUsuarios((prev) => prev.map((u) => (u.id === usuarioId ? { ...u, tienePin: false } : u)))
+      setFPin('')
+      setPinBanner('PIN eliminado ✓')
+      setTimeout(() => setPinBanner(null), 3000)
+    })
+  }
+
   const sheetOpen = sheet.tipo !== 'none'
 
   return (
@@ -169,6 +220,11 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
                         {!u.activo && (
                           <span className="flex-shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600">
                             Inactivo
+                          </span>
+                        )}
+                        {u.tienePin && (
+                          <span className="flex-shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600">
+                            🔢 PIN
                           </span>
                         )}
                       </div>
@@ -326,6 +382,48 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
                   }`}
                 />
               </button>
+            </div>
+          )}
+
+          {sheet.tipo === 'editar' && (
+            <div className="border-t border-[#F2F2F7] pt-3">
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                PIN de acceso rápido (/cambiar-usuario)
+              </label>
+              <p className="mb-2 text-[11px] text-text-4">
+                {sheet.usuario.tienePin
+                  ? 'Ya tiene un PIN configurado — guarda uno nuevo para reemplazarlo.'
+                  : 'Sin PIN configurado — no aparece en la pantalla de cambio rápido de usuario.'}
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={fPin}
+                  onChange={(e) => setFPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="0000"
+                  className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold tracking-widest outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={handleGuardarPin}
+                  disabled={pinPending}
+                  className="flex-1 rounded-xl bg-blue-600 py-3 text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
+                >
+                  {pinPending ? '…' : 'Guardar PIN'}
+                </button>
+              </div>
+              {sheet.usuario.tienePin && (
+                <button
+                  onClick={handleQuitarPin}
+                  disabled={pinPending}
+                  className="mt-2 text-[12px] font-medium text-red-500 active:opacity-60 disabled:opacity-40"
+                >
+                  Quitar PIN
+                </button>
+              )}
+              {pinError && <p className="mt-2 text-xs font-semibold text-red-600">{pinError}</p>}
+              {pinBanner && <p className="mt-2 text-xs font-semibold text-green-600">{pinBanner}</p>}
             </div>
           )}
 

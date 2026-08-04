@@ -33,6 +33,11 @@ export interface Perfil {
   created_at: string
   telefono: string | null
   fecha_contratacion: string | null // DATE — 'YYYY-MM-DD'
+  // PIN rápido (/cambiar-usuario) — nunca expuesto vía RLS a ningún
+  // cliente, solo leído/escrito por Server Actions vía el cliente admin.
+  pin_hash: string | null
+  pin_intentos_fallidos: number
+  pin_bloqueado_hasta: string | null
 }
 
 export interface ConfigSistema {

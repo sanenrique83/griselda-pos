@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import bcrypt from 'bcryptjs'
 import type { RolUsuario } from '@/lib/types/database.types'
 
 type Err = { error: string }
@@ -102,4 +103,60 @@ export async function actualizarUsuario(
 
   revalidatePath('/mas/usuarios')
   revalidatePath('/mesas')
+}
+
+// ─── PIN rápido (/cambiar-usuario) ─────────────────────────────────────────
+// pin_hash nunca se lee/escribe con el cliente normal — aunque
+// perfil_propio_update ya dejaría a un admin editar cualquier fila, se usa
+// el cliente admin aquí también por consistencia con cambiarUsuario() (la
+// otra mitad del flujo), que sí lo necesita porque corre en el contexto de
+// quien se está cambiando DE cuenta, no del admin.
+export async function actualizarPin(
+  id: string,
+  pin: string,
+): Promise<Err | undefined> {
+  const errAdmin = await verificarAdmin()
+  if (errAdmin) return errAdmin
+
+  if (!/^\d{4}$/.test(pin)) return { error: 'El PIN debe ser de 4 dígitos.' }
+
+  let admin: ReturnType<typeof createAdminClient>
+  try {
+    admin = createAdminClient()
+  } catch (e) {
+    console.error('[actualizarPin] cliente admin no disponible:', e)
+    return { error: 'Falta configurar SUPABASE_SERVICE_ROLE_KEY en el servidor.' }
+  }
+
+  const pinHash = await bcrypt.hash(pin, 10)
+  const { error } = await admin
+    .from('perfiles')
+    .update({ pin_hash: pinHash, pin_intentos_fallidos: 0, pin_bloqueado_hasta: null })
+    .eq('id', id)
+
+  if (error) return { error: 'Error al guardar el PIN.' }
+
+  revalidatePath('/mas/usuarios')
+}
+
+export async function quitarPin(id: string): Promise<Err | undefined> {
+  const errAdmin = await verificarAdmin()
+  if (errAdmin) return errAdmin
+
+  let admin: ReturnType<typeof createAdminClient>
+  try {
+    admin = createAdminClient()
+  } catch (e) {
+    console.error('[quitarPin] cliente admin no disponible:', e)
+    return { error: 'Falta configurar SUPABASE_SERVICE_ROLE_KEY en el servidor.' }
+  }
+
+  const { error } = await admin
+    .from('perfiles')
+    .update({ pin_hash: null, pin_intentos_fallidos: 0, pin_bloqueado_hasta: null })
+    .eq('id', id)
+
+  if (error) return { error: 'Error al quitar el PIN.' }
+
+  revalidatePath('/mas/usuarios')
 }

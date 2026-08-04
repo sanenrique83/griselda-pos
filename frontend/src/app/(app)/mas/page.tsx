@@ -84,6 +84,23 @@ export default async function MasPage() {
           </div>
         </div>
 
+        {/* ── Cambiar de usuario (PIN rápido) ─────────────────────────────────
+            Prominente y pegado arriba a propósito, no como una fila más del
+            menú alfabético de Admin — es una acción operativa de uso muy
+            frecuente (cambio de turno a media mesa), disponible para
+            cualquier rol, no solo admin. */}
+        <Link
+          href="/cambiar-usuario"
+          className="flex items-center gap-3 rounded-2xl bg-blue-600 px-4 py-4 text-white shadow-[0_4px_14px_rgba(37,99,235,.28)] active:scale-[.98]"
+        >
+          <span className="text-[26px] leading-none">🔁</span>
+          <div className="flex-1 text-left">
+            <div className="text-[15px] font-semibold">Cambiar de usuario</div>
+            <div className="mt-0.5 text-[12px] opacity-80">Con PIN, sin cerrar sesión</div>
+          </div>
+          <span className="text-xl opacity-70">›</span>
+        </Link>
+
         {/* ── Sección: Admin ────────────────────────────────────────────────── */}
         {isAdmin && (
           <Section title="Administración">
