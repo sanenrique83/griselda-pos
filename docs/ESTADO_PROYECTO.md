@@ -1,5 +1,5 @@
-# Griselda POS — Estado Consolidado del Proyecto (v5)
-**Última actualización:** 1 de agosto de 2026. Reemplaza la v4 — **Fase 9 completa** (los 8 puntos: F7-04 combos electivos + F9-01 a F9-08), se creó `CLAUDE.md` para instrucciones persistentes, y se hizo un repaso completo de pendientes sueltos de fases anteriores nunca cerrados.
+# Griselda POS — Estado Consolidado del Proyecto (v6)
+**Última actualización:** 2 de agosto de 2026. Reemplaza la v5 — se cerró la "Cola Maestra v2" completa desde H-01 hasta el #10 (10 de 12 ítems), incluyendo el rediseño de Comanda en cascada (el más grande de uso diario de esta ronda), PIN rápido, administración de usuarios, y un segundo bug real de embed ambiguo (mismo patrón que `combo_productos`, esta vez en `grupos_modificadores`).
 
 **Leyenda:** ✅ Hecho y confirmado · 🟡 Parcial · ⚪ Spec listo, sin implementar · 🚫 Descartado/superado · ❓ No verificado
 
@@ -203,10 +203,11 @@ Con Fase 9 cerrada, se hizo un repaso deliberado de qué quedó pendiente de fas
 
 | Tema | Estado |
 |---|---|
-| **Modelo de permisos escalará mal** | ⚪ Cada feature nueva agrega otra columna booleana a `config_sistema` — ya son varias (`descuentos_mesero`, `cancelaciones_mesero`, `cancelar_pedido_mesero`, `alerta_mesa_sin_atender`/`_minutos`, `tiempo_mesa_alerta_minutos`, `modificadores_por_linea`, `alerta_ventas_bajas_activa`/`_umbral_pct`, `orden_productos`/`orden_modificadores`...). Cada vez más urgente considerar una tabla de permisos en vez de seguir agregando columnas — el argumento de "esperar a que sean 10" ya se cumplió de sobra. |
+| **Modelo de permisos escalará mal** | ⚪ Cada feature nueva agrega otra columna booleana a `config_sistema` — ya son varias (`descuentos_mesero`, `cancelaciones_mesero`, `cancelar_pedido_mesero`, `alerta_mesa_sin_atender`/`_minutos`, `tiempo_mesa_alerta_minutos`, `modificadores_por_linea`, `alerta_ventas_bajas_activa`/`_umbral_pct`, `orden_productos`/`orden_modificadores`/`orden_popularidad_dias`, `formato_modificadores_ticket`, `alerta_precuenta_activa`/`_minutos`, `turno_diferencia_alerta_monto`...). Cada vez más urgente considerar una tabla de permisos en vez de seguir agregando columnas — el argumento de "esperar a que sean 10" ya se cumplió varias veces de sobra. |
+| **`grupos_modificadores.padre_opcion_id` sin terminar de eliminar** | ⚪ **Ya causó un bug real en producción dos veces** con el mismo patrón que `ingredientes` (FK viva desde una columna deprecada, ambigüedad de embed en PostgREST) — primero con `combo_productos`, ahora con `opciones_modificador`↔`grupos_modificadores`. Ambas veces se corrigió con un hint de FK explícito, pero la causa de fondo (la columna deprecada nunca se terminó de eliminar) sigue viva y puede repetirse en cualquier embed futuro. Vale la pena terminar su `DROP`, igual que ya se hizo con `ingredientes` en la auditoría. |
 | **Inconsistencia de tipos: `categorias.modo_captura` (texto plano) vs. `productos.modo_captura` (enum)** | ⚪ Detectado en la auditoría, documentado a propósito sin resolver (cambiar el tipo de una columna en producción es una decisión aparte, con más riesgo que solo documentarla). |
-| **Ambiente de staging separado de producción** | ⚪ Sigue sin existir — todo lo grande de esta conversación (rediseño de recetas, Fase 7, mesas unidas visual, Fase 9 completa) se probó directo contra producción. |
-| Proceso de migraciones | 🟡 Resuelto en la práctica — el proyecto está vinculado al Supabase CLI y se ha usado consistentemente (`supabase db push`) en toda la Fase 9. |
+| **Ambiente de staging separado de producción** | ⚪ Sigue sin existir — todo lo grande de esta conversación (rediseño de recetas, Fase 7, mesas unidas visual, Fase 9 completa, Cola Maestra v2) se probó directo contra producción. |
+| Proceso de migraciones | 🟡 Resuelto en la práctica — el proyecto está vinculado al Supabase CLI y se ha usado consistentemente (`supabase db push`) en toda la Fase 9 y la Cola Maestra v2. |
 | Reconciliación física de inventario | ⚪ Mencionado hace tiempo, sin spec todavía. |
 | Conciliación de terminal bancaria | ⚪ Mencionado hace tiempo, sin spec todavía. |
 
@@ -217,21 +218,50 @@ Con Fase 9 cerrada, se hizo un repaso deliberado de qué quedó pendiente de fas
 
 ---
 
-## Hallazgos adicionales post-Fase 9
+## Cola Maestra v2 — 10 de 12 completados (H-01 a #10)
 
-| Tema | Estado |
-|---|---|
-| **C1 — Advertencia de diferencia de efectivo al cerrar turno** | ✅ `config_sistema.turno_diferencia_alerta_monto` (default $50); si el efectivo contado difiere del teórico por más de ese monto, `TurnoShell` pide una segunda confirmación explícita antes de cerrar (no bloqueante). Control en `/mas/permisos`. |
-| **C3 — `mesas.fuera_de_servicio`** | ✅ Mesa marcada así no es seleccionable para abrir pedido nuevo pero tampoco cuenta como ocupada — color gris + 🔧 propio en el semáforo (`lib/colorMesa.ts`), aplicado en `/mesas` (mapa y lista) y `/mas/mapa-mesas`. Toggle en el mismo sheet donde ya se edita forma/tamaño/rotación. |
-| **Alerta de precuenta impresa sin cobrar** | ⚪ Implementado, migración sin aplicar todavía. `pedidos.precuenta_impresa_en` se marca al imprimir exitosamente el escenario `'precuenta'` desde `CobroShell` y se limpia en `cobrarPedido()` ante cualquier cobro real (parcial o total). Indicador aparte del semáforo de color (🧾 hace X min) en `/mesas` (mapa y lista) y `/mas/mapa-mesas`, umbral configurable (`alerta_precuenta_activa`/`_minutos`) en `/mas/permisos`. De paso: el checkbox "Imprimir ticket de pago" se movió del cuerpo scrolleable al pie fijo, pegado al botón "Cobrar" — separado visualmente de "Imprimir cuenta" (precuenta), que es una decisión de etapa previa e independiente. |
-| **Orden de modificadores por popularidad** | ⚪ Implementado, migración sin aplicar todavía. Cuarta opción de `orden_modificadores` — cuenta selecciones de los últimos `orden_popularidad_dias` días vía RPC (`popularidad_opciones_modificador`), solo en POS (`cargarModificadores()`/`cargarGuisados()`), nunca en Catálogo. Selector en `/mas/permisos`. |
-| **Formato de modificadores en texto natural** | ⚪ Implementado, migración sin aplicar todavía. Tercera opción de `formato_modificadores_ticket` ('lista'/'agrupado' ya existían) — arma una frase (`construirDescripcionNatural()`, `lib/descripcionNatural.ts`) en vez de la lista de modificadores, usando `grupos_modificadores.conector`/`prefijo_seleccion_unica` configurables por grupo en Catálogo (con vista previa en vivo). `print_server.py` no se tocó — la frase ya viene resuelta en el payload. Selector en `/mas/permisos`. |
-| **Administración de usuarios (`/mas/usuarios`)** | ⚪ Implementado, migración sin aplicar todavía (`perfiles.telefono`/`fecha_contratacion` — `activo` ya existía desde el esquema inicial). Crear usuario usa `lib/supabase/admin.ts` (cliente service_role) — **requiere agregar la variable de entorno `SUPABASE_SERVICE_ROLE_KEY` en `.env.local` y en Vercel antes de que "Nuevo usuario"/PIN funcionen**; sin ella, las acciones devuelven un error controlado en vez de tronar. Enlaza a `/mas/asistencia?usuarioId=<id>` en vez de duplicar esa pantalla. |
-| **`perfiles.activo` ahora sí bloquea acceso real** | ✅ `(app)/layout.tsx` cierra sesión y redirige a `/login` con mensaje si `activo=false` — antes de esto, desactivar solo ocultaba de listas/selectores sin quitar acceso real. Corre en cada navegación (no solo en login), porque `activo` puede cambiar con la sesión ya abierta. |
-| **PIN rápido / `/cambiar-usuario`** | ⚪ Implementado, migración sin aplicar todavía (`perfiles.pin_hash`/`pin_intentos_fallidos`/`pin_bloqueado_hasta`). Define/resetea el PIN desde `/mas/usuarios` (no es pantalla aparte). El cambio de sesión es real (magic-link + `verifyOtp()` vía `lib/supabase/admin.ts`), no un "usuario activo" simulado — ver [[project_pin_rapido_mecanismo]] en memoria. Lockout de 5 intentos guardado en BD. Nueva dependencia: `bcryptjs`. Entrada prominente arriba de `/mas`, no como fila alfabética del menú de Admin. Pendiente explícitamente fuera de este build: que el timeout de inactividad (F7-08) regrese aquí en vez de cerrar sesión por completo. |
+Todos los ítems de abajo están ✅ **implementados, revisados a fondo, y con su migración ya aplicada** — no quedan pendientes de `supabase db push` de esta ronda.
+
+| # | Tema | Detalle |
+|---|---|---|
+| 1 | **C3 — `mesas.fuera_de_servicio`** | Mesa marcada así no es seleccionable para abrir pedido nuevo pero tampoco cuenta como ocupada — color gris + 🔧 propio en el semáforo (`lib/colorMesa.ts`). |
+| 2 | **Alerta de precuenta + reordenar checkbox de ticket** | `pedidos.precuenta_impresa_en` se marca al imprimir precuenta, se limpia en cualquier cobro real. Indicador aparte del semáforo (🧾 hace X min), umbral configurable en `/mas/permisos`. El checkbox "Imprimir ticket de pago" se movió al pie fijo, pegado a "Cobrar" — separado de "Imprimir cuenta" (etapa distinta). |
+| 3 | **Navegación entre comensales en el menú** | Pasó por dos rondas de refinamiento tras usarlo en la práctica — ver detalle abajo, "Cómo quedó la navegación final". |
+| 4 | **Orden de modificadores por popularidad** | Cuarta opción de `orden_modificadores` (`'popularidad'`) — cuenta selecciones de los últimos `orden_popularidad_dias` días vía RPC, solo en POS, nunca en Catálogo (donde el orden se queda estable para editar). |
+| 5 | **F4-03 — Reasignar mesero de un pedido activo** | Solo `pedidos.mesero_id` (no `subpedidos.mesero_id`, que es trazabilidad histórica y se deja intacta a propósito). Admin-only, verificado server-side. |
+| 6 | **Texto coherente de modificadores en el ticket** | Tercera opción de `formato_modificadores_ticket` (`'texto_natural'`) — frase gramatical vía `construirDescripcionNatural()`, con `conector`/`prefijo_seleccion_unica` configurables por grupo y vista previa en vivo en Catálogo. Aplica a cocina, cliente, y reimpresión desde Historial. |
+| 7 | **Administración de usuarios (`/mas/usuarios`)** | Crear usuario vía `lib/supabase/admin.ts` (service_role, requiere `SUPABASE_SERVICE_ROLE_KEY` en `.env.local` y Vercel — ya configurada). **Fix crítico de seguridad incluido:** `perfiles.activo=false` ahora sí bloquea acceso real (antes solo ocultaba de listas) — `(app)/layout.tsx` cierra sesión en cada navegación si detecta la cuenta desactivada. |
+| 8 | **PIN rápido (`/cambiar-usuario`)** | El más delicado de toda la cola — cambio de sesión real (magic-link + `verifyOtp()`, no un "usuario activo" simulado), lectura de `pin_hash` nunca expuesta vía RLS normal (siempre por el cliente admin, server-side), lockout de 5 intentos en BD. Definir/resetear PIN vive dentro de `/mas/usuarios`. Pendiente explícito, no construido: que el timeout de inactividad (F7-08) regrese aquí en vez de cerrar sesión completa. |
+| 9 | **Pestaña "Pedidos" mejorada** | Reemplaza lo que iban a ser dos cosas nuevas separadas (Tablero en vivo + historial temporal) — se descubrió que `/pedidos` ya existía mostrando solo conteos; se le agregó detalle real por comensal (nombre de cada producto) y `pedido_productos.enviado_en` con "hace X min" junto a cada línea ya enviada. |
+| 10 | **Comanda en cascada** | El rediseño más grande de uso diario. Pestañas → secciones apiladas en scroll, cada una con su propio "+ Agregar" (navega a Menú con ese comensal activo, sin selección previa). Indicador de "🔁 N rondas" por comensal (cuenta valores distintos de `enviado_en` entre sus ítems enviados — no por categoría ni por gap de tiempo, ambos descartados por ser poco confiables). El sheet "Mover a otro comensal" se corrigió para usar el origen real del ítem tocado (`origenSubId`) en vez de un "comensal activo" global, que dejó de tener sentido en una cascada. |
+
+### Cómo quedó la navegación final entre comensales (tras dos rondas de refinamiento)
+
+El diseño original de este ítem ("Volver al comensal 1") resultó incompleto al usarlo en la práctica — no había forma de avanzar al comensal 2, 3, etc. sin ir a la pestaña de Comanda. Quedó así:
+
+- **"Nuevo comensal"** (izquierda, sin el ícono "+" — redundante con la palabra) — siempre crea uno nuevo, nunca hace nada más.
+- **"→ Siguiente (X de Y)"** (derecha) — recorre en orden (`comensal_numero`) únicamente los comensales que **ya existen**, dando la vuelta del último al primero automáticamente (módulo, sin caso especial). Nunca salta a sillas físicas vacías que no se hayan creado explícitamente con "Nuevo comensal" — si solo hay 2 comensales activados en una mesa de 4 sillas, el recorrido es 1→2→1→2...
+
+Los dos botones nunca se pisan: uno crea, el otro solo recorre lo que ya existe.
+
+## Bug crítico encontrado a media ronda — embed ambiguo, segunda vez
+
+Durante las pruebas del #9, la Comanda de una mesa con pedido real dejó de mostrar comensales/productos (aunque sí existían en la base, confirmado vía `/pedidos`). Causa: **el mismo patrón de FK ambigua que ya resolvimos con `combo_productos`**, esta vez entre `opciones_modificador` y `grupos_modificadores` — el query embebido (agregado en el ítem 6, texto coherente) nunca especificó el hint de FK, y como `grupos_modificadores.padre_opcion_id` (columna **ya marcada `@deprecated` desde hace tiempo, nunca se completó su `DROP`**) sigue teniendo una FK viva hacia `opciones_modificador`, PostgREST no podía resolver el embed sin ambigüedad — y el error se descartaba en silencio porque la consulta no revisaba su propio `error`.
+
+**Corregido:** los 3 sitios reales que hacían este embed (`pos/[pedidoId]/page.tsx`, `cobro/[pedidoId]/page.tsx`, `historial/actions.ts`) ahora usan el hint explícito `grupos_modificadores!opciones_modificador_grupo_id_fkey`, y la consulta de `pos/[pedidoId]/page.tsx` ya loguea su error si vuelve a fallar.
+
+**Esto refuerza, por segunda vez, la recomendación de terminar el `DROP` de `padre_opcion_id`** — ver "Recomendaciones Abiertas" arriba, ya no es solo teórico, ya causó un bug real en producción dos veces con el mismo patrón.
+
+## Lo que falta de la Cola Maestra v2
+
+- **#11 — Bloque E (experiencia visual e interacción)** — sonido/vibración, favoritos curados, mensaje de despedida, splash screen, animación de rebote. Spec listo, sin implementar.
+- **#12 — Bloque A (motor de recetas, rediseño de UX)** — el más grande, dejado a propósito al final: buscar-o-crear inline de insumos/utensilios, instrucciones por insumo derivado, rendimiento aprendido de producciones históricas. Spec listo (A1-A5), sin implementar.
+- **Recordatorio proactivo de fin de turno** — spec ya escrito (`turnos_horario` como catálogo de patrones fijos, emparejado automático al abrir turno vía `dentroDeHorario()` ya existente, aviso configurable "faltan X min para tu turno programado"). **Se había perdido de vista, nunca quedó anotado en ninguna cola anterior** — recuperado y agregado aquí. Distinto de C1 (que es validación de diferencia de efectivo al cerrar) — este es puramente proactivo, antes de llegar a la hora de fin programada, no bloquea nada.
+
+**Todavía sin spec, esperando alguna decisión tuya** (sin cambios desde la v5): C6 (botón SOS, falta que confirmes qué debe hacer), Bloque F (identidad visual — verde agave/monoespaciado, viste el mockup, falta tu confirmación), Fase 8 completa (F8-01/02/03), 3 hallazgos de las conversaciones ChatGPT (límite de descuentos, modo de prueba, alertas por WhatsApp/Telegram), y la conversación de multi-tenant/SaaS vendible — **guardada explícitamente para el final de todo**, como pediste.
 
 ---
 
 ## Próxima vez que actualices este documento
 
-Cuando implementes cualquier cosa de Fase 9 o de los Hallazgos de Uso Real, regresa aquí y mueve el renglón de ⚪ a ✅. Este documento solo es útil si se mantiene al día — ya se dejó pasar una vez, no conviene que se repita.
+Cuando implementes cualquier cosa de la lista de "Todavía NO listos" (ver el documento de spec correspondiente — Bloque E, Bloque A, C6, etc.), regresa aquí y agrega su renglón. Este documento solo es útil si se mantiene al día — ya se dejó pasar una vez, no conviene que se repita.
