@@ -111,7 +111,7 @@ export default async function PosPage({
   if (!pedido) redirect('/mesas')
 
   // ── Subpedidos → items → opciones ─────────────────────────────────────────
-  const { data: rawSubs } = await supabase
+  const { data: rawSubs, error: rawSubsError } = await supabase
     .from('subpedidos')
     .select(`
       id, comensal_numero, nombre, silla_numero,
@@ -120,12 +120,22 @@ export default async function PosPage({
         productos(nombre, emoji, es_combo, categorias(nombre)),
         pedido_producto_opciones(
           precio_extra,
-          opciones_modificador(id, nombre, grupo_id, grupos_modificadores(orden, conector, prefijo_seleccion_unica))
+          opciones_modificador(id, nombre, grupo_id, grupos_modificadores!opciones_modificador_grupo_id_fkey(orden, conector, prefijo_seleccion_unica))
         )
       )
     `)
     .eq('pedido_id', pedidoId)
     .order('comensal_numero')
+
+  if (rawSubsError) {
+    console.error('[PosPage] error cargando subpedidos:', {
+      pedidoId,
+      code: rawSubsError.code,
+      message: rawSubsError.message,
+      details: rawSubsError.details,
+      hint: rawSubsError.hint,
+    })
+  }
 
   // ── Desglose de combos para el ticket de cocina (F7-04) ────────────────────
   // Los componentes fijos (combo_productos) y las elecciones de slot

@@ -82,7 +82,7 @@ export async function reimprimirTicketCliente(
       productos(nombre),
       pedido_producto_opciones(
         precio_extra,
-        opciones_modificador(nombre, grupo_id, grupos_modificadores(orden, conector, prefijo_seleccion_unica))
+        opciones_modificador(nombre, grupo_id, grupos_modificadores!opciones_modificador_grupo_id_fkey(orden, conector, prefijo_seleccion_unica))
       )
     `)
     .in('subpedido_id', subpedidoIds)
