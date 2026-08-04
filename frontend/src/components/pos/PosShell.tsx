@@ -376,7 +376,9 @@ export function PosShell({
           <VistaMenu
             categorias={categorias}
             productos={productos}
-            onVolverComensal1={() => setSubpedidoActivoId(subpedidos[0]?.id ?? 0)}
+            subpedidos={subpedidos}
+            subpedidoActivoId={subpedidoActivoId}
+            onCambiarSubpedido={(id) => setSubpedidoActivoId(id)}
             onAgregarProducto={handleAgregarProducto}
             onAgregarLibre={() => setSheetLibreOpen(true)}
             onAgregarComensal={handleAgregarComensalMenu}

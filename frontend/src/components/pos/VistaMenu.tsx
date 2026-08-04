@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import type { ProductoCatalogo, CategoriaPOS } from '@/app/(app)/pos/[pedidoId]/page'
+import type { ProductoCatalogo, CategoriaPOS, SubpedidoPOS } from '@/app/(app)/pos/[pedidoId]/page'
 
 interface VistaMenuProps {
   categorias: CategoriaPOS[]
   productos: ProductoCatalogo[]
-  onVolverComensal1: () => void
+  subpedidos: SubpedidoPOS[]
+  subpedidoActivoId: number
+  onCambiarSubpedido: (id: number) => void
   onAgregarProducto: (producto: ProductoCatalogo) => void
   onAgregarLibre?: () => void
   onAgregarComensal?: () => void
@@ -16,13 +18,29 @@ interface VistaMenuProps {
 export function VistaMenu({
   categorias,
   productos,
-  onVolverComensal1,
+  subpedidos,
+  subpedidoActivoId,
+  onCambiarSubpedido,
   onAgregarProducto,
   onAgregarLibre,
   onAgregarComensal,
   isPendingAgregarComensal = false,
 }: VistaMenuProps) {
   const [categoriaActiva, setCategoriaActiva] = useState<number | null>(null)
+
+  // Recorre en orden los comensales YA CREADOS (comensal_numero), nunca
+  // salta a sillas físicas sin comensal. Da la vuelta sola del último al
+  // primero — sin acción especial, como pidió el usuario.
+  const comensalesOrdenados = [...subpedidos].sort((a, b) => a.comensal_numero - b.comensal_numero)
+  const indiceActivo = comensalesOrdenados.findIndex((s) => s.id === subpedidoActivoId)
+  const posicionActual = indiceActivo >= 0 ? indiceActivo + 1 : 1
+  const totalComensales = comensalesOrdenados.length
+
+  function handleSiguienteComensal() {
+    if (comensalesOrdenados.length === 0) return
+    const siguienteIndice = indiceActivo >= 0 ? (indiceActivo + 1) % comensalesOrdenados.length : 0
+    onCambiarSubpedido(comensalesOrdenados[siguienteIndice].id)
+  }
 
   const productosFiltrados = categoriaActiva
     ? productos.filter((p) => p.categoria_id === categoriaActiva)
@@ -132,7 +150,7 @@ export function VistaMenu({
         })}
       </div>
 
-      {/* Footer fijo: + Nuevo comensal / Volver al comensal 1 */}
+      {/* Footer fijo: Nuevo comensal / Siguiente comensal */}
       <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 border-t border-[#E5E5EA] bg-white px-3 py-3">
         <div className="flex gap-2">
           {onAgregarComensal && (
@@ -141,14 +159,14 @@ export function VistaMenu({
               disabled={isPendingAgregarComensal}
               className="flex-1 rounded-xl bg-green-600 py-[18px] text-base font-bold text-white shadow-[0_4px_14px_rgba(22,163,74,.28)] active:scale-[.98] disabled:opacity-40"
             >
-              {isPendingAgregarComensal ? '…' : '+ Nuevo comensal'}
+              {isPendingAgregarComensal ? '…' : 'Nuevo comensal'}
             </button>
           )}
           <button
-            onClick={onVolverComensal1}
+            onClick={handleSiguienteComensal}
             className="flex-1 rounded-xl bg-blue-600 py-[18px] text-base font-bold text-white shadow-[0_4px_14px_rgba(37,99,235,.28)] active:scale-[.98]"
           >
-            🔁 Volver al comensal 1
+            → Siguiente ({posicionActual} de {totalComensales})
           </button>
         </div>
       </div>
