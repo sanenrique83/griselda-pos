@@ -39,6 +39,11 @@ export type ItemComanda = {
   // imprimir — ej. ["2x Refresco", "Bebida: Coca-Cola"]. undefined si el
   // producto no es un combo.
   comboDesglose?: string[]
+  // Cuándo se envió a cocina — null si sigue pendiente o si nunca pasó por
+  // "Enviar" (reconciliado al cobrar). Distintos valores entre los ítems
+  // 'enviado' de un mismo comensal = distintas tandas mandadas a cocina
+  // (indicador de "ronda" en la cascada, ver VistaComanda.tsx).
+  enviadoEn: string | null
 }
 
 export type SubpedidoPOS = {
@@ -116,7 +121,7 @@ export default async function PosPage({
     .select(`
       id, comensal_numero, nombre, silla_numero,
       pedido_productos(
-        id, producto_id, cantidad, precio_unit, estado, notas, nombre_libre, combo_selecciones,
+        id, producto_id, cantidad, precio_unit, estado, notas, nombre_libre, combo_selecciones, enviado_en,
         productos(nombre, emoji, es_combo, categorias(nombre)),
         pedido_producto_opciones(
           precio_extra,
@@ -333,6 +338,7 @@ export default async function PosPage({
         opciones,
         esBebida: catNombre.includes('bebida'),
         comboDesglose,
+        enviadoEn: pp.enviado_en ?? null,
       }
     })
 

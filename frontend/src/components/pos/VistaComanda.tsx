@@ -17,6 +17,21 @@ const MOTIVOS_CANCELACION = [
   'Otro',
 ]
 
+// "Ronda" = una tanda confirmada a cocina — enviar_pedido_a_cocina() estampa
+// el mismo enviado_en (NOW() de la transacción) a todos los ítems de un
+// mismo envío, así que valores distintos entre los ítems 'enviado' de un
+// comensal son, literalmente, envíos distintos. No se basa en categoría
+// (comida+bebida en el mismo pedido no cuenta como 2 rondas) ni en gaps de
+// tiempo de captura (frágil ante interrupciones del mesero).
+function contarRondas(items: ItemComanda[]): number {
+  const enviados = new Set(
+    items
+      .filter((i) => i.estado === 'enviado' && i.enviadoEn)
+      .map((i) => i.enviadoEn),
+  )
+  return enviados.size
+}
+
 interface VistaComandaProps {
   pedidoId: number
   subpedidos: SubpedidoPOS[]
@@ -362,6 +377,7 @@ export function VistaComanda({
           const label = sub.nombre ?? `Comensal ${sub.comensal_numero}`
           const vacio = sub.items.length === 0
           const puedeEliminar = vacio && subpedidos.length > 1
+          const rondas = contarRondas(sub.items)
 
           return (
             <div key={sub.id} className="rounded-2xl bg-white shadow-card overflow-hidden">
@@ -372,6 +388,14 @@ export function VistaComanda({
                   {sub.silla_numero && (
                     <span className="inline-flex items-center rounded-full bg-s3 px-1.5 py-0.5 text-[10px] font-bold leading-none text-text-2">
                       🪑{sub.silla_numero}
+                    </span>
+                  )}
+                  {rondas >= 2 && (
+                    <span
+                      title={`${rondas} tandas mandadas a cocina`}
+                      className="inline-flex items-center rounded-full bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold leading-none text-purple-600"
+                    >
+                      🔁 {rondas} rondas
                     </span>
                   )}
                 </div>
