@@ -298,6 +298,10 @@ export interface PedidoProducto {
   // [{"slot_id": 3, "producto_id": 45}]. null si el producto no tiene
   // slots elegidos (incluye combos fijos y productos normales).
   combo_selecciones: { slot_id: number; producto_id: number }[] | null
+  // Cuándo se envió a cocina (enviar_pedido_a_cocina()) — null si nunca se
+  // envió (ej. ítem simple comunicado de viva voz, reconciliado al cobrar
+  // vía enviar_pendientes_de_subpedidos(), que NO llena esta columna).
+  enviado_en: string | null
 }
 
 export interface PedidoProductoOpcion {

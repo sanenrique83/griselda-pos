@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { PedidoActivo } from '@/app/(app)/pedidos/page'
+import type { PedidoActivo, ProductoDetalle } from '@/app/(app)/pedidos/page'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -74,60 +74,119 @@ export function PedidosShell({ pedidos }: { pedidos: PedidoActivo[] }) {
 
 // ─── Tarjeta de pedido ────────────────────────────────────────────────────────
 
+const ESTILO_ESTADO_PRODUCTO: Record<
+  ProductoDetalle['estado'],
+  { dot: string; texto: string }
+> = {
+  pendiente: { dot: 'bg-amber-400', texto: 'text-text-2' },
+  enviado: { dot: 'bg-emerald-400', texto: 'text-text-2' },
+  cancelado: { dot: 'bg-[#D1D1D6]', texto: 'text-text-4 line-through' },
+}
+
 function PedidoCard({ pedido: p }: { pedido: PedidoActivo }) {
+  const [expandido, setExpandido] = useState(false)
   const totalItems = p.pendientes + p.enviados + p.cancelados
   const todoEnviado = p.pendientes === 0 && p.enviados > 0
 
   return (
-    <Link
-      href={`/pos/${p.id}`}
-      className="block rounded-2xl bg-white shadow-card overflow-hidden active:opacity-75"
-    >
-      {/* Cabecera */}
-      <div className="flex items-start justify-between px-4 pt-3.5 pb-3 border-b border-[#F2F2F7]">
-        <div>
-          <p className="text-[15px] font-semibold leading-tight">{p.mesaLabel}</p>
-          <p className="mt-0.5 text-[12px] text-text-3">
-            #{p.id}
-            {p.tipo === 'mesa' && ` · ${p.numComensales} comensal${p.numComensales !== 1 ? 'es' : ''}`}
-          </p>
+    <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+      {/* Cabecera — tocar expande/colapsa el detalle por comensal */}
+      <button
+        onClick={() => setExpandido((v) => !v)}
+        className="block w-full text-left active:opacity-75"
+      >
+        <div className="flex items-start justify-between px-4 pt-3.5 pb-3 border-b border-[#F2F2F7]">
+          <div>
+            <p className="text-[15px] font-semibold leading-tight">{p.mesaLabel}</p>
+            <p className="mt-0.5 text-[12px] text-text-3">
+              #{p.id}
+              {p.tipo === 'mesa' && ` · ${p.numComensales} comensal${p.numComensales !== 1 ? 'es' : ''}`}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="font-mono text-[15px] font-bold text-blue-600">
+              ${fmtMoney(p.total)}
+            </p>
+            <p className="mt-0.5 text-[12px] text-text-4"><ElapsedTime iso={p.createdAt} /></p>
+          </div>
         </div>
-        <div className="text-right">
-          <p className="font-mono text-[15px] font-bold text-blue-600">
-            ${fmtMoney(p.total)}
-          </p>
-          <p className="mt-0.5 text-[12px] text-text-4"><ElapsedTime iso={p.createdAt} /></p>
-        </div>
-      </div>
 
-      {/* Estado de ítems */}
-      <div className="flex items-center gap-3 px-4 py-3">
-        {totalItems === 0 ? (
-          <p className="text-xs text-text-4">Sin productos</p>
-        ) : (
-          <>
-            {p.pendientes > 0 && (
-              <span className="flex items-center gap-1 text-[12px] font-medium text-amber-600">
-                <span className="h-2 w-2 rounded-full bg-amber-400" />
-                {p.pendientes} pendiente{p.pendientes !== 1 ? 's' : ''}
-              </span>
-            )}
-            {p.enviados > 0 && (
-              <span className="flex items-center gap-1 text-[12px] font-medium text-emerald-600">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                {p.enviados} enviado{p.enviados !== 1 ? 's' : ''}
-              </span>
-            )}
-            {todoEnviado && p.pendientes === 0 && (
-              <span className="ml-auto text-[11px] font-semibold text-emerald-600">
-                ✓ Todo enviado
-              </span>
-            )}
-          </>
-        )}
-        <span className="ml-auto text-[18px] text-text-4">›</span>
-      </div>
-    </Link>
+        {/* Estado de ítems */}
+        <div className="flex items-center gap-3 px-4 py-3">
+          {totalItems === 0 ? (
+            <p className="text-xs text-text-4">Sin productos</p>
+          ) : (
+            <>
+              {p.pendientes > 0 && (
+                <span className="flex items-center gap-1 text-[12px] font-medium text-amber-600">
+                  <span className="h-2 w-2 rounded-full bg-amber-400" />
+                  {p.pendientes} pendiente{p.pendientes !== 1 ? 's' : ''}
+                </span>
+              )}
+              {p.enviados > 0 && (
+                <span className="flex items-center gap-1 text-[12px] font-medium text-emerald-600">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                  {p.enviados} enviado{p.enviados !== 1 ? 's' : ''}
+                </span>
+              )}
+              {todoEnviado && p.pendientes === 0 && (
+                <span className="ml-auto text-[11px] font-semibold text-emerald-600">
+                  ✓ Todo enviado
+                </span>
+              )}
+            </>
+          )}
+          <span className={`ml-auto text-[18px] text-text-4 transition-transform ${expandido ? 'rotate-90' : ''}`}>
+            ›
+          </span>
+        </div>
+      </button>
+
+      {/* Detalle por comensal */}
+      {expandido && (
+        <div className="border-t border-[#F2F2F7] divide-y divide-[#F2F2F7]">
+          {p.comensales.every((c) => c.productos.length === 0) ? (
+            <p className="px-4 py-3 text-xs text-text-4">Sin productos todavía.</p>
+          ) : (
+            p.comensales.map((c) => (
+              <div key={c.id} className="px-4 py-3">
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                  {c.nombre || `Comensal ${c.numero}`}
+                </p>
+                {c.productos.length === 0 ? (
+                  <p className="text-xs text-text-4">Sin productos</p>
+                ) : (
+                  <div className="space-y-1">
+                    {c.productos.map((prod) => {
+                      const estilo = ESTILO_ESTADO_PRODUCTO[prod.estado]
+                      return (
+                        <div key={prod.id} className="flex items-center gap-2">
+                          <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${estilo.dot}`} />
+                          <span className={`flex-1 text-[13px] ${estilo.texto}`}>
+                            {prod.cantidad}× {prod.nombre}
+                          </span>
+                          {prod.estado === 'enviado' && prod.enviadoEn && (
+                            <span className="flex-shrink-0 text-[11px] text-text-4">
+                              hace <ElapsedTime iso={prod.enviadoEn} />
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+          <Link
+            href={`/pos/${p.id}`}
+            className="block px-4 py-3 text-center text-[13px] font-semibold text-blue-600 active:opacity-60"
+          >
+            Abrir comanda →
+          </Link>
+        </div>
+      )}
+    </div>
   )
 }
 
