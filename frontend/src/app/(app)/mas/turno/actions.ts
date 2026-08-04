@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { horaActualMX, dentroDeHorario } from '@/lib/horarioDisponibilidad'
 
 // ─── Abrir turno ──────────────────────────────────────────────────────────────
 
@@ -26,9 +27,26 @@ export async function abrirTurno(
 
   if (existing) return { error: 'Ya hay un turno activo.' }
 
+  // Emparejamiento automático contra los patrones fijos (turnos_horario) —
+  // reutiliza dentroDeHorario() (ya soporta cruce de medianoche), no repite
+  // esa lógica aparte. Si la hora actual no cae en exactamente uno de los
+  // patrones activos (ninguno, o más de uno se traslapan), queda NULL — el
+  // recordatorio de fin de turno simplemente no aplica para ese turno.
+  const horaActual = horaActualMX()
+  const { data: horarios } = await supabase
+    .from('turnos_horario')
+    .select('id, hora_inicio, hora_fin')
+    .eq('activo', true)
+
+  const coincidencias = (horarios ?? []).filter((h) =>
+    dentroDeHorario(h.hora_inicio, h.hora_fin, horaActual),
+  )
+  const turnoHorarioId = coincidencias.length === 1 ? coincidencias[0].id : null
+
   const { error } = await supabase.from('turnos').insert({
     usuario_id: user.id,
     fondo_inicial: fondoInicial,
+    turno_horario_id: turnoHorarioId,
   })
 
   if (error) return { error: 'Error al abrir el turno.' }

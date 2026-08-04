@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Perfil } from '@/lib/types/database.types'
 import { TurnoShell } from '@/components/turno/TurnoShell'
+import { horaActualMX, minutosHastaHora } from '@/lib/horarioDisponibilidad'
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -11,6 +12,14 @@ export type MovimientoCajaItem = {
   monto: number
   notas: string | null
   created_at: string
+}
+
+// Recordatorio proactivo (no validación) de fin de turno programado — null
+// si no aplica (sin patrón emparejado, apagado en config, o fuera de la
+// ventana de minutos configurada).
+export type RecordatorioFinTurno = {
+  nombre: string
+  minutosRestantes: number
 }
 
 export type TurnoResumen = {
@@ -57,12 +66,16 @@ export default async function TurnoPage() {
   const [{ data: turno }, { data: config }] = await Promise.all([
     supabase
       .from('turnos')
-      .select('id, fondo_inicial, abierto_en')
+      .select('id, fondo_inicial, abierto_en, turno_horario_id')
       .eq('estado', 'abierto')
       .order('abierto_en', { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase.from('config_sistema').select('turno_diferencia_alerta_monto').eq('id', 1).single(),
+    supabase
+      .from('config_sistema')
+      .select('turno_diferencia_alerta_monto, recordatorio_fin_turno_activo, recordatorio_fin_turno_minutos')
+      .eq('id', 1)
+      .single(),
   ])
 
   const diferenciaAlertaMonto = (config as any)?.turno_diferencia_alerta_monto ?? 50
@@ -70,6 +83,25 @@ export default async function TurnoPage() {
   // Sin turno activo → mostrar form de apertura
   if (!turno) {
     return <TurnoShell turnoActivo={null} diferenciaAlertaMonto={diferenciaAlertaMonto} />
+  }
+
+  // ── Recordatorio proactivo de fin de turno programado ──────────────────────
+  let recordatorioFinTurno: RecordatorioFinTurno | null = null
+  const recordatorioActivo = (config as any)?.recordatorio_fin_turno_activo ?? true
+  const recordatorioMinutos = (config as any)?.recordatorio_fin_turno_minutos ?? 20
+  if (recordatorioActivo && turno.turno_horario_id) {
+    const { data: horario } = await supabase
+      .from('turnos_horario')
+      .select('nombre, hora_fin')
+      .eq('id', turno.turno_horario_id)
+      .single()
+
+    if (horario) {
+      const minutosRestantes = minutosHastaHora(horario.hora_fin, horaActualMX())
+      if (minutosRestantes <= recordatorioMinutos) {
+        recordatorioFinTurno = { nombre: horario.nombre, minutosRestantes }
+      }
+    }
   }
 
   // ── Métricas del turno activo ──────────────────────────────────────────────
@@ -168,5 +200,11 @@ export default async function TurnoPage() {
     movimientos: (movsFondoRetiroRes.data ?? []) as MovimientoCajaItem[],
   }
 
-  return <TurnoShell turnoActivo={turnoResumen} diferenciaAlertaMonto={diferenciaAlertaMonto} />
+  return (
+    <TurnoShell
+      turnoActivo={turnoResumen}
+      diferenciaAlertaMonto={diferenciaAlertaMonto}
+      recordatorioFinTurno={recordatorioFinTurno}
+    />
+  )
 }

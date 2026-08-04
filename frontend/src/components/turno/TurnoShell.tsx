@@ -4,13 +4,14 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
 import { abrirTurno, cerrarTurno, registrarMovimiento } from '@/app/(app)/mas/turno/actions'
-import type { TurnoResumen, MovimientoCajaItem } from '@/app/(app)/mas/turno/page'
+import type { TurnoResumen, MovimientoCajaItem, RecordatorioFinTurno } from '@/app/(app)/mas/turno/page'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface TurnoShellProps {
   turnoActivo: TurnoResumen | null
   diferenciaAlertaMonto: number
+  recordatorioFinTurno?: RecordatorioFinTurno | null
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -40,7 +41,7 @@ function round2(n: number) {
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
-export function TurnoShell({ turnoActivo, diferenciaAlertaMonto }: TurnoShellProps) {
+export function TurnoShell({ turnoActivo, diferenciaAlertaMonto, recordatorioFinTurno = null }: TurnoShellProps) {
   return (
     <div>
       {/* Header */}
@@ -58,7 +59,11 @@ export function TurnoShell({ turnoActivo, diferenciaAlertaMonto }: TurnoShellPro
 
       <div className="px-4 py-4 space-y-4">
         {turnoActivo ? (
-          <TurnoActivo turno={turnoActivo} diferenciaAlertaMonto={diferenciaAlertaMonto} />
+          <TurnoActivo
+            turno={turnoActivo}
+            diferenciaAlertaMonto={diferenciaAlertaMonto}
+            recordatorioFinTurno={recordatorioFinTurno}
+          />
         ) : (
           <AbrirTurnoForm />
         )}
@@ -163,9 +168,11 @@ function AbrirTurnoForm() {
 function TurnoActivo({
   turno,
   diferenciaAlertaMonto,
+  recordatorioFinTurno,
 }: {
   turno: TurnoResumen
   diferenciaAlertaMonto: number
+  recordatorioFinTurno: RecordatorioFinTurno | null
 }) {
   const router = useRouter()
   const [efectivoContado, setEfectivoContado] = useState('')
@@ -244,6 +251,18 @@ function TurnoActivo({
 
   return (
     <div className="space-y-4">
+      {/* Recordatorio proactivo de fin de turno programado — informativo, no
+          bloqueante, distinto del ámbar de "necesita atención" de abajo. */}
+      {recordatorioFinTurno && (
+        <div className="flex items-start gap-2.5 rounded-xl bg-blue-50 border border-blue-100 px-3.5 py-3">
+          <span className="text-[18px] mt-0.5">⏰</span>
+          <p className="text-xs font-medium text-blue-700">
+            Tu turno programado ({recordatorioFinTurno.nombre}) termina en{' '}
+            {recordatorioFinTurno.minutosRestantes} min.
+          </p>
+        </div>
+      )}
+
       {/* Alerta de pedidos abiertos */}
       {turno.pedidosAbiertos > 0 && (
         <div className="flex items-start gap-2.5 rounded-xl bg-amber-50 border border-amber-100 px-3.5 py-3">

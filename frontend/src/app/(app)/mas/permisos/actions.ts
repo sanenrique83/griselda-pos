@@ -189,3 +189,58 @@ export async function actualizarFormatoModificadoresTicket(
 
   if (error) return { error: 'Error al actualizar el formato de modificadores del ticket.' }
 }
+
+// ─── Recordatorio de fin de turno programado ───────────────────────────────
+
+export async function actualizarRecordatorioFinTurnoMinutos(
+  minutos: number,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('config_sistema')
+    .update({ recordatorio_fin_turno_minutos: minutos })
+    .eq('id', 1)
+
+  if (error) return { error: 'Error al actualizar los minutos del recordatorio.' }
+}
+
+// ─── Patrones de turno (turnos_horario) ────────────────────────────────────
+// Catálogo simple, configurado una sola vez — abrirTurno() lo usa para
+// emparejar el turno recién abierto contra un patrón fijo (ver
+// lib/horarioDisponibilidad.ts). "Desactivar" (activo=false) en vez de
+// borrar, para no romper turnos ya emparejados con un patrón viejo.
+
+export async function crearTurnoHorario(data: {
+  nombre: string
+  horaInicio: string
+  horaFin: string
+}): Promise<{ id: number } | Err> {
+  const supabase = await createClient()
+  const { data: nuevo, error } = await supabase
+    .from('turnos_horario')
+    .insert({ nombre: data.nombre, hora_inicio: data.horaInicio, hora_fin: data.horaFin, activo: true })
+    .select('id')
+    .single()
+
+  if (error || !nuevo) return { error: 'Error al crear el patrón de turno.' }
+  return { id: nuevo.id }
+}
+
+export async function actualizarTurnoHorario(
+  id: number,
+  patch: { nombre?: string; horaInicio?: string; horaFin?: string; activo?: boolean },
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('turnos_horario')
+    .update({
+      ...(patch.nombre !== undefined ? { nombre: patch.nombre } : {}),
+      ...(patch.horaInicio !== undefined ? { hora_inicio: patch.horaInicio } : {}),
+      ...(patch.horaFin !== undefined ? { hora_fin: patch.horaFin } : {}),
+      ...(patch.activo !== undefined ? { activo: patch.activo } : {}),
+    })
+    .eq('id', id)
+
+  if (error) return { error: 'Error al actualizar el patrón de turno.' }
+}

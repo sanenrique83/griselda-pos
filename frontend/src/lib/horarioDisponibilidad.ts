@@ -27,3 +27,18 @@ export function dentroDeHorario(
   const h = hasta ?? '23:59:59'
   return d <= h ? horaActual >= d && horaActual <= h : horaActual >= d || horaActual <= h
 }
+
+/**
+ * Minutos desde `horaActual` hasta la próxima vez que el reloj marque
+ * `horaObjetivo` — si ya pasó hoy, asume que es mañana (cruza medianoche).
+ * Usado por el recordatorio de fin de turno programado (turnos_horario):
+ * "faltan X min para la hora_fin de mi turno".
+ */
+export function minutosHastaHora(horaObjetivo: string, horaActual: string): number {
+  const [hO, mO] = horaObjetivo.split(':').map(Number)
+  const [hA, mA] = horaActual.split(':').map(Number)
+  const minObjetivo = hO * 60 + mO
+  const minActual = hA * 60 + mA
+  const diff = minObjetivo - minActual
+  return diff >= 0 ? diff : diff + 24 * 60
+}

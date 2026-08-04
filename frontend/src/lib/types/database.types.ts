@@ -106,6 +106,10 @@ export interface ConfigSistema {
   // semáforo de color de la mesa) — ver pedidos.precuenta_impresa_en.
   alerta_precuenta_activa: boolean
   alerta_precuenta_minutos: number
+  // Recordatorio proactivo de fin de turno programado (turnos_horario) — no
+  // es validación de cierre, es un aviso antes de llegar a la hora fin.
+  recordatorio_fin_turno_activo: boolean
+  recordatorio_fin_turno_minutos: number
 }
 
 export interface Area {
@@ -253,6 +257,19 @@ export interface Turno {
   cerrado_en: string | null
   cerrado_por: string | null
   notas: string | null
+  // Patrón fijo (turnos_horario) emparejado automáticamente al abrir — NULL
+  // si no hubo coincidencia clara (ver abrirTurno()).
+  turno_horario_id: number | null
+}
+
+// Catálogo de patrones de turno fijos (/mas/permisos) — para el recordatorio
+// proactivo de fin de turno programado, no para validar el cierre.
+export interface TurnoHorario {
+  id: number
+  nombre: string
+  hora_inicio: string // TIME 'HH:MM:SS'
+  hora_fin: string
+  activo: boolean
 }
 
 export interface Pedido {
