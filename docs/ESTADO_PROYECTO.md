@@ -197,7 +197,7 @@ Con Fase 9 cerrada, se hizo un repaso deliberado de qué quedó pendiente de fas
 |---|---|
 | **F4-03 — Cambiar el mesero asignado a una mesa activa** | ⚪ Identificado desde el spec original de marzo, nunca asignado a ninguna fase posterior. Sigue sin construirse. |
 | **Fase 8 completa** (F8-01 heatmap de horas pico, F8-02 scatter margen vs. volumen, F8-03 predicción de demanda) | ⚪ Especificada hace tiempo, nunca implementada — el proyecto se desvió hacia el rediseño de recetas y luego Fase 9. **Dato a favor:** F9-04 (alerta de ventas bajas) ya construyó el mismo patrón de comparación "mismo día de la semana a la misma hora" que necesita F8-03 — implementarla ahora sería más barato que antes de que existiera ese precedente. |
-| **F5-00 — Verificar nombres de perfiles** | ❓ Pendiente chico, nunca confirmado, arrastrado desde Fase 5. |
+| **F5-00 — Verificar nombres de perfiles** | ✅ Auditado y corregido: los ~15 sitios que resuelven `usuario_id`/`mesero_id` → nombre ahora usan `primerNombreValido()` (`lib/nombreUsuario.ts`), fallback único `'Sin registrar'` que también captura string vacío (no solo `null`/`undefined`). Historial ahora también muestra el nombre del mesero. |
 
 ### Deuda técnica que sigue creciendo
 
@@ -214,6 +214,16 @@ Con Fase 9 cerrada, se hizo un repaso deliberado de qué quedó pendiente de fas
 
 - ✅ Auditoría de queries contra el esquema real (2 rondas completas).
 - ✅ Código muerto identificado en la auditoría (todo eliminado).
+
+---
+
+## Hallazgos adicionales post-Fase 9
+
+| Tema | Estado |
+|---|---|
+| **C1 — Advertencia de diferencia de efectivo al cerrar turno** | ✅ `config_sistema.turno_diferencia_alerta_monto` (default $50); si el efectivo contado difiere del teórico por más de ese monto, `TurnoShell` pide una segunda confirmación explícita antes de cerrar (no bloqueante). Control en `/mas/permisos`. |
+| **C3 — `mesas.fuera_de_servicio`** | ✅ Mesa marcada así no es seleccionable para abrir pedido nuevo pero tampoco cuenta como ocupada — color gris + 🔧 propio en el semáforo (`lib/colorMesa.ts`), aplicado en `/mesas` (mapa y lista) y `/mas/mapa-mesas`. Toggle en el mismo sheet donde ya se edita forma/tamaño/rotación. |
+| **Alerta de precuenta impresa sin cobrar** | ⚪ Implementado, migración sin aplicar todavía. `pedidos.precuenta_impresa_en` se marca al imprimir exitosamente el escenario `'precuenta'` desde `CobroShell` y se limpia en `cobrarPedido()` ante cualquier cobro real (parcial o total). Indicador aparte del semáforo de color (🧾 hace X min) en `/mesas` (mapa y lista) y `/mas/mapa-mesas`, umbral configurable (`alerta_precuenta_activa`/`_minutos`) en `/mas/permisos`. De paso: el checkbox "Imprimir ticket de pago" se movió del cuerpo scrolleable al pie fijo, pegado al botón "Cobrar" — separado visualmente de "Imprimir cuenta" (precuenta), que es una decisión de etapa previa e independiente. |
 
 ---
 

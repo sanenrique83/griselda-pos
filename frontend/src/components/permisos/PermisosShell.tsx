@@ -14,6 +14,7 @@ import {
   actualizarTiempoMesaAlerta,
   actualizarAlertaVentasBajasUmbral,
   actualizarTurnoDiferenciaAlerta,
+  actualizarAlertaPrecuentaMinutos,
 } from '@/app/(app)/mas/permisos/actions'
 import type { ConfigPermisos } from '@/app/(app)/mas/permisos/page'
 
@@ -145,6 +146,11 @@ export function PermisosShell({ config }: PermisosShellProps) {
   )
   const [savingTurnoDiferencia, setSavingTurnoDiferencia] = useState(false)
   const [turnoDiferenciaBanner, setTurnoDiferenciaBanner] = useState<string | null>(null)
+
+  // Alerta de precuenta impresa hace tiempo sin cobrar
+  const [precuentaMin, setPrecuentaMin] = useState(config.alerta_precuenta_minutos.toString())
+  const [savingPrecuenta, setSavingPrecuenta] = useState(false)
+  const [precuentaBanner, setPrecuentaBanner] = useState<string | null>(null)
 
   function handleToggle(campo: keyof ConfigPermisos, valor: boolean) {
     // Optimistic update
@@ -300,6 +306,24 @@ export function PermisosShell({ config }: PermisosShellProps) {
     } else {
       setTurnoDiferenciaBanner('Guardado ✓')
       setTimeout(() => setTurnoDiferenciaBanner(null), 3000)
+    }
+  }
+
+  async function handleGuardarPrecuentaMinutos() {
+    const minutos = parseInt(precuentaMin, 10)
+    if (isNaN(minutos) || minutos < 1) {
+      setPrecuentaBanner('Ingresa un número de minutos válido (1 o más).')
+      return
+    }
+    setSavingPrecuenta(true)
+    setPrecuentaBanner(null)
+    const result = await actualizarAlertaPrecuentaMinutos(minutos)
+    setSavingPrecuenta(false)
+    if (result?.error) {
+      setPrecuentaBanner(result.error)
+    } else {
+      setPrecuentaBanner('Guardado ✓')
+      setTimeout(() => setPrecuentaBanner(null), 3000)
     }
   }
 
@@ -648,6 +672,55 @@ export function PermisosShell({ config }: PermisosShellProps) {
               className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
             >
               {savingTurnoDiferencia ? 'Guardando…' : 'Guardar umbral de diferencia'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Alerta de precuenta impresa hace tiempo sin cobrar ─────────────── */}
+        <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+          <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+              Alerta de precuenta
+            </p>
+          </div>
+          <ToggleRow
+            label="Mostrar aviso"
+            desc="Marca la mesa en /mesas y /mas/mapa-mesas si se imprimió la precuenta y aún no se ha cobrado, pasado el tiempo configurado"
+            value={permisos.alerta_precuenta_activa}
+            onChange={(v) => handleToggle('alerta_precuenta_activa', v)}
+            disabled={isPending}
+          />
+          <div className="px-4 py-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-3">
+                Minutos desde la precuenta que disparan el aviso
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={1}
+                value={precuentaMin}
+                onChange={(e) => setPrecuentaMin(e.target.value)}
+                disabled={!permisos.alerta_precuenta_activa}
+                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-blue-500 disabled:opacity-40"
+              />
+            </div>
+            <p className="text-xs text-text-3">
+              El aviso (🧾 hace X min) es independiente del semáforo de color de la mesa — se
+              limpia solo en cuanto se registra cualquier cobro real sobre ese pedido.
+            </p>
+            {precuentaBanner && (
+              <p className={`text-xs font-semibold ${precuentaBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+                {precuentaBanner}
+              </p>
+            )}
+            <button
+              onClick={handleGuardarPrecuentaMinutos}
+              disabled={savingPrecuenta || !permisos.alerta_precuenta_activa}
+              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+            >
+              {savingPrecuenta ? 'Guardando…' : 'Guardar minutos de alerta'}
             </button>
           </div>
         </div>

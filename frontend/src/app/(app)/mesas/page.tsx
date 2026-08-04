@@ -32,6 +32,7 @@ export type MesaUI = {
     mesero_nombre: string
     algunoPagadoNoTodos: boolean
     tieneProductos: boolean
+    precuentaImpresaEn: string | null
   } | null
 }
 
@@ -77,7 +78,7 @@ export default async function MesasPage() {
   // Pedidos abiertos en mesa (no llevar) — mesa "principal" de cada uno
   const { data: pedidosAbiertos } = await supabase
     .from('pedidos')
-    .select('id, mesa_id, created_at, num_comensales, mesero_id')
+    .select('id, mesa_id, created_at, num_comensales, mesero_id, precuenta_impresa_en')
     .eq('estado', 'abierto')
     .not('mesa_id', 'is', null)
 
@@ -100,7 +101,7 @@ export default async function MesasPage() {
       supabase
         .from('config_sistema')
         .select(
-          'alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos, tiempo_mesa_alerta_minutos, alerta_ventas_bajas_activa, alerta_ventas_bajas_umbral_pct',
+          'alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos, tiempo_mesa_alerta_minutos, alerta_ventas_bajas_activa, alerta_ventas_bajas_umbral_pct, alerta_precuenta_activa, alerta_precuenta_minutos',
         )
         .eq('id', 1)
         .single(),
@@ -215,6 +216,7 @@ export default async function MesasPage() {
             mesero_nombre: primerNombreValido(perfilMap.get(pedido.mesero_id)),
             algunoPagadoNoTodos: algunoPagadoNoTodosPorPedido.get(pedido.id) ?? false,
             tieneProductos: tieneProductosPorPedido.get(pedido.id) ?? false,
+            precuentaImpresaEn: pedido.precuenta_impresa_en ?? null,
           }
         : null,
     }
@@ -240,6 +242,8 @@ export default async function MesasPage() {
       alertaMinutos={config?.alerta_mesa_sin_atender_minutos ?? 10}
       tiempoMesaAlertaMinutos={config?.tiempo_mesa_alerta_minutos ?? 60}
       alertaVentasBajas={alertaVentasBajas}
+      alertaPrecuentaActiva={config?.alerta_precuenta_activa ?? true}
+      alertaPrecuentaMinutos={config?.alerta_precuenta_minutos ?? 5}
     />
   )
 }

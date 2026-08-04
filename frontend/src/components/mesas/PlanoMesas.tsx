@@ -16,6 +16,8 @@ import { MesaShape, dimensionesMesa, colorParaGrupo } from './MesaShape'
 import { TiempoMesa } from './TiempoMesa'
 import { calcularPosicionesSillas } from '@/lib/asientos'
 import { colorSemaforoMesa, ESTILO_COLOR_MESA } from '@/lib/colorMesa'
+import { mostrarAvisoPrecuenta } from '@/lib/precuenta'
+import { AvisoPrecuenta } from './AvisoPrecuenta'
 import { unirMesas, unirMesaLibreAOcupada } from '@/app/(app)/pos/[pedidoId]/actions'
 import { guardarDisposicion } from '@/app/(app)/mas/mapa-mesas/actions'
 import {
@@ -54,6 +56,8 @@ export function PlanoMesas({
   alertaActiva,
   alertaMinutos,
   tiempoMesaAlertaMinutos,
+  alertaPrecuentaActiva,
+  alertaPrecuentaMinutos,
 }: {
   mesas: MesaUI[]
   onMesaClick: (mesa: MesaUI) => void
@@ -62,6 +66,8 @@ export function PlanoMesas({
   alertaActiva: boolean
   alertaMinutos: number
   tiempoMesaAlertaMinutos: number
+  alertaPrecuentaActiva: boolean
+  alertaPrecuentaMinutos: number
 }) {
   const router = useRouter()
   const [magnetTarget, setMagnetTarget] = useState<{ targetId: number; tipo: TipoUnionIman } | null>(
@@ -328,6 +334,13 @@ export function PlanoMesas({
                   colorEstado={color}
                   marcadores={marcadores}
                   tiempoMesaAlertaMinutos={tiempoMesaAlertaMinutos}
+                  ahora={ahora}
+                  mostrarPrecuenta={mostrarAvisoPrecuenta(
+                    mesa.pedido_activo?.precuentaImpresaEn ?? null,
+                    alertaPrecuentaActiva,
+                    alertaPrecuentaMinutos,
+                    ahora,
+                  )}
                 />
               )
             })}
@@ -346,6 +359,8 @@ function MesaArrastrable({
   colorEstado,
   marcadores,
   tiempoMesaAlertaMinutos,
+  ahora,
+  mostrarPrecuenta,
 }: {
   mesa: MesaUI
   posicion: { x: number; y: number }
@@ -354,6 +369,8 @@ function MesaArrastrable({
   colorEstado: ReturnType<typeof colorSemaforoMesa>
   marcadores: { x: number; y: number; anguloDeg: number; ocupada: boolean }[]
   tiempoMesaAlertaMinutos: number
+  ahora: number
+  mostrarPrecuenta: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(mesa.id),
@@ -375,6 +392,15 @@ function MesaArrastrable({
       className="absolute touch-none active:scale-[.96] transition-transform"
       style={style}
     >
+      {mostrarPrecuenta && mesa.pedido_activo?.precuentaImpresaEn && (
+        <div className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2">
+          <AvisoPrecuenta
+            precuentaImpresaEn={mesa.pedido_activo.precuentaImpresaEn}
+            ahora={ahora}
+            className="border border-amber-200 bg-white shadow-sm"
+          />
+        </div>
+      )}
       <MesaShape
         forma={mesa.forma}
         tamano={mesa.tamano}

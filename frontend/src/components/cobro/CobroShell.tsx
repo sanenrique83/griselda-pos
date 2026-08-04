@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   cobrarPedido,
   anularPedido,
+  marcarPrecuentaImpresa,
   type PagoInput,
 } from '@/app/(app)/cobro/[pedidoId]/actions'
 import type { SubpedidoCobro } from '@/app/(app)/cobro/[pedidoId]/page'
@@ -652,37 +653,7 @@ export function CobroShell({
           </button>
         )}
 
-        {/* ── Imprimir ticket de pago ─────────────────────────────────────── */}
-        {!mostrarAnular && (
-          <button
-            onClick={() => setImprimirTicketPago((v) => !v)}
-            className={`w-full flex items-center justify-between rounded-2xl border-[1.5px] px-4 py-3.5 transition-colors ${
-              imprimirTicketPago
-                ? 'border-blue-400 bg-blue-50'
-                : 'border-[#D1D1D6] bg-white'
-            }`}
-          >
-            <div className="text-left">
-              <p className={`text-sm font-semibold ${imprimirTicketPago ? 'text-blue-700' : 'text-text-1'}`}>
-                🖨️ Imprimir ticket de pago
-              </p>
-              <p className={`text-xs mt-0.5 ${imprimirTicketPago ? 'text-blue-600' : 'text-text-3'}`}>
-                La cuenta ya impresa no siempre requiere ticket de pago
-              </p>
-            </div>
-            <div
-              className={`flex h-[24px] w-[24px] flex-shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold text-white transition-all ${
-                imprimirTicketPago
-                  ? 'border-blue-500 bg-blue-500'
-                  : 'border-border'
-              }`}
-            >
-              {imprimirTicketPago && '✓'}
-            </div>
-          </button>
-        )}
-
-        {/* ── Botón imprimir cuenta ──────────────────────────────────────── */}
+        {/* ── Botón imprimir cuenta (etapa ANTES de cobrar — precuenta) ────── */}
         {!mostrarAnular && (
           <button
             onClick={async () => {
@@ -729,6 +700,10 @@ export function CobroShell({
                   cambio: null,
                   config: ticketConfig,
                 }, impresionActiva)
+
+                if (ok) {
+                  await marcarPrecuentaImpresa(pedidoId)
+                }
               }
               if (!ok) setPrintError(true)
             }}
@@ -1083,6 +1058,25 @@ export function CobroShell({
               ${total.toFixed(2)}
             </span>
           </div>
+
+          {/* Decisión de la acción de cobrar en sí — pegada al botón,
+              deliberadamente separada de "Imprimir cuenta" (arriba, en el
+              cuerpo scrolleable), que es una etapa previa e independiente. */}
+          <button
+            onClick={() => setImprimirTicketPago((v) => !v)}
+            className="mb-3 flex w-full items-center gap-2.5 rounded-xl bg-s2 px-3.5 py-2.5 active:opacity-70"
+          >
+            <div
+              className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-[5px] border-2 text-[10px] font-bold text-white transition-all ${
+                imprimirTicketPago ? 'border-blue-600 bg-blue-600' : 'border-border'
+              }`}
+            >
+              {imprimirTicketPago && '✓'}
+            </div>
+            <span className="text-[13px] font-medium text-text-2">
+              🖨️ Imprimir ticket de pago al cobrar
+            </span>
+          </button>
 
           <button
             onClick={handleCobrar}

@@ -116,6 +116,24 @@ export async function anularPedido(
   redirect('/mesas')
 }
 
+// ─── Marcar precuenta impresa ──────────────────────────────────────────────
+// Llamada desde CobroShell tras un imprimirTicket({ escenario: 'precuenta' })
+// exitoso. Se limpia (NULL) en cobrarPedido() en cuanto ocurre un cobro real.
+export async function marcarPrecuentaImpresa(pedidoId: number): Promise<{ error: string } | { ok: true }> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('pedidos')
+    .update({ precuenta_impresa_en: new Date().toISOString() })
+    .eq('id', pedidoId)
+
+  if (error) return { error: 'Error al registrar la precuenta.' }
+
+  revalidatePath('/mesas')
+  revalidatePath('/mas/mapa-mesas')
+  return { ok: true }
+}
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 type MetodoPago = 'efectivo' | 'tarjeta' | 'transferencia'
@@ -156,6 +174,10 @@ export async function cobrarPedido(data: {
   if (sumaPagos < totalFisico - 0.01) {
     return { error: 'El monto ingresado no cubre el total del pedido.' }
   }
+
+  // Cualquier cobro real (parcial o total) invalida el aviso de "precuenta
+  // impresa hace tiempo sin cobrar" — ver marcarPrecuentaImpresa() arriba.
+  await supabase.from('pedidos').update({ precuenta_impresa_en: null }).eq('id', data.pedidoId)
 
   // ── 0. Registrar descuento si aplica ──────────────────────────────────────
   if (data.descuentoPct && data.descuentoPct > 0 && data.descuentoMonto && user) {

@@ -29,6 +29,7 @@ export type MesaEditable = {
   algunoPagadoNoTodos: boolean
   tieneProductos: boolean
   pedidoCreatedAt: string | null
+  precuentaImpresaEn: string | null
 }
 
 export type AreaTab = {
@@ -62,10 +63,16 @@ export default async function MapaMesasPage() {
       )
       .eq('activa', true)
       .order('numero'),
-    supabase.from('pedidos').select('id, mesa_id, created_at').eq('estado', 'abierto').not('mesa_id', 'is', null),
+    supabase
+      .from('pedidos')
+      .select('id, mesa_id, created_at, precuenta_impresa_en')
+      .eq('estado', 'abierto')
+      .not('mesa_id', 'is', null),
     supabase
       .from('config_sistema')
-      .select('alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos, tiempo_mesa_alerta_minutos')
+      .select(
+        'alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos, tiempo_mesa_alerta_minutos, alerta_precuenta_activa, alerta_precuenta_minutos',
+      )
       .eq('id', 1)
       .single(),
     supabase.from('areas').select('id, nombre').eq('activa', true).order('orden'),
@@ -90,9 +97,11 @@ export default async function MapaMesasPage() {
   // mesa_id → pedido que la ocupa, ya sea como principal o como satélite.
   const pedidoPorMesa = new Map<number, number>()
   const pedidoCreatedAtPorId = new Map<number, string>()
+  const precuentaImpresaEnPorId = new Map<number, string | null>()
   for (const p of pedidosAbiertos ?? []) {
     if (p.mesa_id) pedidoPorMesa.set(p.mesa_id, p.id)
     pedidoCreatedAtPorId.set(p.id, p.created_at)
+    precuentaImpresaEnPorId.set(p.id, p.precuenta_impresa_en ?? null)
   }
   for (const pm of pedidoMesasRaw ?? []) {
     pedidoPorMesa.set(pm.mesa_id, pm.pedido_id)
@@ -162,6 +171,7 @@ export default async function MapaMesasPage() {
       algunoPagadoNoTodos: pedidoActivoId ? algunoPagadoNoTodosPorPedido.get(pedidoActivoId) ?? false : false,
       tieneProductos: pedidoActivoId ? tieneProductosPorPedido.get(pedidoActivoId) ?? false : false,
       pedidoCreatedAt: pedidoActivoId ? pedidoCreatedAtPorId.get(pedidoActivoId) ?? null : null,
+      precuentaImpresaEn: pedidoActivoId ? precuentaImpresaEnPorId.get(pedidoActivoId) ?? null : null,
     }
   })
 
@@ -172,6 +182,8 @@ export default async function MapaMesasPage() {
       alertaActiva={config?.alerta_mesa_sin_atender ?? true}
       alertaMinutos={config?.alerta_mesa_sin_atender_minutos ?? 10}
       tiempoMesaAlertaMinutos={config?.tiempo_mesa_alerta_minutos ?? 60}
+      alertaPrecuentaActiva={config?.alerta_precuenta_activa ?? true}
+      alertaPrecuentaMinutos={config?.alerta_precuenta_minutos ?? 5}
     />
   )
 }

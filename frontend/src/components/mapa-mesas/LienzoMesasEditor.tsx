@@ -20,6 +20,8 @@ import { crearArea } from '@/app/(app)/mas/catalogo/actions'
 import { unirMesas, unirMesaLibreAOcupada } from '@/app/(app)/pos/[pedidoId]/actions'
 import { calcularPosicionesSillas } from '@/lib/asientos'
 import { colorSemaforoMesa, type ColorMesa } from '@/lib/colorMesa'
+import { mostrarAvisoPrecuenta } from '@/lib/precuenta'
+import { AvisoPrecuenta } from '@/components/mesas/AvisoPrecuenta'
 import {
   COLOR_IMAN,
   buscarCandidatoIman as buscarCandidatoImanBase,
@@ -118,12 +120,16 @@ export function LienzoMesasEditor({
   alertaActiva,
   alertaMinutos,
   tiempoMesaAlertaMinutos,
+  alertaPrecuentaActiva,
+  alertaPrecuentaMinutos,
 }: {
   mesas: MesaEditable[]
   areas: AreaTab[]
   alertaActiva: boolean
   alertaMinutos: number
   tiempoMesaAlertaMinutos: number
+  alertaPrecuentaActiva: boolean
+  alertaPrecuentaMinutos: number
 }) {
   const router = useRouter()
   const [posiciones, setPosiciones] = useState<Record<number, Posicion>>(() =>
@@ -572,6 +578,14 @@ export function LienzoMesasEditor({
                       onSelect={() => setSeleccionId(mesa.id)}
                       pedidoCreatedAt={mesa.pedidoCreatedAt}
                       tiempoMesaAlertaMinutos={tiempoMesaAlertaMinutos}
+                      ahora={ahora}
+                      mostrarPrecuenta={mostrarAvisoPrecuenta(
+                        mesa.precuentaImpresaEn,
+                        alertaPrecuentaActiva,
+                        alertaPrecuentaMinutos,
+                        ahora,
+                      )}
+                      precuentaImpresaEn={mesa.precuentaImpresaEn}
                     />
                   ))}
                 </div>
@@ -727,6 +741,9 @@ function MesaDraggable({
   onSelect,
   pedidoCreatedAt,
   tiempoMesaAlertaMinutos,
+  ahora,
+  mostrarPrecuenta,
+  precuentaImpresaEn,
 }: {
   mesa: MesaEditable
   posicion: Posicion
@@ -737,6 +754,9 @@ function MesaDraggable({
   onSelect: () => void
   pedidoCreatedAt: string | null
   tiempoMesaAlertaMinutos: number
+  ahora: number
+  mostrarPrecuenta: boolean
+  precuentaImpresaEn: string | null
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(mesa.id),
@@ -768,6 +788,15 @@ function MesaDraggable({
       className="absolute cursor-grab touch-none active:cursor-grabbing"
       style={style}
     >
+      {mostrarPrecuenta && precuentaImpresaEn && (
+        <div className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2">
+          <AvisoPrecuenta
+            precuentaImpresaEn={precuentaImpresaEn}
+            ahora={ahora}
+            className="border border-amber-200 bg-white shadow-sm"
+          />
+        </div>
+      )}
       <MesaShape
         forma={posicion.forma}
         tamano={posicion.tamano}

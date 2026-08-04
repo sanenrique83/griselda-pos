@@ -87,6 +87,10 @@ export interface ConfigSistema {
   // Cuántos modificadores caben por línea en tickets impresos (cocina y
   // cliente) — 1 = uno por línea (comportamiento de siempre).
   modificadores_por_linea: number
+  // Aviso de precuenta impresa hace tiempo sin cobro (independiente del
+  // semáforo de color de la mesa) — ver pedidos.precuenta_impresa_en.
+  alerta_precuenta_activa: boolean
+  alerta_precuenta_minutos: number
 }
 
 export interface Area {
@@ -245,6 +249,10 @@ export interface Pedido {
   notas: string | null
   created_at: string
   cerrado_en: string | null
+  // Marca cuándo se imprimió la precuenta (escenario 'precuenta' de
+  // imprimirTicket) — se limpia (NULL) en cuanto ocurre cualquier cobro
+  // real sobre el pedido, parcial o total (ver cobrarPedido()).
+  precuenta_impresa_en: string | null
 }
 
 export interface Subpedido {

@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react'
 import type { MesaUI } from '@/app/(app)/mesas/page'
 import { colorSemaforoMesa, type ColorMesa } from '@/lib/colorMesa'
+import { mostrarAvisoPrecuenta } from '@/lib/precuenta'
 import { TiempoMesa } from './TiempoMesa'
+import { AvisoPrecuenta } from './AvisoPrecuenta'
 
 interface TarjetaMesaProps {
   mesa: MesaUI
@@ -12,6 +14,8 @@ interface TarjetaMesaProps {
   alertaActiva: boolean
   alertaMinutos: number
   tiempoMesaAlertaMinutos: number
+  alertaPrecuentaActiva: boolean
+  alertaPrecuentaMinutos: number
 }
 
 const ESTILO_TARJETA: Record<ColorMesa, { border: string; bg: string; badgeBg: string; badgeText: string; label: string }> = {
@@ -29,6 +33,8 @@ export function TarjetaMesa({
   alertaActiva,
   alertaMinutos,
   tiempoMesaAlertaMinutos,
+  alertaPrecuentaActiva,
+  alertaPrecuentaMinutos,
 }: TarjetaMesaProps) {
   const ocupada = mesa.pedido_activo !== null
 
@@ -87,6 +93,17 @@ export function TarjetaMesa({
         >
           {estilo.label}
         </span>
+        {mesa.pedido_activo?.precuentaImpresaEn &&
+          mostrarAvisoPrecuenta(
+            mesa.pedido_activo.precuentaImpresaEn,
+            alertaPrecuentaActiva,
+            alertaPrecuentaMinutos,
+            ahora ?? undefined,
+          ) && (
+            <span className="ml-1.5 inline-block align-middle">
+              <AvisoPrecuenta precuentaImpresaEn={mesa.pedido_activo.precuentaImpresaEn} ahora={ahora ?? undefined} />
+            </span>
+          )}
       </div>
 
       {/* Info del pedido activo */}

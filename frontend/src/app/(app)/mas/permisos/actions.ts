@@ -124,6 +124,19 @@ export async function actualizarTurnoDiferenciaAlerta(
   if (error) return { error: 'Error al actualizar el umbral de diferencia de turno.' }
 }
 
+export async function actualizarAlertaPrecuentaMinutos(
+  minutos: number,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('config_sistema')
+    .update({ alerta_precuenta_minutos: minutos })
+    .eq('id', 1)
+
+  if (error) return { error: 'Error al actualizar los minutos de alerta de precuenta.' }
+}
+
 type ModoOrden = 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
 
 export async function actualizarOrdenProductos(

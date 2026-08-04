@@ -21,6 +21,8 @@ interface MesasShellProps {
   // F9-06 — ya viene resuelta desde el servidor: null si está apagada, sin
   // suficiente historial, o si no aplica para este rol (solo admin la ve).
   alertaVentasBajas: AlertaVentasBajas | null
+  alertaPrecuentaActiva: boolean
+  alertaPrecuentaMinutos: number
 }
 
 // Selector de pestaña de área para la vista de Mapa — el id real de un área,
@@ -56,6 +58,8 @@ export function MesasShell({
   alertaMinutos,
   tiempoMesaAlertaMinutos,
   alertaVentasBajas,
+  alertaPrecuentaActiva,
+  alertaPrecuentaMinutos,
 }: MesasShellProps) {
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -315,6 +319,8 @@ export function MesasShell({
             alertaActiva={alertaActiva}
             alertaMinutos={alertaMinutos}
             tiempoMesaAlertaMinutos={tiempoMesaAlertaMinutos}
+            alertaPrecuentaActiva={alertaPrecuentaActiva}
+            alertaPrecuentaMinutos={alertaPrecuentaMinutos}
           />
         )}
 
@@ -338,6 +344,8 @@ export function MesasShell({
                     alertaActiva={alertaActiva}
                     alertaMinutos={alertaMinutos}
                     tiempoMesaAlertaMinutos={tiempoMesaAlertaMinutos}
+                    alertaPrecuentaActiva={alertaPrecuentaActiva}
+                    alertaPrecuentaMinutos={alertaPrecuentaMinutos}
                   />
                 ))}
               </div>
