@@ -361,8 +361,7 @@ export function PosShell({
           <VistaMenu
             categorias={categorias}
             productos={productos}
-            totalPedido={totalPedido}
-            onVerComanda={() => setVista('comanda')}
+            onVolverComensal1={() => setSubpedidoActivoId(subpedidos[0]?.id ?? 0)}
             onAgregarProducto={handleAgregarProducto}
             onAgregarLibre={() => setSheetLibreOpen(true)}
             onAgregarComensal={handleAgregarComensalMenu}

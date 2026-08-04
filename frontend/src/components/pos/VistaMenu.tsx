@@ -6,8 +6,7 @@ import type { ProductoCatalogo, CategoriaPOS } from '@/app/(app)/pos/[pedidoId]/
 interface VistaMenuProps {
   categorias: CategoriaPOS[]
   productos: ProductoCatalogo[]
-  totalPedido: number
-  onVerComanda: () => void
+  onVolverComensal1: () => void
   onAgregarProducto: (producto: ProductoCatalogo) => void
   onAgregarLibre?: () => void
   onAgregarComensal?: () => void
@@ -17,8 +16,7 @@ interface VistaMenuProps {
 export function VistaMenu({
   categorias,
   productos,
-  totalPedido,
-  onVerComanda,
+  onVolverComensal1,
   onAgregarProducto,
   onAgregarLibre,
   onAgregarComensal,
@@ -134,7 +132,7 @@ export function VistaMenu({
         })}
       </div>
 
-      {/* Footer fijo: + Nuevo comensal / Ver comanda */}
+      {/* Footer fijo: + Nuevo comensal / Volver al comensal 1 */}
       <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 border-t border-[#E5E5EA] bg-white px-3 py-3">
         <div className="flex gap-2">
           {onAgregarComensal && (
@@ -147,11 +145,10 @@ export function VistaMenu({
             </button>
           )}
           <button
-            onClick={onVerComanda}
+            onClick={onVolverComensal1}
             className="flex-1 rounded-xl bg-blue-600 py-[18px] text-base font-bold text-white shadow-[0_4px_14px_rgba(37,99,235,.28)] active:scale-[.98]"
           >
-            Ver comanda
-            {totalPedido > 0 && ` — $${totalPedido.toFixed(2)}`} →
+            🔁 Volver al comensal 1
           </button>
         </div>
       </div>
