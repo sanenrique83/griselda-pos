@@ -23,6 +23,7 @@ import { SeccionReceta } from './SeccionReceta'
 import { ListaArrastrable } from './ListaArrastrable'
 import type { ProductoCatalogo, CategoriaCatalogo, IngredienteCatalogo, InsumoCatalogo } from '@/app/(app)/mas/catalogo/page'
 import type { ModoOrden, ModoOrdenModificadores } from '@/lib/ordenCatalogo'
+import { construirDescripcionNatural } from '@/lib/descripcionNatural'
 
 // ─── Tipos locales ────────────────────────────────────────────────────────────
 
@@ -47,6 +48,9 @@ type GrupoLocal = {
   // Opciones (de otros grupos ya guardados de este producto) que activan
   // este grupo condicional. Vacío = grupo siempre visible.
   opciones_padre: number[]
+  // Formato 'texto_natural' del ticket (ver lib/descripcionNatural.ts).
+  conector: string | null
+  prefijo_seleccion_unica: string | null
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -118,6 +122,9 @@ export function SeccionProductos({
   const [fgMax, setFgMax] = useState('1')
   const [fgRapido, setFgRapido] = useState(false)
   const [fgOpcionesPadre, setFgOpcionesPadre] = useState<number[]>([])
+  // Formato 'texto_natural' del ticket (ver lib/descripcionNatural.ts)
+  const [fgConector, setFgConector] = useState('')
+  const [fgPrefijoUnica, setFgPrefijoUnica] = useState('')
 
   // Form nueva opción (qué grupoId tiene el form abierto)
   const [opFormId, setOpFormId] = useState<number | null>(null)
@@ -171,6 +178,8 @@ export function SeccionProductos({
             mostrar_en_rapido: g.mostrar_en_rapido,
             opciones: g.opciones,
             opciones_padre: g.opciones_padre,
+            conector: g.conector,
+            prefijo_seleccion_unica: g.prefijo_seleccion_unica,
           })),
         )
         setLoadingGrupos(false)
@@ -347,6 +356,8 @@ export function SeccionProductos({
     setFgMax('1')
     setFgRapido(false)
     setFgOpcionesPadre([])
+    setFgConector('')
+    setFgPrefijoUnica('')
     setGrupoEditandoId(null)
     setShowFormGrupo(false)
   }
@@ -361,6 +372,8 @@ export function SeccionProductos({
       setFgMax(grupo.maximo.toString())
       setFgRapido(grupo.mostrar_en_rapido)
       setFgOpcionesPadre(grupo.opciones_padre)
+      setFgConector(grupo.conector ?? '')
+      setFgPrefijoUnica(grupo.prefijo_seleccion_unica ?? '')
     } else {
       setGrupoEditandoId(null)
       setFgNombre('')
@@ -369,6 +382,8 @@ export function SeccionProductos({
       setFgMax('1')
       setFgRapido(false)
       setFgOpcionesPadre([])
+      setFgConector('')
+      setFgPrefijoUnica('')
     }
     setShowFormGrupo(true)
   }
@@ -387,6 +402,8 @@ export function SeccionProductos({
           minimo,
           maximo,
           mostrar_en_rapido: fgRapido,
+          conector: fgConector.trim() || null,
+          prefijo_seleccion_unica: fgPrefijoUnica.trim() || null,
         })
         if (result?.error) { setGrupoError(result.error); return }
 
@@ -412,6 +429,8 @@ export function SeccionProductos({
                   maximo,
                   mostrar_en_rapido: fgRapido,
                   opciones_padre: opcionesPadreGuardadas,
+                  conector: fgConector.trim() || null,
+                  prefijo_seleccion_unica: fgPrefijoUnica.trim() || null,
                 }
               : g,
           ),
@@ -430,6 +449,8 @@ export function SeccionProductos({
         minimo,
         maximo,
         mostrar_en_rapido: fgRapido,
+        conector: fgConector.trim() || null,
+        prefijo_seleccion_unica: fgPrefijoUnica.trim() || null,
       })
       if ('error' in result) { setGrupoError(result.error); return }
 
@@ -454,6 +475,8 @@ export function SeccionProductos({
           mostrar_en_rapido: fgRapido,
           opciones: [],
           opciones_padre: opcionesPadreGuardadas,
+          conector: fgConector.trim() || null,
+          prefijo_seleccion_unica: fgPrefijoUnica.trim() || null,
         },
       ])
       resetFormGrupo()
@@ -1213,6 +1236,64 @@ export function SeccionProductos({
                       className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
                     />
                   </div>
+
+                  {/* Formato 'texto_natural' del ticket (/mas/permisos) — ver
+                      lib/descripcionNatural.ts. Opcionales: un grupo sin
+                      conector se pega directo al nombre del producto, y sin
+                      prefijo una sola opción se muestra tal cual. */}
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                        Conector
+                      </label>
+                      <input
+                        type="text"
+                        value={fgConector}
+                        onChange={(e) => setFgConector(e.target.value)}
+                        placeholder="Ej: con, de, sin…"
+                        className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                        Prefijo si se elige solo una
+                      </label>
+                      <input
+                        type="text"
+                        value={fgPrefijoUnica}
+                        onChange={(e) => setFgPrefijoUnica(e.target.value)}
+                        placeholder="Ej: de"
+                        className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                  {(() => {
+                    if (sheet.tipo !== 'editar') return null
+                    const grupoActual = grupoEditandoId !== null ? grupos.find((g) => g.id === grupoEditandoId) : undefined
+                    const opcionesReales = (grupoActual?.opciones ?? [])
+                      .filter((o) => o.activa)
+                      .map((o) => o.nombre)
+                    const maxEjemplo = Math.max(1, Math.min(3, parseInt(fgMax) || 1))
+                    const opcionesEjemplo =
+                      opcionesReales.length > 0
+                        ? opcionesReales.slice(0, maxEjemplo)
+                        : maxEjemplo === 1
+                          ? ['Pedacito']
+                          : ['Libro', 'Pata']
+                    const frase = construirDescripcionNatural(sheet.prod.nombre, [
+                      {
+                        orden: 0,
+                        conector: fgConector.trim() || null,
+                        prefijoSeleccionUnica: fgPrefijoUnica.trim() || null,
+                        opciones: opcionesEjemplo,
+                      },
+                    ])
+                    return (
+                      <p className="rounded-lg bg-blue-50 px-3 py-2 text-[12px] text-blue-700">
+                        Vista previa: <span className="font-semibold">{frase}</span>
+                      </p>
+                    )
+                  })()}
 
                   {/* Requerido toggle */}
                   <div className="flex items-center justify-between">

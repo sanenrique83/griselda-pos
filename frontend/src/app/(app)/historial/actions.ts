@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { imprimirTicket, consolidarItemsCliente, type ItemCliente, type TicketConfig } from '@/lib/print'
+import { agruparPorGrupo, construirDescripcionNatural, type OpcionConGrupo } from '@/lib/descripcionNatural'
 
 const METODO_LABEL: Record<string, string> = {
   efectivo: 'Efectivo',
@@ -62,12 +63,27 @@ export async function reimprimirTicketCliente(
     mesaLabel = 'Mostrador'
   }
 
+  const { data: config } = await supabase
+    .from('config_sistema')
+    .select(`
+      impresion_activa,
+      ticket_nombre, ticket_direccion, ticket_telefono, ticket_rfc,
+      ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea,
+      formato_modificadores_ticket
+    `)
+    .eq('id', 1)
+    .single()
+  const formatoModificadores = (config as any)?.formato_modificadores_ticket ?? 'agrupado'
+
   const { data: rawProductos } = await supabase
     .from('pedido_productos')
     .select(`
       cantidad, precio_unit, nombre_libre,
       productos(nombre),
-      pedido_producto_opciones(precio_extra, opciones_modificador(nombre))
+      pedido_producto_opciones(
+        precio_extra,
+        opciones_modificador(nombre, grupo_id, grupos_modificadores(orden, conector, prefijo_seleccion_unica))
+      )
     `)
     .in('subpedido_id', subpedidoIds)
     .neq('estado', 'cancelado')
@@ -75,11 +91,30 @@ export async function reimprimirTicketCliente(
   const items: ItemCliente[] = (rawProductos ?? []).map((pp: any) => {
     const opciones: any[] = pp.pedido_producto_opciones ?? []
     const extras = opciones.reduce((e: number, o: any) => e + o.precio_extra, 0)
+    const nombreBase = pp.nombre_libre || pp.productos?.nombre || ''
+
+    if (formatoModificadores === 'texto_natural') {
+      const conGrupo: OpcionConGrupo[] = opciones
+        .filter((o: any) => o.opciones_modificador?.grupos_modificadores)
+        .map((o: any) => ({
+          nombre: o.opciones_modificador.nombre,
+          grupoId: o.opciones_modificador.grupo_id,
+          grupoOrden: o.opciones_modificador.grupos_modificadores.orden,
+          grupoConector: o.opciones_modificador.grupos_modificadores.conector,
+          grupoPrefijoSeleccionUnica: o.opciones_modificador.grupos_modificadores.prefijo_seleccion_unica,
+        }))
+      return {
+        nombre: construirDescripcionNatural(nombreBase, agruparPorGrupo(conGrupo)),
+        cantidad: pp.cantidad,
+        precio: pp.precio_unit + extras,
+      }
+    }
+
     const modificadores = opciones
       .map((o: any) => o.opciones_modificador?.nombre as string | undefined)
       .filter((n): n is string => !!n)
     return {
-      nombre: pp.nombre_libre || pp.productos?.nombre || '',
+      nombre: nombreBase,
       cantidad: pp.cantidad,
       precio: pp.precio_unit + extras,
       ...(modificadores.length > 0 ? { modificadores } : {}),
@@ -89,16 +124,6 @@ export async function reimprimirTicketCliente(
   if (items.length === 0) return { ok: false, error: 'El recibo no tiene productos.' }
 
   const printItems = consolidarItemsCliente(items)
-
-  const { data: config } = await supabase
-    .from('config_sistema')
-    .select(`
-      impresion_activa,
-      ticket_nombre, ticket_direccion, ticket_telefono, ticket_rfc,
-      ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea
-    `)
-    .eq('id', 1)
-    .single()
 
   const ticketConfig: TicketConfig = {
     nombre: (config as any)?.ticket_nombre ?? 'La Menuderia',
@@ -110,6 +135,7 @@ export async function reimprimirTicketCliente(
     pie: (config as any)?.ticket_pie ?? 'Gracias por su visita!',
     pie2: (config as any)?.ticket_pie2 ?? '',
     modificadores_por_linea: (config as any)?.modificadores_por_linea ?? 1,
+    formato_modificadores_ticket: formatoModificadores,
   }
 
   const pagos = movimiento.pagos ?? []

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { CobroShell } from '@/components/cobro/CobroShell'
 import type { ItemCliente, TicketConfig } from '@/lib/print'
+import { agruparPorGrupo, construirDescripcionNatural, type OpcionConGrupo } from '@/lib/descripcionNatural'
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -43,7 +44,10 @@ export default async function CobroPage({
       pedido_productos(
         cantidad, precio_unit, estado, nombre_libre,
         productos(nombre),
-        pedido_producto_opciones(precio_extra, opciones_modificador(nombre))
+        pedido_producto_opciones(
+          precio_extra,
+          opciones_modificador(nombre, grupo_id, grupos_modificadores(orden, conector, prefijo_seleccion_unica))
+        )
       )
     `)
     .eq('pedido_id', pedidoId)
@@ -60,7 +64,8 @@ export default async function CobroPage({
         transferencia_banco, transferencia_clabe, transferencia_titular,
         descuentos_mesero, descuento_max_pct,
         ticket_nombre, ticket_direccion, ticket_telefono, ticket_rfc,
-        ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea
+        ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea,
+        formato_modificadores_ticket
       `)
       .eq('id', 1)
       .single(),
@@ -70,6 +75,7 @@ export default async function CobroPage({
   ])
 
   // ── Transformar subpedidos ──────────────────────────────────────────────────
+  const formatoModificadores = (config as any)?.formato_modificadores_ticket ?? 'agrupado'
   const subpedidos: SubpedidoCobro[] = (rawSubs ?? []).map((sub: any) => {
     const prods = (sub.pedido_productos ?? []).filter(
       (pp: any) => pp.estado !== 'cancelado',
@@ -84,11 +90,33 @@ export default async function CobroPage({
     const items: ItemCliente[] = prods.map((pp: any) => {
       const opciones: any[] = pp.pedido_producto_opciones ?? []
       const extras = opciones.reduce((e: number, o: any) => e + o.precio_extra, 0)
+      const nombreBase = pp.nombre_libre || pp.productos?.nombre || ''
+
+      // Formato 'texto_natural': una sola frase en vez del arreglo de
+      // modificadores — ver lib/descripcionNatural.ts. 'lista'/'agrupado'
+      // (existentes) siguen mandando el arreglo tal cual, sin cambios.
+      if (formatoModificadores === 'texto_natural') {
+        const conGrupo: OpcionConGrupo[] = opciones
+          .filter((o: any) => o.opciones_modificador?.grupos_modificadores)
+          .map((o: any) => ({
+            nombre: o.opciones_modificador.nombre,
+            grupoId: o.opciones_modificador.grupo_id,
+            grupoOrden: o.opciones_modificador.grupos_modificadores.orden,
+            grupoConector: o.opciones_modificador.grupos_modificadores.conector,
+            grupoPrefijoSeleccionUnica: o.opciones_modificador.grupos_modificadores.prefijo_seleccion_unica,
+          }))
+        return {
+          nombre: construirDescripcionNatural(nombreBase, agruparPorGrupo(conGrupo)),
+          cantidad: pp.cantidad,
+          precio: pp.precio_unit + extras,
+        }
+      }
+
       const modificadores = opciones
         .map((o: any) => o.opciones_modificador?.nombre as string | undefined)
         .filter((n): n is string => !!n)
       return {
-        nombre: pp.nombre_libre || pp.productos?.nombre || '',
+        nombre: nombreBase,
         cantidad: pp.cantidad,
         precio: pp.precio_unit + extras, // precio unitario consolidado
         ...(modificadores.length > 0 ? { modificadores } : {}),
@@ -126,6 +154,7 @@ export default async function CobroPage({
     pie: (config as any)?.ticket_pie ?? 'Gracias por su visita!',
     pie2: (config as any)?.ticket_pie2 ?? '',
     modificadores_por_linea: (config as any)?.modificadores_por_linea ?? 1,
+    formato_modificadores_ticket: formatoModificadores,
   }
 
   return (

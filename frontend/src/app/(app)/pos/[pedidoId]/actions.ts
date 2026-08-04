@@ -38,6 +38,9 @@ export type GrupoMod = {
   opciones_padre: number[]
   mostrar_en_rapido: boolean
   opciones: OpcionMod[]
+  // Formato 'texto_natural' del ticket (ver lib/descripcionNatural.ts).
+  conector: string | null
+  prefijo_seleccion_unica: string | null
 }
 
 export type GuisadoMod = {
@@ -108,7 +111,7 @@ export async function cargarModificadores(
   const { data, error } = await supabase
     .from('grupos_modificadores')
     .select(
-      'id, nombre, requerido, minimo, maximo, orden, mostrar_en_rapido, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, orden, horario_desde, horario_hasta, insumos!insumo_id(disponible)), grupo_modificador_padres!grupo_id(opcion_id)',
+      'id, nombre, requerido, minimo, maximo, orden, mostrar_en_rapido, conector, prefijo_seleccion_unica, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, orden, horario_desde, horario_hasta, insumos!insumo_id(disponible)), grupo_modificador_padres!grupo_id(opcion_id)',
     )
     .eq('producto_id', productoId)
     .eq('activo', true)
@@ -139,6 +142,8 @@ export async function cargarModificadores(
     orden: gr.orden,
     opciones_padre: (gr.grupo_modificador_padres ?? []).map((p: any) => p.opcion_id),
     mostrar_en_rapido: gr.mostrar_en_rapido ?? false,
+    conector: gr.conector ?? null,
+    prefijo_seleccion_unica: gr.prefijo_seleccion_unica ?? null,
     opciones: (gr.opciones_modificador ?? [])
       .filter(
         (o: any) =>

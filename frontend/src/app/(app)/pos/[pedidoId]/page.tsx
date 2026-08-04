@@ -22,7 +22,18 @@ export type ItemComanda = {
   total: number
   estado: 'pendiente' | 'enviado' | 'cancelado'
   notas: string | null
-  opciones: { id: number; nombre: string; precio_extra: number }[]
+  opciones: {
+    id: number
+    nombre: string
+    precio_extra: number
+    // Solo para armar el ticket en formato 'texto_natural' (ver
+    // lib/descripcionNatural.ts) — la comanda en pantalla sigue mostrando
+    // opciones.nombre como siempre, esto no se usa para eso.
+    grupoId: number
+    grupoOrden: number
+    grupoConector: string | null
+    grupoPrefijoSeleccionUnica: string | null
+  }[]
   esBebida: boolean
   // Desglose de combo (fijo + electivo), ya resuelto a texto listo para
   // imprimir — ej. ["2x Refresco", "Bebida: Coca-Cola"]. undefined si el
@@ -109,7 +120,7 @@ export default async function PosPage({
         productos(nombre, emoji, es_combo, categorias(nombre)),
         pedido_producto_opciones(
           precio_extra,
-          opciones_modificador(id, nombre)
+          opciones_modificador(id, nombre, grupo_id, grupos_modificadores(orden, conector, prefijo_seleccion_unica))
         )
       )
     `)
@@ -209,7 +220,8 @@ export default async function PosPage({
       .select(
         'cancelaciones_mesero, cancelar_pedido_mesero, orden_productos, ' +
           'ticket_nombre, ticket_direccion, ticket_telefono, ticket_rfc, ' +
-          'ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea',
+          'ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea, ' +
+          'formato_modificadores_ticket',
       )
       .eq('id', 1)
       .single(),
@@ -249,6 +261,7 @@ export default async function PosPage({
     pie: (config as any)?.ticket_pie ?? 'Gracias por su visita!',
     pie2: (config as any)?.ticket_pie2 ?? '',
     modificadores_por_linea: (config as any)?.modificadores_por_linea ?? 1,
+    formato_modificadores_ticket: (config as any)?.formato_modificadores_ticket ?? 'agrupado',
   }
 
   // ── Catálogo: categorías + productos ──────────────────────────────────────
@@ -274,6 +287,10 @@ export default async function PosPage({
         id: ppo.opciones_modificador?.id ?? 0,
         nombre: ppo.opciones_modificador?.nombre ?? '',
         precio_extra: ppo.precio_extra,
+        grupoId: ppo.opciones_modificador?.grupo_id ?? 0,
+        grupoOrden: ppo.opciones_modificador?.grupos_modificadores?.orden ?? 0,
+        grupoConector: ppo.opciones_modificador?.grupos_modificadores?.conector ?? null,
+        grupoPrefijoSeleccionUnica: ppo.opciones_modificador?.grupos_modificadores?.prefijo_seleccion_unica ?? null,
       }))
       const extrasTotal = opciones.reduce(
         (s: number, o: any) => s + o.precio_extra,

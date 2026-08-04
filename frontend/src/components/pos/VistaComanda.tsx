@@ -6,6 +6,7 @@ import { ItemComandaRow } from './ItemComanda'
 import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem, eliminarProductoPendiente, moverProducto, dividirProducto, anularPedidoCompleto, asignarSilla } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { SubpedidoPOS, ItemComanda, MesaSillas, MesaCadenaItem } from '@/app/(app)/pos/[pedidoId]/page'
 import { imprimirTicket, type TicketConfig } from '@/lib/print'
+import { agruparPorGrupo, construirDescripcionNatural, type OpcionConGrupo } from '@/lib/descripcionNatural'
 import { SheetAsientos } from './SheetAsientos'
 import { siguienteSillaLibre } from '@/lib/asientos'
 
@@ -85,6 +86,30 @@ export function VistaComanda({
     s.items.some((i) => i.estado === 'enviado'),
   )
 
+  // Formato 'texto_natural' del ticket de cocina: una sola frase en vez del
+  // arreglo de modificadores (ver lib/descripcionNatural.ts) — el desglose
+  // de combo (F7-04) no es una selección de grupo, así que se queda aparte
+  // como modificadores adicionales en vez de meterse en la frase.
+  function nombreYModificadores(item: ItemComanda): { nombre: string; modificadores: string[] } {
+    if (ticketConfig.formato_modificadores_ticket === 'texto_natural') {
+      const conGrupo: OpcionConGrupo[] = item.opciones.map((o) => ({
+        nombre: o.nombre,
+        grupoId: o.grupoId,
+        grupoOrden: o.grupoOrden,
+        grupoConector: o.grupoConector,
+        grupoPrefijoSeleccionUnica: o.grupoPrefijoSeleccionUnica,
+      }))
+      return {
+        nombre: construirDescripcionNatural(item.nombre, agruparPorGrupo(conGrupo)),
+        modificadores: item.comboDesglose ?? [],
+      }
+    }
+    return {
+      nombre: item.nombre,
+      modificadores: [...item.opciones.map((o) => o.nombre), ...(item.comboDesglose ?? [])],
+    }
+  }
+
   function handleEnviar() {
     setError(null)
     startEnviar(async () => {
@@ -96,12 +121,11 @@ export function VistaComanda({
             .filter((i) => i.estado === 'pendiente')
             .map((i) => ({
               cantidad: i.cantidad,
-              nombre: i.nombre,
               // Combo (F7-04): el desglose de componentes fijos + elecciones
               // de slot ya viene resuelto a texto desde el servidor (ver
               // pos/[pedidoId]/page.tsx) — se concatena a los modificadores
               // para que cocina vea todo bajo el mismo nombre de producto.
-              modificadores: [...i.opciones.map((o) => o.nombre), ...(i.comboDesglose ?? [])],
+              ...nombreYModificadores(i),
               nota: i.notas ?? '',
               esBebida: i.esBebida,
             })),
@@ -143,8 +167,7 @@ export function VistaComanda({
             .filter((i) => i.estado === 'enviado')
             .map((i) => ({
               cantidad: i.cantidad,
-              nombre: i.nombre,
-              modificadores: [...i.opciones.map((o) => o.nombre), ...(i.comboDesglose ?? [])],
+              ...nombreYModificadores(i),
               nota: i.notas ?? '',
               esBebida: i.esBebida,
             })),

@@ -16,6 +16,7 @@ import {
   actualizarTurnoDiferenciaAlerta,
   actualizarAlertaPrecuentaMinutos,
   actualizarOrdenPopularidadDias,
+  actualizarFormatoModificadoresTicket,
 } from '@/app/(app)/mas/permisos/actions'
 import type { ConfigPermisos } from '@/app/(app)/mas/permisos/page'
 import type { ModoOrden, ModoOrdenModificadores } from '@/lib/ordenCatalogo'
@@ -31,6 +32,14 @@ const OPCIONES_ORDEN: { value: ModoOrden; label: string }[] = [
 const OPCIONES_ORDEN_MODIFICADORES: { value: ModoOrdenModificadores; label: string }[] = [
   ...OPCIONES_ORDEN,
   { value: 'popularidad', label: 'Popularidad' },
+]
+
+type FormatoModificadoresTicket = ConfigPermisos['formato_modificadores_ticket']
+
+const OPCIONES_FORMATO_MODIFICADORES: { value: FormatoModificadoresTicket; label: string }[] = [
+  { value: 'agrupado', label: 'Agrupado' },
+  { value: 'lista', label: 'Lista' },
+  { value: 'texto_natural', label: 'Texto natural' },
 ]
 
 const PERMISOS_MESERO: { campo: keyof ConfigPermisos; label: string; desc: string }[] = [
@@ -141,6 +150,12 @@ export function PermisosShell({ config }: PermisosShellProps) {
   const [modsPorLinea, setModsPorLinea] = useState(config.modificadores_por_linea.toString())
   const [savingModsPorLinea, setSavingModsPorLinea] = useState(false)
   const [modsPorLineaBanner, setModsPorLineaBanner] = useState<string | null>(null)
+
+  // Formato de modificadores en tickets impresos ('lista'/'agrupado' ya
+  // existían, gobernados por modificadores_por_linea; 'texto_natural' arma
+  // una frase — ver lib/descripcionNatural.ts)
+  const [formatoMods, setFormatoMods] = useState<FormatoModificadoresTicket>(config.formato_modificadores_ticket)
+  const [formatoModsBanner, setFormatoModsBanner] = useState<string | null>(null)
 
   // Temporizador de mesa en vivo (F9-03)
   const [tiempoMesaMin, setTiempoMesaMin] = useState(config.tiempo_mesa_alerta_minutos.toString())
@@ -264,6 +279,20 @@ export function PermisosShell({ config }: PermisosShellProps) {
     } else {
       setModsPorLineaBanner('Guardado ✓')
       setTimeout(() => setModsPorLineaBanner(null), 3000)
+    }
+  }
+
+  async function handleCambiarFormatoMods(formato: FormatoModificadoresTicket) {
+    const anterior = formatoMods
+    setFormatoMods(formato)
+    setFormatoModsBanner(null)
+    const result = await actualizarFormatoModificadoresTicket(formato)
+    if (result?.error) {
+      setFormatoMods(anterior)
+      setFormatoModsBanner(result.error)
+    } else {
+      setFormatoModsBanner('Guardado ✓')
+      setTimeout(() => setFormatoModsBanner(null), 3000)
     }
   }
 
@@ -806,6 +835,34 @@ export function PermisosShell({ config }: PermisosShellProps) {
           </div>
           <div className="px-4 py-4 space-y-3">
             <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-3">
+                Formato de modificadores
+              </label>
+              <div className="flex gap-1.5">
+                {OPCIONES_FORMATO_MODIFICADORES.map((o) => (
+                  <button
+                    key={o.value}
+                    onClick={() => handleCambiarFormatoMods(o.value)}
+                    className={`flex-1 rounded-lg px-2 py-2.5 text-[12px] font-semibold transition-colors ${
+                      formatoMods === o.value ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-xs text-text-3">
+              &quot;Agrupado&quot; y &quot;Lista&quot; usan los modificadores por línea de abajo.
+              &quot;Texto natural&quot; arma una frase (ej. &quot;Menudo Chico de Pedacito con Libro
+              y Pata&quot;) configurada por grupo en Catálogo → Productos → editar grupo.
+            </p>
+            {formatoModsBanner && (
+              <p className={`text-xs font-semibold ${formatoModsBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+                {formatoModsBanner}
+              </p>
+            )}
+            <div className="border-t border-[#F2F2F7] pt-3">
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-3">
                 Modificadores por línea
               </label>

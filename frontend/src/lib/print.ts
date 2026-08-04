@@ -67,6 +67,11 @@ export type TicketConfig = {
   // línea. Nombre en snake_case a propósito: se envía tal cual al servidor
   // de impresión, que lo lee como config.get('modificadores_por_linea', 1).
   modificadores_por_linea: number
+  // 'texto_natural' se resuelve ANTES de armar este payload (ver
+  // construirDescripcionNatural() en cobro/[pedidoId]/page.tsx,
+  // historial/actions.ts y VistaComanda.tsx) — el print server nunca ve
+  // este valor, solo el resultado ya embebido en `nombre`/`modificadores`.
+  formato_modificadores_ticket: 'lista' | 'agrupado' | 'texto_natural'
 }
 
 export type ItemCancelacion = {

@@ -176,3 +176,16 @@ export async function actualizarOrdenPopularidadDias(
 
   if (error) return { error: 'Error al actualizar los días de popularidad.' }
 }
+
+export async function actualizarFormatoModificadoresTicket(
+  formato: 'lista' | 'agrupado' | 'texto_natural',
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('config_sistema')
+    .update({ formato_modificadores_ticket: formato })
+    .eq('id', 1)
+
+  if (error) return { error: 'Error al actualizar el formato de modificadores del ticket.' }
+}

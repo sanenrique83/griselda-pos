@@ -91,6 +91,10 @@ export interface ConfigSistema {
   // Cuántos modificadores caben por línea en tickets impresos (cocina y
   // cliente) — 1 = uno por línea (comportamiento de siempre).
   modificadores_por_linea: number
+  // 'lista'/'agrupado' (existentes, gobernados por modificadores_por_linea)
+  // vs. 'texto_natural' (frase armada con construirDescripcionNatural() —
+  // ver lib/descripcionNatural.ts).
+  formato_modificadores_ticket: 'lista' | 'agrupado' | 'texto_natural'
   // Aviso de precuenta impresa hace tiempo sin cobro (independiente del
   // semáforo de color de la mesa) — ver pedidos.precuenta_impresa_en.
   alerta_precuenta_activa: boolean
@@ -205,6 +209,11 @@ export interface GrupoModificador {
   /** @deprecated Sin usar desde grupo_modificador_padres (columna aún viva en BD, no eliminada). */
   padre_opcion_id: number | null
   mostrar_en_rapido: boolean
+  // Formato 'texto_natural' del ticket (ver lib/descripcionNatural.ts) —
+  // ambos nullable, sin valor = grupo se pega directo sin conector / opción
+  // única se muestra sin prefijo.
+  conector: string | null
+  prefijo_seleccion_unica: string | null
 }
 
 export interface GrupoModificadorPadre {
