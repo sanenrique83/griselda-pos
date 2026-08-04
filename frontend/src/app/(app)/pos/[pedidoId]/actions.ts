@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
 import { imprimirTicket, type ItemCancelacion } from '@/lib/print'
 import { anularPedido } from '@/app/(app)/cobro/[pedidoId]/actions'
 import { columnaOrden, type ModoOrdenModificadores } from '@/lib/ordenCatalogo'
@@ -1353,4 +1354,46 @@ export async function asignarSilla(
     .eq('id', subpedidoId)
 
   if (error) return { error: 'Error al asignar la silla.' }
+}
+
+// ─── Reasignar mesero (admin-only) ─────────────────────────────────────────────
+// Solo toca pedidos.mesero_id — es el campo que se usa en toda la app para
+// atribuir el pedido a un mesero (mesero_nombre en /mesas, "ventas por
+// mesero" en Asistencia, Historial). subpedidos.mesero_id es independiente
+// a propósito: se fija una sola vez al agregar cada comensal (quién lo
+// atendió en ese momento) y es trazabilidad histórica, no "dueño actual" —
+// reasignar el pedido no debe reescribir esa historia.
+export async function reasignarMesero(
+  pedidoId: number,
+  nuevoMeseroId: string,
+): Promise<Err | { ok: true }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Sin sesión.' }
+
+  const { data: perfil } = await supabase
+    .from('perfiles')
+    .select('rol')
+    .eq('id', user.id)
+    .single()
+  if (perfil?.rol !== 'admin') return { error: 'Solo un admin puede reasignar el mesero.' }
+
+  const { data: nuevoMesero } = await supabase
+    .from('perfiles')
+    .select('id, activo')
+    .eq('id', nuevoMeseroId)
+    .single()
+  if (!nuevoMesero || !nuevoMesero.activo) return { error: 'Ese usuario no está disponible.' }
+
+  const { error } = await supabase
+    .from('pedidos')
+    .update({ mesero_id: nuevoMeseroId })
+    .eq('id', pedidoId)
+
+  if (error) return { error: 'Error al reasignar el mesero.' }
+
+  revalidatePath(`/pos/${pedidoId}`)
+  revalidatePath('/mesas')
+  return { ok: true }
 }

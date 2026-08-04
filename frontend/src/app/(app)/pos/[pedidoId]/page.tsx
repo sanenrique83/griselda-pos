@@ -4,6 +4,7 @@ import { PosShell } from '@/components/pos/PosShell'
 import type { MesaOcupada } from '@/components/pos/SheetUnirMesa'
 import type { MesaLibre } from '@/components/pos/SheetMoverMesa'
 import type { MesaSatelite } from '@/components/pos/SheetSepararMesa'
+import type { MeseroActivo } from '@/components/pos/SheetReasignarMesero'
 import { columnaOrden } from '@/lib/ordenCatalogo'
 import { horaActualMX, dentroDeHorario } from '@/lib/horarioDisponibilidad'
 import { primerNombreValido } from '@/lib/nombreUsuario'
@@ -91,7 +92,7 @@ export default async function PosPage({
   const { data: pedido } = await supabase
     .from('pedidos')
     .select(
-      'id, created_at, tipo, num_comensales, mesa_id, mesas(numero, nombre, capacidad, forma, tamano, rotacion, asientos_horario)',
+      'id, created_at, tipo, num_comensales, mesa_id, mesero_id, mesas(numero, nombre, capacidad, forma, tamano, rotacion, asientos_horario)',
     )
     .eq('id', pedidoId)
     .single()
@@ -224,6 +225,16 @@ export default async function PosPage({
   const rol: 'admin' | 'mesero' = (perfil as any)?.rol === 'admin' ? 'admin' : 'mesero'
   const tipoMesa: 'mesa' | 'llevar' | 'mostrador' =
     pedido.tipo === 'mesa' ? 'mesa' : pedido.tipo === 'mostrador' ? 'mostrador' : 'llevar'
+
+  // Reasignar mesero (admin-only) — solo se necesita la lista si quien mira
+  // es admin, ya que es el único rol que ve el botón en el header.
+  const { data: meserosRaw } = esAdmin
+    ? await supabase.from('perfiles').select('id, nombre').eq('activo', true).order('nombre')
+    : { data: [] as { id: string; nombre: string }[] }
+  const meserosActivos: MeseroActivo[] = (meserosRaw ?? []).map((m) => ({
+    id: m.id,
+    nombre: primerNombreValido(m.nombre),
+  }))
 
   // Ticket de cocina: antes no necesitaba nada de config_sistema (su
   // encabezado usa mesa/mesero/orden/rol) — ahora sí, solo para que
@@ -390,6 +401,8 @@ export default async function PosPage({
       puedesCancelar={puedesCancelar}
       puedeAnularPedido={puedeAnularPedido}
       meseroNombre={meseroNombre}
+      meseroActualId={(pedido as any).mesero_id}
+      meserosActivos={meserosActivos}
       rol={rol}
       tipoMesa={tipoMesa}
       mesaSillas={mesaSillas}
