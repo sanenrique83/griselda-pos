@@ -29,6 +29,16 @@ export default async function AppLayout({
 
   if (!perfil) redirect('/login')
 
+  // Cuenta desactivada (/mas/usuarios → toggle Activo): el guard de
+  // inactividad (F7-08, InactivityGuard.tsx) cierra sesión del lado del
+  // cliente por timeout; esto es lo mismo pero server-side y en cada
+  // navegación, porque perfiles.activo puede cambiar en cualquier momento
+  // mientras el usuario ya tiene una sesión abierta.
+  if (!perfil.activo) {
+    await supabase.auth.signOut()
+    redirect(`/login?mensaje=${encodeURIComponent('Tu cuenta ha sido desactivada. Contacta al administrador.')}`)
+  }
+
   return (
     <div className="flex min-h-dvh flex-col">
       <InactivityGuard timeoutMinutos={config?.timeout_inactividad_minutos ?? 15} />
