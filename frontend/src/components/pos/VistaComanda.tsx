@@ -20,7 +20,6 @@ const MOTIVOS_CANCELACION = [
 interface VistaComandaProps {
   pedidoId: number
   subpedidos: SubpedidoPOS[]
-  subpedidoActivoId: number
   onCambiarSubpedido: (id: number) => void
   onAgregar: () => void // vuelve a vista menú
   puedesCancelar?: boolean
@@ -35,10 +34,14 @@ interface VistaComandaProps {
   ticketConfig: TicketConfig
 }
 
+// Ítem a mover — se guarda junto con la sección (comensal) de origen, ya
+// que en la cascada todos los comensales se ven a la vez y ya no hay una
+// "pestaña activa" de la que inferirlo (antes bastaba subpedidoActivoId).
+type ItemAMover = { item: ItemComanda; origenSubId: number }
+
 export function VistaComanda({
   pedidoId,
   subpedidos,
-  subpedidoActivoId,
   onCambiarSubpedido,
   onAgregar,
   puedesCancelar = false,
@@ -63,7 +66,7 @@ export function VistaComanda({
   const [printError, setPrintError] = useState(false)
   const [itemACancelar, setItemACancelar] = useState<ItemComanda | null>(null)
   const [motivoIdx, setMotivoIdx] = useState(0)
-  const [itemAMover, setItemAMover] = useState<ItemComanda | null>(null)
+  const [itemAMover, setItemAMover] = useState<ItemAMover | null>(null)
   const [cantidadMover, setCantidadMover] = useState(1)
   const [isPendingReimprimir, setIsPendingReimprimir] = useState(false)
   const [sheetAnularOpen, setSheetAnularOpen] = useState(false)
@@ -78,7 +81,7 @@ export function VistaComanda({
     }
   }, [printError])
 
-  const subActivo = subpedidos.find((s) => s.id === subpedidoActivoId)
+  const totalPedido = subpedidos.reduce((s, sp) => s + sp.total, 0)
   const hayPendientes = subpedidos.some((s) =>
     s.items.some((i) => i.estado === 'pendiente'),
   )
@@ -193,9 +196,6 @@ export function VistaComanda({
 
   function handleEliminarComensal(subId: number) {
     setError(null)
-    // Cambiar al primer comensal antes de eliminar
-    const otro = subpedidos.find((s) => s.id !== subId)
-    if (otro) onCambiarSubpedido(otro.id)
     startEliminar(async () => {
       const result = await eliminarComensal(pedidoId, subId)
       if (result?.error) {
@@ -236,11 +236,11 @@ export function VistaComanda({
   function handleMover(subpedidoDestinoId: number) {
     if (!itemAMover) return
     setError(null)
-    const dividir = cantidadMover < itemAMover.cantidad
+    const dividir = cantidadMover < itemAMover.item.cantidad
     startMover(async () => {
       const result = dividir
-        ? await dividirProducto(itemAMover.id, subpedidoDestinoId, cantidadMover)
-        : await moverProducto(itemAMover.id, subpedidoDestinoId)
+        ? await dividirProducto(itemAMover.item.id, subpedidoDestinoId, cantidadMover)
+        : await moverProducto(itemAMover.item.id, subpedidoDestinoId)
       if (result?.error) {
         setError(result.error)
       } else {
@@ -253,7 +253,7 @@ export function VistaComanda({
   function handleMoverANuevoComensal() {
     if (!itemAMover) return
     setError(null)
-    const dividir = cantidadMover < itemAMover.cantidad
+    const dividir = cantidadMover < itemAMover.item.cantidad
     startMover(async () => {
       const nuevo = await agregarComensal(pedidoId)
       if ('error' in nuevo) {
@@ -264,8 +264,8 @@ export function VistaComanda({
         await asignarSilla(nuevo.nuevoId, siguienteSillaLibre(subpedidos.map((s) => s.silla_numero)))
       }
       const result = dividir
-        ? await dividirProducto(itemAMover.id, nuevo.nuevoId, cantidadMover)
-        : await moverProducto(itemAMover.id, nuevo.nuevoId)
+        ? await dividirProducto(itemAMover.item.id, nuevo.nuevoId, cantidadMover)
+        : await moverProducto(itemAMover.item.id, nuevo.nuevoId)
       if (result?.error) {
         setError(result.error)
       } else {
@@ -307,93 +307,48 @@ export function VistaComanda({
     })
   }
 
+  // Botón "+ Agregar" de una sección: activa a ESE comensal como destino y
+  // navega a Menú en un solo toque, sin tener que seleccionarlo aparte.
+  function handleAgregarASeccion(subId: number) {
+    onCambiarSubpedido(subId)
+    onAgregar()
+  }
+
+  const hayAccionesGlobales = hayEnviados || !!mesaSillas || puedeAnularPedido
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Tabs de comensales */}
-      <div className="flex overflow-x-auto border-b border-[#E5E5EA] bg-white scrollbar-none">
-        {subpedidos.map((sub) => {
-          const label = sub.nombre ?? `Comensal ${sub.comensal_numero}`
-          const activo = sub.id === subpedidoActivoId
-          const tienePendientes = sub.items.some((i) => i.estado === 'pendiente')
-          const vacio = sub.items.length === 0
-          const puedeEliminar = vacio && subpedidos.length > 1
-
-          return (
-            <div key={sub.id} className="relative flex-shrink-0 flex items-center">
-              <button
-                onClick={() => onCambiarSubpedido(sub.id)}
-                className={`relative flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-[13px] font-medium whitespace-nowrap transition-colors ${
-                  puedeEliminar ? 'pr-6' : ''
-                } ${
-                  activo
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-text-3'
-                }`}
-              >
-                {label}
-                {sub.silla_numero && (
-                  <span className="inline-flex items-center rounded-full bg-s3 px-1.5 py-0.5 text-[10px] font-bold leading-none text-text-2">
-                    🪑{sub.silla_numero}
-                  </span>
-                )}
-                {tienePendientes && (
-                  <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-blue-600" />
-                )}
-              </button>
-              {puedeEliminar && (
-                <button
-                  onClick={() => handleEliminarComensal(sub.id)}
-                  disabled={isPendingEliminar}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-full bg-red-100 text-[10px] font-bold text-red-600 active:scale-90 disabled:opacity-40"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          )
-        })}
-
-        {/* + Agregar comensal */}
-        <button
-          onClick={handleAgregarComensal}
-          disabled={isPendingComensal}
-          className="flex-shrink-0 px-3 py-2.5 text-lg text-blue-600 disabled:opacity-40"
-        >
-          {isPendingComensal ? '…' : '+'}
-        </button>
-
-        {/* Reimprimir comanda de cocina (items ya enviados) */}
-        {hayEnviados && (
-          <button
-            onClick={handleReimprimirCocina}
-            disabled={isPendingReimprimir}
-            title="Reimprimir comanda de cocina"
-            className="flex-shrink-0 px-3 py-2.5 text-[13px] font-medium text-text-3 active:opacity-60 disabled:opacity-40"
-          >
-            {isPendingReimprimir ? '…' : '🖨 Reimprimir'}
-          </button>
-        )}
-
-        {/* Ver/asignar sillas */}
-        {mesaSillas && (
-          <button
-            onClick={() => setSheetAsientosOpen(true)}
-            className="flex-shrink-0 px-3 py-2.5 text-[13px] font-medium text-text-3 active:opacity-60"
-          >
-            🪑 Sillas
-          </button>
-        )}
-
-        {/* Anular pedido completo */}
-        {puedeAnularPedido && (
-          <button
-            onClick={() => { setMotivoAnularIdx(0); setSheetAnularOpen(true) }}
-            className="flex-shrink-0 px-3 py-2.5 text-[13px] font-medium text-red-600 active:opacity-60"
-          >
-            🗑 Anular pedido
-          </button>
-        )}
-      </div>
+      {/* Barra de acciones globales del pedido (fuera del scroll de comensales) */}
+      {hayAccionesGlobales && (
+        <div className="flex flex-shrink-0 items-center gap-1 overflow-x-auto border-b border-[#E5E5EA] bg-white px-2 py-1.5 scrollbar-none">
+          {hayEnviados && (
+            <button
+              onClick={handleReimprimirCocina}
+              disabled={isPendingReimprimir}
+              title="Reimprimir comanda de cocina"
+              className="flex-shrink-0 px-2.5 py-1.5 text-[13px] font-medium text-text-3 active:opacity-60 disabled:opacity-40"
+            >
+              {isPendingReimprimir ? '…' : '🖨 Reimprimir'}
+            </button>
+          )}
+          {mesaSillas && (
+            <button
+              onClick={() => setSheetAsientosOpen(true)}
+              className="flex-shrink-0 px-2.5 py-1.5 text-[13px] font-medium text-text-3 active:opacity-60"
+            >
+              🪑 Sillas
+            </button>
+          )}
+          {puedeAnularPedido && (
+            <button
+              onClick={() => { setMotivoAnularIdx(0); setSheetAnularOpen(true) }}
+              className="flex-shrink-0 px-2.5 py-1.5 text-[13px] font-medium text-red-600 active:opacity-60"
+            >
+              🗑 Anular pedido
+            </button>
+          )}
+        </div>
+      )}
 
       {printError && (
         <div className="flex-shrink-0 bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white">
@@ -401,38 +356,86 @@ export function VistaComanda({
         </div>
       )}
 
-      {/* Lista de items */}
-      <div className="flex-1 overflow-y-auto space-y-2 px-3 pt-2 pb-32">
-        {!subActivo || subActivo.items.length === 0 ? (
-          <div className="py-12 text-center">
-            <p className="text-sm text-text-3">Sin productos aún.</p>
-            <button
-              onClick={onAgregar}
-              className="mt-3 text-sm font-semibold text-blue-600"
-            >
-              + Agregar del menú
-            </button>
-          </div>
-        ) : (
-          subActivo.items.map((item) => (
-            <ItemComandaRow
-              key={item.id}
-              item={item}
-              onCancelar={
-                item.estado === 'pendiente'
-                  ? () => handleEliminarPendiente(item.id)
-                  : puedesCancelar && item.estado === 'enviado'
-                    ? () => { setItemACancelar(item); setMotivoIdx(0) }
-                    : undefined
-              }
-              onMover={
-                item.estado !== 'cancelado'
-                  ? () => { setItemAMover(item); setCantidadMover(item.cantidad) }
-                  : undefined
-              }
-            />
-          ))
-        )}
+      {/* Cascada: una sección por comensal, todas visibles en scroll continuo */}
+      <div className="flex-1 overflow-y-auto space-y-3 px-3 pt-3 pb-32">
+        {subpedidos.map((sub) => {
+          const label = sub.nombre ?? `Comensal ${sub.comensal_numero}`
+          const vacio = sub.items.length === 0
+          const puedeEliminar = vacio && subpedidos.length > 1
+
+          return (
+            <div key={sub.id} className="rounded-2xl bg-white shadow-card overflow-hidden">
+              {/* Encabezado de la sección */}
+              <div className="flex items-center justify-between border-b border-[#F2F2F7] px-3.5 py-2.5">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[14px] font-semibold leading-tight">{label}</p>
+                  {sub.silla_numero && (
+                    <span className="inline-flex items-center rounded-full bg-s3 px-1.5 py-0.5 text-[10px] font-bold leading-none text-text-2">
+                      🪑{sub.silla_numero}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-[13px] font-semibold text-text-2">
+                    ${sub.total.toFixed(2)}
+                  </span>
+                  {puedeEliminar && (
+                    <button
+                      onClick={() => handleEliminarComensal(sub.id)}
+                      disabled={isPendingEliminar}
+                      className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-red-100 text-[11px] font-bold text-red-600 active:scale-90 disabled:opacity-40"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Ítems de este comensal */}
+              <div className="space-y-2 px-3 py-2.5">
+                {sub.items.length === 0 ? (
+                  <p className="py-1.5 text-center text-xs text-text-4">Sin productos aún.</p>
+                ) : (
+                  sub.items.map((item) => (
+                    <ItemComandaRow
+                      key={item.id}
+                      item={item}
+                      onCancelar={
+                        item.estado === 'pendiente'
+                          ? () => handleEliminarPendiente(item.id)
+                          : puedesCancelar && item.estado === 'enviado'
+                            ? () => { setItemACancelar(item); setMotivoIdx(0) }
+                            : undefined
+                      }
+                      onMover={
+                        item.estado !== 'cancelado'
+                          ? () => { setItemAMover({ item, origenSubId: sub.id }); setCantidadMover(item.cantidad) }
+                          : undefined
+                      }
+                    />
+                  ))
+                )}
+              </div>
+
+              {/* + Agregar de este comensal — activa el destino y va a Menú */}
+              <button
+                onClick={() => handleAgregarASeccion(sub.id)}
+                className="w-full border-t border-[#F2F2F7] py-2.5 text-[13px] font-semibold text-blue-600 active:bg-s2"
+              >
+                + Agregar
+              </button>
+            </div>
+          )
+        })}
+
+        {/* + Nuevo comensal */}
+        <button
+          onClick={handleAgregarComensal}
+          disabled={isPendingComensal}
+          className="w-full rounded-2xl border-[1.5px] border-dashed border-border bg-white py-3.5 text-[13px] font-semibold text-blue-600 active:scale-[.98] disabled:opacity-40"
+        >
+          {isPendingComensal ? 'Agregando…' : '+ Nuevo comensal'}
+        </button>
 
         {error && (
           <p className="rounded-card bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -506,14 +509,14 @@ export function VistaComanda({
           <div className="fixed bottom-0 left-0 right-0 z-[70] max-h-[85vh] flex flex-col rounded-t-2xl bg-white">
             <div className="flex-shrink-0 px-4 pt-5 pb-3 border-b border-[#E5E5EA]">
               <p className="text-[16px] font-bold leading-snug">
-                Mover {itemAMover.emoji ? `${itemAMover.emoji} ` : ''}{itemAMover.nombre}
+                Mover {itemAMover.item.emoji ? `${itemAMover.item.emoji} ` : ''}{itemAMover.item.nombre}
               </p>
               <p className="mt-0.5 text-xs text-text-3">Selecciona el comensal destino</p>
 
-              {itemAMover.cantidad > 1 && (
+              {itemAMover.item.cantidad > 1 && (
                 <div className="mt-3 flex items-center justify-between rounded-xl bg-s2 px-3 py-2.5">
                   <span className="text-[13px] font-medium text-text-2">
-                    Cuántos mover (de {itemAMover.cantidad})
+                    Cuántos mover (de {itemAMover.item.cantidad})
                   </span>
                   <div className="flex items-center gap-3">
                     <button
@@ -527,8 +530,8 @@ export function VistaComanda({
                       {cantidadMover}
                     </span>
                     <button
-                      onClick={() => setCantidadMover((c) => Math.min(itemAMover.cantidad, c + 1))}
-                      disabled={cantidadMover >= itemAMover.cantidad}
+                      onClick={() => setCantidadMover((c) => Math.min(itemAMover.item.cantidad, c + 1))}
+                      disabled={cantidadMover >= itemAMover.item.cantidad}
                       className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-[15px] font-bold text-text-2 shadow-sm active:scale-90 disabled:opacity-30"
                     >
                       +
@@ -539,7 +542,7 @@ export function VistaComanda({
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
               {subpedidos
-                .filter((s) => s.id !== subpedidoActivoId)
+                .filter((s) => s.id !== itemAMover.origenSubId)
                 .map((s) => (
                   <button
                     key={s.id}
@@ -647,26 +650,17 @@ export function VistaComanda({
         mesasCadena={mesasCadena}
       />
 
-      {/* Footer fijo */}
+      {/* Footer fijo — total del pedido completo (ya no "del comensal activo":
+          en la cascada se ve todo a la vez, no hay una pestaña resaltada) */}
       <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 border-t border-[#E5E5EA] bg-white px-4 py-3.5">
-        {/* Total del comensal activo */}
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-[13px] text-text-3">
-            Total {subActivo?.nombre ?? `Comensal ${subActivo?.comensal_numero ?? ''}`}
-          </span>
+          <span className="text-[13px] text-text-3">Total pedido</span>
           <span className="font-mono text-xl font-bold text-green-600">
-            ${(subActivo?.total ?? 0).toFixed(2)}
+            ${totalPedido.toFixed(2)}
           </span>
         </div>
 
-        {/* 3 botones */}
         <div className="flex gap-2">
-          <button
-            onClick={onAgregar}
-            className="flex-1 rounded-xl bg-s2 py-[13px] text-sm font-semibold text-text-3 active:scale-[.97]"
-          >
-            + Agregar
-          </button>
           <button
             onClick={handleEnviar}
             disabled={!hayPendientes || isPendingEnviar}

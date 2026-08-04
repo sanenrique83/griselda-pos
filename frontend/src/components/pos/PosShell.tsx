@@ -386,7 +386,6 @@ export function PosShell({
           <VistaComanda
             pedidoId={pedidoId}
             subpedidos={subpedidos}
-            subpedidoActivoId={subpedidoActivoId}
             onCambiarSubpedido={(id) => setSubpedidoActivoId(id)}
             onAgregar={() => setVista('menu')}
             puedesCancelar={puedesCancelar}
