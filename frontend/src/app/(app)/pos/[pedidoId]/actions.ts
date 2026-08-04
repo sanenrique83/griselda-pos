@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { imprimirTicket, type ItemCancelacion } from '@/lib/print'
 import { anularPedido } from '@/app/(app)/cobro/[pedidoId]/actions'
-import { columnaOrden } from '@/lib/ordenCatalogo'
+import { columnaOrden, type ModoOrdenModificadores } from '@/lib/ordenCatalogo'
 import { horaActualMX, dentroDeHorario } from '@/lib/horarioDisponibilidad'
 import { liberarUnaMesaSatelite } from '@/lib/mesasSatelite'
 import { primerNombreValido } from '@/lib/nombreUsuario'
@@ -52,6 +52,38 @@ export type GrupoRapido = {
   opciones: GuisadoMod[]
 }
 
+// ─── Orden por popularidad (config_sistema.orden_modificadores = 'popularidad') ─
+// Reordena en JS las opciones ya cargadas — la popularidad no es una columna
+// real, se calcula al vuelo vía RPC (sin guardar ni cachear nada) contando
+// pedido_producto_opciones → pedido_productos → subpedidos → pedidos.created_at
+// de los últimos `dias` días. Un solo RPC por llamada, acotado a los ids de
+// opciones que ya se van a mostrar (nunca un escaneo global).
+async function ordenarPorPopularidad<T extends { id: number }>(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  grupos: { opciones: T[] }[],
+  dias: number,
+): Promise<void> {
+  const idsUnicos = [...new Set(grupos.flatMap((g) => g.opciones.map((o) => o.id)))]
+  if (idsUnicos.length === 0) return
+
+  const { data: popularidad, error } = await supabase.rpc('popularidad_opciones_modificador', {
+    p_opcion_ids: idsUnicos,
+    p_dias: dias,
+  })
+
+  if (error) {
+    console.error('[ordenarPorPopularidad] error RPC:', error.message)
+    return // se queda con el orden ya cargado (fallback silencioso)
+  }
+
+  const conteoPorOpcion = new Map<number, number>(
+    (popularidad ?? []).map((p: any) => [p.opcion_id, Number(p.conteo)]),
+  )
+  for (const g of grupos) {
+    g.opciones.sort((a, b) => (conteoPorOpcion.get(b.id) ?? 0) - (conteoPorOpcion.get(a.id) ?? 0))
+  }
+}
+
 // ─── Cargar modificadores (modo estándar) ─────────────────────────────────────
 // soloDisponiblesAhora=true (default, uso en POS) también excluye opciones
 // fuera de su ventana horaria (F9-04). El editor de Catálogo llama con
@@ -66,10 +98,11 @@ export async function cargarModificadores(
 
   const { data: configOrden } = await supabase
     .from('config_sistema')
-    .select('orden_modificadores')
+    .select('orden_modificadores, orden_popularidad_dias')
     .eq('id', 1)
     .single()
-  const ordenOpciones = columnaOrden((configOrden as any)?.orden_modificadores)
+  const modoOrden = (configOrden as any)?.orden_modificadores as ModoOrdenModificadores | undefined
+  const ordenOpciones = columnaOrden(modoOrden)
 
   const { data, error } = await supabase
     .from('grupos_modificadores')
@@ -124,6 +157,13 @@ export async function cargarModificadores(
       })),
   }))
 
+  // Popularidad: nunca en Catálogo (soloDisponiblesAhora=false ahí — ver
+  // SeccionProductos.tsx, que se queda con el orden alfabético/personalizado
+  // ya calculado arriba por columnaOrden()).
+  if (modoOrden === 'popularidad' && soloDisponiblesAhora) {
+    await ordenarPorPopularidad(supabase, grupos, (configOrden as any)?.orden_popularidad_dias ?? 30)
+  }
+
   console.log(`[cargarModificadores] productoId=${productoId} → ${grupos.length} grupos`)
   return { grupos }
 }
@@ -137,10 +177,11 @@ export async function cargarGuisados(
 
   const { data: configOrden } = await supabase
     .from('config_sistema')
-    .select('orden_modificadores')
+    .select('orden_modificadores, orden_popularidad_dias')
     .eq('id', 1)
     .single()
-  const ordenOpciones = columnaOrden((configOrden as any)?.orden_modificadores)
+  const modoOrden = (configOrden as any)?.orden_modificadores as ModoOrdenModificadores | undefined
+  const ordenOpciones = columnaOrden(modoOrden)
 
   // Query 1: grupos con mostrar_en_rapido=true para este producto
   const { data: gruposData, error: gruposErr } = await supabase
@@ -201,6 +242,12 @@ export async function cargarGuisados(
         disponible: true,
       })),
   }))
+
+  // Este action es exclusivo de POS (nunca lo llama Catálogo) — a diferencia
+  // de cargarModificadores() no hace falta condicionar por contexto.
+  if (modoOrden === 'popularidad') {
+    await ordenarPorPopularidad(supabase, grupos, (configOrden as any)?.orden_popularidad_dias ?? 30)
+  }
 
   console.log(`[cargarGuisados] productoId=${productoId} → ${grupos.length} grupos`)
   console.log('[cargarGuisados] grupos resultado:', JSON.stringify(grupos))

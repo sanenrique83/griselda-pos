@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import type { ModoOrden, ModoOrdenModificadores } from '@/lib/ordenCatalogo'
 
 type Err = { error: string }
 
@@ -137,8 +138,6 @@ export async function actualizarAlertaPrecuentaMinutos(
   if (error) return { error: 'Error al actualizar los minutos de alerta de precuenta.' }
 }
 
-type ModoOrden = 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
-
 export async function actualizarOrdenProductos(
   modo: ModoOrden,
 ): Promise<Err | undefined> {
@@ -153,7 +152,7 @@ export async function actualizarOrdenProductos(
 }
 
 export async function actualizarOrdenModificadores(
-  modo: ModoOrden,
+  modo: ModoOrdenModificadores,
 ): Promise<Err | undefined> {
   const supabase = await createClient()
 
@@ -163,4 +162,17 @@ export async function actualizarOrdenModificadores(
     .eq('id', 1)
 
   if (error) return { error: 'Error al actualizar el orden de modificadores.' }
+}
+
+export async function actualizarOrdenPopularidadDias(
+  dias: number,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('config_sistema')
+    .update({ orden_popularidad_dias: dias })
+    .eq('id', 1)
+
+  if (error) return { error: 'Error al actualizar los días de popularidad.' }
 }

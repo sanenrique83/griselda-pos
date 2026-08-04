@@ -57,7 +57,11 @@ export interface ConfigSistema {
   ver_dashboard_mesero: boolean
   timeout_inactividad_minutos: number
   orden_productos: 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
-  orden_modificadores: 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
+  orden_modificadores: 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado' | 'popularidad'
+  // Días hacia atrás que considera el modo 'popularidad' de orden_modificadores
+  // al contar cuántas veces se eligió cada opción — ver
+  // popularidad_opciones_modificador() y ordenarPorPopularidad().
+  orden_popularidad_dias: number
   alerta_mesa_sin_atender: boolean
   alerta_mesa_sin_atender_minutos: number
   // Temporizador de mesa en vivo (F9-03): umbral (minutos) a partir del cual

@@ -22,7 +22,7 @@ import { cargarModificadores } from '@/app/(app)/pos/[pedidoId]/actions'
 import { SeccionReceta } from './SeccionReceta'
 import { ListaArrastrable } from './ListaArrastrable'
 import type { ProductoCatalogo, CategoriaCatalogo, IngredienteCatalogo, InsumoCatalogo } from '@/app/(app)/mas/catalogo/page'
-import type { ModoOrden } from '@/lib/ordenCatalogo'
+import type { ModoOrden, ModoOrdenModificadores } from '@/lib/ordenCatalogo'
 
 // ─── Tipos locales ────────────────────────────────────────────────────────────
 
@@ -59,7 +59,7 @@ interface SeccionProductosProps {
   // Deep-link desde Inventario → Recetas: abre directo el editor de este producto.
   editarProductoId?: number | null
   modoOrdenProductos: ModoOrden
-  modoOrdenModificadores: ModoOrden
+  modoOrdenModificadores: ModoOrdenModificadores
 }
 
 export function SeccionProductos({

@@ -15,15 +15,22 @@ import {
   actualizarAlertaVentasBajasUmbral,
   actualizarTurnoDiferenciaAlerta,
   actualizarAlertaPrecuentaMinutos,
+  actualizarOrdenPopularidadDias,
 } from '@/app/(app)/mas/permisos/actions'
 import type { ConfigPermisos } from '@/app/(app)/mas/permisos/page'
-
-type ModoOrden = 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
+import type { ModoOrden, ModoOrdenModificadores } from '@/lib/ordenCatalogo'
 
 const OPCIONES_ORDEN: { value: ModoOrden; label: string }[] = [
   { value: 'personalizado', label: 'Personalizado' },
   { value: 'alfabetico_asc', label: 'A → Z' },
   { value: 'alfabetico_desc', label: 'Z → A' },
+]
+
+// Solo para el selector de modificadores — orden_productos nunca acepta
+// 'popularidad' (ver CHECK constraint de config_sistema).
+const OPCIONES_ORDEN_MODIFICADORES: { value: ModoOrdenModificadores; label: string }[] = [
+  ...OPCIONES_ORDEN,
+  { value: 'popularidad', label: 'Popularidad' },
 ]
 
 const PERMISOS_MESERO: { campo: keyof ConfigPermisos; label: string; desc: string }[] = [
@@ -117,8 +124,13 @@ export function PermisosShell({ config }: PermisosShellProps) {
 
   // Orden del catálogo
   const [ordenProductos, setOrdenProductos] = useState<ModoOrden>(config.orden_productos)
-  const [ordenModificadores, setOrdenModificadores] = useState<ModoOrden>(config.orden_modificadores)
+  const [ordenModificadores, setOrdenModificadores] = useState<ModoOrdenModificadores>(config.orden_modificadores)
   const [ordenBanner, setOrdenBanner] = useState<string | null>(null)
+
+  // Días considerados por el modo 'popularidad' de orden_modificadores
+  const [popularidadDias, setPopularidadDias] = useState(config.orden_popularidad_dias.toString())
+  const [savingPopularidadDias, setSavingPopularidadDias] = useState(false)
+  const [popularidadDiasBanner, setPopularidadDiasBanner] = useState<string | null>(null)
 
   // Alerta de mesa sin atender
   const [alertaMin, setAlertaMin] = useState(config.alerta_mesa_sin_atender_minutos.toString())
@@ -341,7 +353,7 @@ export function PermisosShell({ config }: PermisosShellProps) {
     }
   }
 
-  async function handleCambiarOrdenModificadores(modo: ModoOrden) {
+  async function handleCambiarOrdenModificadores(modo: ModoOrdenModificadores) {
     const anterior = ordenModificadores
     setOrdenModificadores(modo)
     setOrdenBanner(null)
@@ -352,6 +364,24 @@ export function PermisosShell({ config }: PermisosShellProps) {
     } else {
       setOrdenBanner('Guardado ✓')
       setTimeout(() => setOrdenBanner(null), 3000)
+    }
+  }
+
+  async function handleGuardarPopularidadDias() {
+    const dias = parseInt(popularidadDias, 10)
+    if (isNaN(dias) || dias < 1) {
+      setPopularidadDiasBanner('Ingresa un número de días válido (1 o más).')
+      return
+    }
+    setSavingPopularidadDias(true)
+    setPopularidadDiasBanner(null)
+    const result = await actualizarOrdenPopularidadDias(dias)
+    setSavingPopularidadDias(false)
+    if (result?.error) {
+      setPopularidadDiasBanner(result.error)
+    } else {
+      setPopularidadDiasBanner('Guardado ✓')
+      setTimeout(() => setPopularidadDiasBanner(null), 3000)
     }
   }
 
@@ -839,7 +869,7 @@ export function PermisosShell({ config }: PermisosShellProps) {
                 Opciones de modificadores
               </label>
               <div className="flex gap-1.5">
-                {OPCIONES_ORDEN.map((o) => (
+                {OPCIONES_ORDEN_MODIFICADORES.map((o) => (
                   <button
                     key={o.value}
                     onClick={() => handleCambiarOrdenModificadores(o.value)}
@@ -851,10 +881,39 @@ export function PermisosShell({ config }: PermisosShellProps) {
                   </button>
                 ))}
               </div>
+              {ordenModificadores === 'popularidad' && (
+                <div className="mt-2.5 flex items-center gap-2.5">
+                  <span className="text-xs text-text-3">Considerando los últimos</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    value={popularidadDias}
+                    onChange={(e) => setPopularidadDias(e.target.value)}
+                    className="w-16 rounded-lg border-[1.5px] border-border bg-s2 px-2 py-1.5 text-center font-mono text-sm font-bold outline-none focus:border-blue-500"
+                  />
+                  <span className="text-xs text-text-3">días</span>
+                  <button
+                    onClick={handleGuardarPopularidadDias}
+                    disabled={savingPopularidadDias}
+                    className="ml-auto rounded-lg bg-blue-600 px-3 py-1.5 text-[12px] font-semibold text-white active:opacity-80 disabled:opacity-40"
+                  >
+                    {savingPopularidadDias ? 'Guardando…' : 'Guardar'}
+                  </button>
+                </div>
+              )}
+              {popularidadDiasBanner && (
+                <p className={`mt-1.5 text-xs font-semibold ${popularidadDiasBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+                  {popularidadDiasBanner}
+                </p>
+              )}
             </div>
             <p className="text-xs text-text-3">
               &quot;Personalizado&quot; usa el orden que arrastras a mano en Catálogo. Los modos
-              alfabéticos lo ignoran.
+              alfabéticos lo ignoran. &quot;Popularidad&quot; ordena por veces elegida en los
+              últimos días configurados — calculado al vuelo solo en el menú del POS; el editor
+              de Catálogo se queda con el orden personalizado mientras se edita.
             </p>
             {ordenBanner && (
               <p className={`text-xs font-semibold ${ordenBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
