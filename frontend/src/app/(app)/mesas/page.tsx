@@ -5,6 +5,28 @@ import { MesasShell } from '@/components/mesas/MesasShell'
 import { calcularOcupacionPorMesa } from '@/lib/asientos'
 import { calcularAlertaVentasBajas, type FilaAlertaVentasBajas } from '@/lib/alertaVentasBajas'
 import { primerNombreValido } from '@/lib/nombreUsuario'
+import { colorSemaforoMesa } from '@/lib/colorMesa'
+import { horaActualMX } from '@/lib/horarioDisponibilidad'
+
+// Resumen operativo ("Panel del turno") — deliberadamente escopeado a mesas
+// ocupadas (pedidos con mesa_id), no a para-llevar/mostrador, porque es lo
+// que ya se carga en esta pantalla y es lo que el usuario ve en el plano de
+// abajo. Snapshot al momento de la carga (no live-tick) — igual que el resto
+// de esta página, que ya se recalcula por completo en cada navegación.
+export type PanelTurno = {
+  mesasOcupadas: number
+  clientes: number
+  ticketPromedio: number
+  tiempoPromedioMin: number
+  cobroPendiente: number
+}
+
+function saludoPorHora(horaActual: string): string {
+  const hora = Number(horaActual.split(':')[0])
+  if (hora >= 5 && hora < 12) return 'Buen día'
+  if (hora >= 12 && hora < 19) return 'Buenas tardes'
+  return 'Buenas noches'
+}
 
 // Tipos exportados para que los componentes cliente los importen
 export type MesaUI = {
@@ -54,10 +76,11 @@ export default async function MesasPage() {
   // durante el servicio.
   const { data: perfilPropio } = await supabase
     .from('perfiles')
-    .select('rol')
+    .select('rol, nombre')
     .eq('id', user.id)
     .single()
   const esAdmin = perfilPropio?.rol === 'admin'
+  const nombreUsuario = primerNombreValido(perfilPropio?.nombre).split(' ')[0]
 
   // Turno activo
   const { data: turno } = await supabase
@@ -95,7 +118,7 @@ export default async function MesasPage() {
       pedidoIdsAbiertos.length > 0
         ? supabase
             .from('subpedidos')
-            .select('pedido_id, estado, silla_numero, pedido_productos(estado)')
+            .select('pedido_id, estado, silla_numero, pedido_productos(estado, cantidad, precio_unit)')
             .in('pedido_id', pedidoIdsAbiertos)
         : Promise.resolve({ data: [] as any[] }),
       supabase
@@ -153,6 +176,60 @@ export default async function MesasPage() {
     const todosPagados = subs.every((s) => s.estado === 'pagado')
     algunoPagadoNoTodosPorPedido.set(pedidoId, algunoPagado && !todosPagados)
   }
+
+  // ── Panel del turno (resumen operativo) ────────────────────────────────────
+  const totalPorPedido = new Map<number, number>()
+  let cobroPendiente = 0
+  for (const sub of subpedidosRaw ?? []) {
+    const totalSub = (sub.pedido_productos ?? [])
+      .filter((pp: any) => pp.estado !== 'cancelado')
+      .reduce((s: number, pp: any) => s + pp.cantidad * pp.precio_unit, 0)
+    totalPorPedido.set(sub.pedido_id, (totalPorPedido.get(sub.pedido_id) ?? 0) + totalSub)
+    // Cobro pendiente: valor de lo que aún no se ha cobrado (subpedidos que
+    // siguen 'activo', no 'pagado') entre las mesas ocupadas ahorita.
+    if (sub.estado === 'activo') cobroPendiente += totalSub
+  }
+  const clientes = (pedidosAbiertos ?? []).reduce((s, p) => s + p.num_comensales, 0)
+  const ahoraMs = Date.now()
+  const tiempoPromedioMin =
+    (pedidosAbiertos ?? []).length > 0
+      ? (pedidosAbiertos ?? []).reduce(
+          (s, p) => s + (ahoraMs - new Date(p.created_at).getTime()) / 60_000,
+          0,
+        ) / (pedidosAbiertos ?? []).length
+      : 0
+  const ticketPromedio =
+    (pedidosAbiertos ?? []).length > 0
+      ? (pedidosAbiertos ?? []).reduce((s, p) => s + (totalPorPedido.get(p.id) ?? 0), 0) /
+        (pedidosAbiertos ?? []).length
+      : 0
+  const panelTurno: PanelTurno = {
+    mesasOcupadas: (pedidosAbiertos ?? []).length,
+    clientes,
+    ticketPromedio,
+    tiempoPromedioMin: Math.round(tiempoPromedioMin),
+    cobroPendiente,
+  }
+
+  // Campana de notificaciones del header — cuenta real de pedidos en mesa
+  // en rojo (sin atender por tiempo) al momento de la carga, no un contador
+  // inventado. Por pedido, no por mesa física, para no contar dos veces una
+  // mesa unida (misma alerta se repetiría en cada mesa satélite).
+  const campanaCount = (pedidosAbiertos ?? []).filter(
+    (p) =>
+      colorSemaforoMesa(
+        {
+          ocupada: true,
+          algunoPagadoNoTodos: algunoPagadoNoTodosPorPedido.get(p.id) ?? false,
+          tieneProductos: tieneProductosPorPedido.get(p.id) ?? false,
+          pedidoCreatedAt: p.created_at,
+          alertaActiva: config?.alerta_mesa_sin_atender ?? true,
+          alertaMinutos: config?.alerta_mesa_sin_atender_minutos ?? 10,
+          fueraDeServicio: false,
+        },
+        ahoraMs,
+      ) === 'rojo',
+  ).length
 
   const ocupacionPorMesa = calcularOcupacionPorMesa({
     pedidos: (pedidosAbiertos ?? [])
@@ -244,6 +321,10 @@ export default async function MesasPage() {
       alertaVentasBajas={alertaVentasBajas}
       alertaPrecuentaActiva={config?.alerta_precuenta_activa ?? true}
       alertaPrecuentaMinutos={config?.alerta_precuenta_minutos ?? 5}
+      nombreUsuario={nombreUsuario}
+      saludo={saludoPorHora(horaActualMX())}
+      panelTurno={panelTurno}
+      campanaCount={campanaCount}
     />
   )
 }

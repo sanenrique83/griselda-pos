@@ -1,14 +1,29 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import {
+  Plus,
+  UtensilsCrossed,
+  Users2,
+  Armchair,
+  Users,
+  Receipt,
+  Clock3,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react'
 import { TarjetaMesa } from './TarjetaMesa'
 import { PlanoMesas } from './PlanoMesas'
 import { SheetParaLlevar } from './SheetParaLlevar'
 import { SheetMesaExtra } from './SheetMesaExtra'
 import { abrirPedidoMostrador } from '@/app/(app)/mesas/actions'
-import type { GrupoArea, MesaUI } from '@/app/(app)/mesas/page'
+import type { GrupoArea, MesaUI, PanelTurno } from '@/app/(app)/mesas/page'
 import type { AlertaVentasBajas } from '@/lib/alertaVentasBajas'
+import { HeaderA } from '@/components/ui/HeaderA'
+import { AccionIcono } from '@/components/ui/AccionIcono'
+import { formatCurrency, texto } from '@/components/ui/tokens'
+import { colorSemaforoMesa, ESTILO_COLOR_MESA, type ColorMesa } from '@/lib/colorMesa'
 
 interface MesasShellProps {
   grupos: GrupoArea[]
@@ -23,7 +38,23 @@ interface MesasShellProps {
   alertaVentasBajas: AlertaVentasBajas | null
   alertaPrecuentaActiva: boolean
   alertaPrecuentaMinutos: number
+  nombreUsuario: string
+  saludo: string
+  panelTurno: PanelTurno
+  campanaCount: number
 }
+
+// Regla de diseño transversal #2 (CLAUDE.md): exactamente los 5 estados
+// reales de lib/colorMesa.ts, mismo texto que ya usa TarjetaMesa — la
+// leyenda no inventa un sexto estado ni renombra los existentes.
+const LABEL_LEYENDA: Record<ColorMesa, string> = {
+  verde: 'Libre',
+  naranja: 'Ocupada',
+  azul: 'Cobro parcial',
+  rojo: 'Sin atender',
+  gris: 'Fuera de servicio',
+}
+const ORDEN_LEYENDA: ColorMesa[] = ['verde', 'naranja', 'azul', 'rojo', 'gris']
 
 // Selector de pestaña de área para la vista de Mapa — el id real de un área,
 // o 'sin_area' para mesas con area_id nulo (ej. "+ Mesa extra"). Cada área
@@ -45,10 +76,6 @@ function construirAreasMapa(mesas: MesaUI[]): { id: AreaMapaTabId; nombre: strin
     .sort((a, b) => a.orden - b.orden)
 }
 
-function fmtMoney(n: number) {
-  return n.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-}
-
 export function MesasShell({
   grupos,
   mesas,
@@ -60,6 +87,10 @@ export function MesasShell({
   alertaVentasBajas,
   alertaPrecuentaActiva,
   alertaPrecuentaMinutos,
+  nombreUsuario,
+  saludo,
+  panelTurno,
+  campanaCount,
 }: MesasShellProps) {
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -131,33 +162,90 @@ export function MesasShell({
     router.push(`/pos/nueva/${mesa.id}`)
   }
 
-  const totalMesas = grupos.reduce((acc, g) => acc + g.mesas.length, 0)
-  const mesasOcupadas = grupos.reduce(
-    (acc, g) => acc + g.mesas.filter((m) => m.pedido_activo).length,
-    0,
-  )
+  // Conteos de la leyenda de color — mismo semáforo que cada TarjetaMesa/
+  // MesaShape individual (colorSemaforoMesa), reevaluado con el mismo reloj
+  // compartido `ahora` para que no se desincronice con el resto de la
+  // pantalla.
+  const conteoLeyenda = useMemo(() => {
+    const conteo: Record<ColorMesa, number> = { verde: 0, naranja: 0, azul: 0, rojo: 0, gris: 0 }
+    for (const m of mesas) {
+      const color = colorSemaforoMesa(
+        {
+          ocupada: m.pedido_activo !== null,
+          algunoPagadoNoTodos: m.pedido_activo?.algunoPagadoNoTodos ?? false,
+          tieneProductos: m.pedido_activo?.tieneProductos ?? false,
+          pedidoCreatedAt: m.pedido_activo?.created_at ?? null,
+          alertaActiva,
+          alertaMinutos,
+          fueraDeServicio: m.fuera_de_servicio,
+        },
+        ahora,
+      )
+      conteo[color]++
+    }
+    return conteo
+  }, [mesas, alertaActiva, alertaMinutos, ahora])
 
   return (
     <>
-      {/* Header */}
-      <div className="flex h-[52px] flex-shrink-0 items-center gap-2.5 border-b border-[#E5E5EA] bg-white px-4">
-        <h1 className="flex-1 text-[17px] font-semibold">Griselda POS</h1>
-        {turnoId ? (
-          <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-[11px] font-semibold text-green-600">
-            ● Turno #{turnoId}
-          </span>
-        ) : (
-          <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-600">
-            Sin turno
-          </span>
-        )}
-        <span className="text-[13px] text-text-3">
-          {mesasOcupadas}/{totalMesas}
-        </span>
-      </div>
+      <HeaderA
+        titulo="Griselda POS"
+        subtitulo="La Menudería"
+        turnoId={turnoId}
+        campanaCount={campanaCount}
+      />
 
       {/* Cuerpo scrolleable */}
       <div className="flex-1 overflow-y-auto pb-safe">
+
+        {/* Saludo personalizado */}
+        <div className="px-4 pt-4">
+          <p className={`${texto.tituloPantalla} leading-tight`}>
+            ¡{saludo}, {nombreUsuario}! 👋
+          </p>
+          <p className={`mt-0.5 ${texto.etiqueta}`}>¿Qué deseas hacer hoy?</p>
+        </div>
+
+        {/* 3 tarjetas de acceso rápido — mismas acciones de siempre (Para
+            llevar / Venta rápida / Mesa extra), solo con la disposición del
+            mockup (grid de 3, "acción con ícono"). */}
+        <div className="grid grid-cols-3 gap-2 px-3 pt-3.5" style={{ gridAutoRows: '1fr' }}>
+          <AccionIcono
+            variant="primaria"
+            icon={Plus}
+            label="Nueva orden para llevar"
+            onClick={() => {
+              if (!turnoId) {
+                setError('No hay turno activo. Ve a Más → Turno para abrir uno.')
+                return
+              }
+              setSheetOpen(true)
+            }}
+          />
+          <AccionIcono
+            icon={UtensilsCrossed}
+            label="Venta rápida"
+            sublabel="Directo al menú"
+            tintBg="bg-amber-50"
+            tintText="text-amber-600"
+            onClick={handleVentaRapida}
+            disabled={isPendingMostrador}
+          />
+          <AccionIcono
+            icon={Users2}
+            label="Mesa grande"
+            sublabel="Grupos grandes"
+            tintBg="bg-green-50"
+            tintText="text-green-700"
+            onClick={() => {
+              if (!turnoId) {
+                setError('No hay turno activo. Ve a Más → Turno para abrir uno.')
+                return
+              }
+              setSheetMesaExtraOpen(true)
+            }}
+          />
+        </div>
 
         {/* Alerta de ventas bajas en tiempo real (F9-06) — solo admin */}
         {alertaVentasBajas && (
@@ -169,7 +257,7 @@ export function MesasShell({
                 para esta hora
               </p>
               <p className="mt-0.5 text-[11px] text-red-600">
-                ${fmtMoney(alertaVentasBajas.totalActual)} cobrado vs. ${fmtMoney(alertaVentasBajas.promedioHistorico)}{' '}
+                {formatCurrency(alertaVentasBajas.totalActual)} cobrado vs. {formatCurrency(alertaVentasBajas.promedioHistorico)}{' '}
                 en promedio a esta hora, mismo día de la semana.
               </p>
             </div>
@@ -189,74 +277,6 @@ export function MesasShell({
           </div>
         )}
 
-        {/* Botón Para llevar */}
-        <div className="px-3 pt-3">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.05em] text-text-3">
-            Para llevar
-          </p>
-          <button
-            onClick={() => {
-              if (!turnoId) {
-                setError('No hay turno activo. Ve a Más → Turno para abrir uno.')
-                return
-              }
-              setSheetOpen(true)
-            }}
-            className="flex w-full cursor-pointer items-center gap-3 rounded-xl bg-blue-600 px-4 py-4 text-white shadow-[0_4px_14px_rgba(37,99,235,.28)] active:scale-[.98]"
-          >
-            <span className="text-[28px] leading-none">📦</span>
-            <div className="flex-1 text-left">
-              <div className="text-[15px] font-semibold">Nuevo pedido para llevar</div>
-              <div className="mt-0.5 text-[12px] opacity-80">
-                Sin mesa · Datos opcionales
-              </div>
-            </div>
-            <span className="text-xl opacity-70">›</span>
-          </button>
-        </div>
-
-        {/* Botón Venta rápida (mostrador) */}
-        <div className="px-3 pt-2.5">
-          <button
-            onClick={handleVentaRapida}
-            disabled={isPendingMostrador}
-            className="flex w-full cursor-pointer items-center gap-3 rounded-xl bg-emerald-600 px-4 py-4 text-white shadow-[0_4px_14px_rgba(5,150,105,.28)] active:scale-[.98] disabled:opacity-60"
-          >
-            <span className="text-[28px] leading-none">🛍️</span>
-            <div className="flex-1 text-left">
-              <div className="text-[15px] font-semibold">
-                {isPendingMostrador ? 'Creando…' : 'Venta rápida'}
-              </div>
-              <div className="mt-0.5 text-[12px] opacity-80">
-                Sin mesa · Directo al menú
-              </div>
-            </div>
-            <span className="text-xl opacity-70">›</span>
-          </button>
-        </div>
-
-        {/* Botón + Mesa extra */}
-        <div className="px-3 pt-2.5">
-          <button
-            onClick={() => {
-              if (!turnoId) {
-                setError('No hay turno activo. Ve a Más → Turno para abrir uno.')
-                return
-              }
-              setSheetMesaExtraOpen(true)
-            }}
-            className="flex w-full cursor-pointer items-center gap-3 rounded-xl border-[1.5px] border-dashed border-[#D1D1D6] bg-white px-4 py-3.5 text-text-2 active:scale-[.98]"
-          >
-            <span className="text-[22px] leading-none">➕</span>
-            <div className="flex-1 text-left">
-              <div className="text-[14px] font-semibold">Mesa extra</div>
-              <div className="mt-0.5 text-[12px] text-text-3">
-                Para grupos que no caben en las mesas normales
-              </div>
-            </div>
-          </button>
-        </div>
-
         {/* Sin mesas configuradas */}
         {grupos.length === 0 && (
           <div className="mt-12 text-center text-sm text-text-3">
@@ -266,27 +286,71 @@ export function MesasShell({
           </div>
         )}
 
-        {/* Toggle mapa / lista */}
-        {grupos.length > 0 && hayMapa && (
-          <div className="flex justify-center px-3 pt-4">
-            <div className="inline-flex rounded-xl bg-s2 p-1">
-              <button
-                onClick={() => setVista('mapa')}
-                className={`rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-colors ${
-                  vista === 'mapa' ? 'bg-white text-text-1 shadow-card' : 'text-text-3'
-                }`}
-              >
-                🗺️ Mapa
-              </button>
-              <button
-                onClick={() => setVista('lista')}
-                className={`rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-colors ${
-                  vista === 'lista' ? 'bg-white text-text-1 shadow-card' : 'text-text-3'
-                }`}
-              >
-                ☰ Lista
-              </button>
+        {/* Panel del turno — resumen operativo, escopeado a mesas ocupadas
+            (ver PanelTurno en mesas/page.tsx). Fila horizontal deslizable:
+            5 columnas no caben cómodo en una pantalla angosta. */}
+        {grupos.length > 0 && (
+          <div className="px-3 pt-4">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.05em] text-text-3">
+              Panel del turno
+            </p>
+            <div className="flex gap-1 overflow-x-auto scrollbar-none rounded-2xl bg-white p-3 shadow-card">
+              <StatTile icon={Armchair} label="Mesas ocupadas" value={String(panelTurno.mesasOcupadas)} tintBg="bg-s2" tintText="text-text-2" />
+              <StatTile icon={Users} label="Clientes" value={String(panelTurno.clientes)} tintBg="bg-s2" tintText="text-text-2" />
+              <StatTile icon={Receipt} label="Ticket promedio" value={formatCurrency(panelTurno.ticketPromedio)} tintBg="bg-s2" tintText="text-text-2" />
+              <StatTile icon={Clock3} label="Tiempo promedio" value={`${panelTurno.tiempoPromedioMin} min`} tintBg="bg-s2" tintText="text-text-2" />
+              <StatTile
+                icon={Wallet}
+                label="Cobro pendiente"
+                value={formatCurrency(panelTurno.cobroPendiente)}
+                tintBg="bg-red-50"
+                tintText="text-red-600"
+                valueClass="text-red-600"
+              />
             </div>
+          </div>
+        )}
+
+        {/* Mesas — título + toggle mapa/lista, misma fila (como el mockup) */}
+        {grupos.length > 0 && (
+          <div className="flex items-center justify-between px-3 pt-5">
+            <p className={texto.encabezadoSeccion}>Mesas</p>
+            {hayMapa && (
+              <div className="inline-flex rounded-xl bg-s2 p-1">
+                <button
+                  onClick={() => setVista('mapa')}
+                  className={`rounded-lg px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+                    vista === 'mapa' ? 'bg-[#173F2E] text-white shadow-card' : 'text-text-3'
+                  }`}
+                >
+                  🗺️ Mapa
+                </button>
+                <button
+                  onClick={() => setVista('lista')}
+                  className={`rounded-lg px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+                    vista === 'lista' ? 'bg-[#173F2E] text-white shadow-card' : 'text-text-3'
+                  }`}
+                >
+                  ☰ Lista
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Leyenda de colores — los 5 estados reales de lib/colorMesa.ts,
+            no los 3 del mockup de referencia (no existe "Reservada"). */}
+        {grupos.length > 0 && (
+          <div className="flex gap-3 overflow-x-auto scrollbar-none px-3 pt-3">
+            {ORDEN_LEYENDA.map((c) => (
+              <span key={c} className="flex flex-shrink-0 items-center gap-1.5 text-[12px] text-text-3">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: ESTILO_COLOR_MESA[c].dot }}
+                />
+                {LABEL_LEYENDA[c]} <span className="font-semibold text-text-2">{conteoLeyenda[c]}</span>
+              </span>
+            ))}
           </div>
         )}
 
@@ -368,5 +432,31 @@ export function MesasShell({
         areaId={areaMapaSeleccionada === 'sin_area' ? null : areaMapaSeleccionada}
       />
     </>
+  )
+}
+
+function StatTile({
+  icon: Icon,
+  label,
+  value,
+  tintBg,
+  tintText,
+  valueClass = 'text-text',
+}: {
+  icon: LucideIcon
+  label: string
+  value: string
+  tintBg: string
+  tintText: string
+  valueClass?: string
+}) {
+  return (
+    <div className="flex w-[78px] flex-shrink-0 flex-col items-center gap-1 px-1 text-center">
+      <span className={`flex h-8 w-8 items-center justify-center rounded-full ${tintBg} ${tintText}`}>
+        <Icon size={16} strokeWidth={2.2} />
+      </span>
+      <span className={`${texto.caption} leading-tight`}>{label}</span>
+      <span className={`text-[13px] font-bold leading-none ${valueClass}`}>{value}</span>
+    </div>
   )
 }

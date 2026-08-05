@@ -53,6 +53,13 @@ Referencia común antes de tocar el diseño de una pantalla individual. Ver tamb
 4. **Header A vs. Header B**, composición fija cada uno:
    - Header A (pantallas raíz del bottom nav) = logo circular + nombre/marca + píldora de turno + campana de notificaciones.
    - Header B (pantallas de detalle) = flecha atrás + título + acciones contextuales a la derecha.
+5. **Verde bosque de marca** (`brand.forest` = `#173F2E`, hover `brand.forestHover` = `#0F2E21`, en `components/ui/tokens.ts`) para header tipo A y acciones primarias de marca — **nunca** para el semáforo de mesa. `lib/colorMesa.ts` es un sistema de color aparte con significado operativo propio (libre/ocupada/etc.); no se mezcla con el verde de marca aunque ambos sean "verde".
+
+## Componentes base de UI — Boton / Sheet / Tarjeta
+
+Trabajo **nuevo** de botones, sheets o tarjetas usa `components/ui/Boton.tsx`, `components/ui/Sheet.tsx` y `components/ui/Tarjeta.tsx` (variantes primario/secundario/peligro/texto para Boton, verde bosque como color primario) — no clases de Tailwind sueltas copiadas de otro archivo. Esto es la fundación: los ~40 archivos que ya usan `bg-blue-600` u otros botones/sheets/tarjetas armados a mano **no se migran automáticamente** solo por existir estos componentes; se migran pantalla por pantalla, cuando se rediseñe cada una.
+
+Recordatorio explícito (ya en la regla 5 de arriba, pero se repite aquí porque es fácil pasarlo por alto al tocar botones): el semáforo de mesas (`lib/colorMesa.ts`, `ESTILO_COLOR_MESA`) es un sistema de color aparte, con su propio significado operativo (libre/ocupada/cobro parcial/sin atender/fuera de servicio), probado y estable — **no** se alinea ni se reemplaza por el verde de marca aunque ambos usen tonos de verde.
 
 ## Verificación antes de reportar terminado
 
