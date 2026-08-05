@@ -217,8 +217,6 @@ export interface GrupoModificador {
   minimo: number
   maximo: number
   orden: number
-  /** @deprecated Sin usar desde grupo_modificador_padres (columna aún viva en BD, no eliminada). */
-  padre_opcion_id: number | null
   mostrar_en_rapido: boolean
   // Formato 'texto_natural' del ticket (ver lib/descripcionNatural.ts) —
   // ambos nullable, sin valor = grupo se pega directo sin conector / opción
