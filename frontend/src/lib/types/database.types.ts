@@ -62,6 +62,10 @@ export interface ConfigSistema {
   transferencia_titular: string | null
   cancelar_pedido_mesero: boolean
   ver_dashboard_mesero: boolean
+  // Panel del turno en /mesas: sin este permiso, un mesero solo ve Mesas
+  // ocupadas/Clientes/Tiempo promedio — Ticket promedio y Cobro pendiente
+  // quedan ocultos (Admin siempre ve los 5, sin importar este valor).
+  panel_turno_mesero_financiero: boolean
   timeout_inactividad_minutos: number
   orden_productos: 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado'
   orden_modificadores: 'alfabetico_asc' | 'alfabetico_desc' | 'personalizado' | 'popularidad'

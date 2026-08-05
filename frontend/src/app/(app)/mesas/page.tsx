@@ -226,7 +226,7 @@ export default async function MesasPage({
       supabase
         .from('config_sistema')
         .select(
-          'alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos, tiempo_mesa_alerta_minutos, alerta_ventas_bajas_activa, alerta_ventas_bajas_umbral_pct, alerta_precuenta_activa, alerta_precuenta_minutos',
+          'alerta_mesa_sin_atender, alerta_mesa_sin_atender_minutos, tiempo_mesa_alerta_minutos, alerta_ventas_bajas_activa, alerta_ventas_bajas_umbral_pct, alerta_precuenta_activa, alerta_precuenta_minutos, panel_turno_mesero_financiero',
         )
         .eq('id', 1)
         .single(),
@@ -458,6 +458,7 @@ export default async function MesasPage({
       esAdmin={esAdmin}
       turnosCerrados={turnosCerrados}
       turnoVista={turnoVista}
+      panelTurnoFinanciero={esAdmin || (config?.panel_turno_mesero_financiero ?? false)}
       alertaActiva={config?.alerta_mesa_sin_atender ?? true}
       alertaMinutos={config?.alerta_mesa_sin_atender_minutos ?? 10}
       tiempoMesaAlertaMinutos={config?.tiempo_mesa_alerta_minutos ?? 60}

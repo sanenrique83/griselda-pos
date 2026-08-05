@@ -60,6 +60,7 @@ interface MesasShellProps {
   esAdmin: boolean
   turnosCerrados: TurnoCerradoResumen[]
   turnoVista: TurnoVista
+  panelTurnoFinanciero: boolean
 }
 
 // Regla de diseño transversal #2 (CLAUDE.md): exactamente los 5 estados
@@ -114,6 +115,7 @@ export function MesasShell({
   esAdmin,
   turnosCerrados,
   turnoVista,
+  panelTurnoFinanciero,
 }: MesasShellProps) {
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -315,35 +317,38 @@ export function MesasShell({
         )}
 
         {/* Panel del turno — resumen operativo, escopeado a mesas ocupadas
-            (ver PanelTurno en mesas/page.tsx). Fila horizontal deslizable:
-            5 columnas no caben cómodo en una pantalla angosta. */}
+            (ver PanelTurno en mesas/page.tsx). Compactado a propósito para
+            que los tiles quepan en una sola fila a ~375-390px (etiquetas de
+            una palabra, ícono/tipografía chicos, gap mínimo) — flex-nowrap +
+            overflow-x-auto es solo un colchón por si un dispositivo aún más
+            angosto no alcanza a mostrar los 5, nunca envuelve a 2 filas.
+            Ticket/Cobro solo se muestran si panelTurnoFinanciero (Admin
+            siempre; mesero solo con el permiso de /mas/permisos activo). */}
         {grupos.length > 0 && (
           <div className="px-3 pt-4">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.05em] text-text-3">
               Panel del turno
             </p>
-            <div className="flex flex-wrap gap-x-1 gap-y-3 rounded-2xl bg-white p-3 shadow-card">
-              <StatTile icon={Armchair} label="Mesas ocupadas" value={String(panelTurno.mesasOcupadas)} valueClass="text-[#173F2E]" />
+            <div className="flex flex-nowrap gap-x-2 overflow-x-auto scrollbar-none rounded-2xl bg-white px-2.5 py-2.5 shadow-card">
+              <StatTile icon={Armchair} label="Mesas" value={String(panelTurno.mesasOcupadas)} valueClass="text-[#173F2E]" />
               <StatTile icon={Users} label="Clientes" value={String(panelTurno.clientes)} valueClass="text-[#173F2E]" />
-              <StatTile icon={Receipt} label="Ticket promedio" value={formatCurrency(panelTurno.ticketPromedio)} valueClass="text-[#173F2E]" />
-              <StatTile icon={Clock3} label="Tiempo promedio" value={`${panelTurno.tiempoPromedioMin} min`} valueClass="text-text" />
-              {turnoVista ? (
-                <StatTile
-                  icon={Wallet}
-                  label="Total cobrado"
-                  value={formatCurrency(panelTurno.cobroPendiente)}
-                  valueClass="text-[#173F2E]"
-                />
-              ) : (
-                <StatTile
-                  icon={Wallet}
-                  label="Cobro pendiente"
-                  value={formatCurrency(panelTurno.cobroPendiente)}
-                  tintBg="bg-red-50"
-                  tintText="text-red-600"
-                  valueClass="text-red-600"
-                />
+              {panelTurnoFinanciero && (
+                <StatTile icon={Receipt} label="Ticket" value={formatCurrency(panelTurno.ticketPromedio)} valueClass="text-[#173F2E]" />
               )}
+              <StatTile icon={Clock3} label="Tiempo" value={`${panelTurno.tiempoPromedioMin} min`} valueClass="text-text" />
+              {panelTurnoFinanciero &&
+                (turnoVista ? (
+                  <StatTile icon={Wallet} label="Cobrado" value={formatCurrency(panelTurno.cobroPendiente)} valueClass="text-[#173F2E]" />
+                ) : (
+                  <StatTile
+                    icon={Wallet}
+                    label="Cobro"
+                    value={formatCurrency(panelTurno.cobroPendiente)}
+                    tintBg="bg-red-50"
+                    tintText="text-red-600"
+                    valueClass="text-red-600"
+                  />
+                ))}
             </div>
           </div>
         )}
@@ -563,12 +568,12 @@ function StatTile({
   valueClass?: string
 }) {
   return (
-    <div className="flex w-[78px] flex-shrink-0 flex-col items-center gap-1 px-1 text-center">
-      <span className={`flex h-8 w-8 items-center justify-center rounded-full ${tintBg} ${tintText}`}>
-        <Icon size={16} strokeWidth={2.2} />
+    <div className="flex flex-shrink-0 flex-col items-center gap-0.5 text-center">
+      <span className={`flex h-6 w-6 items-center justify-center rounded-full ${tintBg} ${tintText}`}>
+        <Icon size={12} strokeWidth={2.2} />
       </span>
-      <span className={`${texto.caption} leading-tight`}>{label}</span>
-      <span className={`text-[13px] font-bold leading-none ${valueClass}`}>{value}</span>
+      <span className="whitespace-nowrap text-[9px] leading-tight text-text-4">{label}</span>
+      <span className={`whitespace-nowrap text-[11px] font-bold leading-none ${valueClass}`}>{value}</span>
     </div>
   )
 }

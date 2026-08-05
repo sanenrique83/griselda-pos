@@ -66,6 +66,11 @@ const PERMISOS_MESERO: { campo: keyof ConfigPermisos; label: string; desc: strin
     label: 'Ver Dashboard',
     desc: 'El mesero puede ver las métricas del turno',
   },
+  {
+    campo: 'panel_turno_mesero_financiero',
+    label: 'Ver panel financiero en Mesas',
+    desc: 'El mesero ve Ticket promedio y Cobro pendiente en el Panel del turno de /mesas (siempre visibles para Admin)',
+  },
 ]
 
 interface PermisosShellProps {
