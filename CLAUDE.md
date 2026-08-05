@@ -43,6 +43,17 @@ Este proyecto tiene varios patrones ya establecidos — reutilízalos en vez de 
 
 Modelo de **dos niveles**: los insumos pueden ser `comprado` o `derivado` (con su propia receta en `insumo_receta`, repuesto vía producción). El porcionado de un producto (`receta_insumos`) es simple: `(receta_id, insumo_id, cantidad_usada)`, sin ninguna columna de "opción". La relación con modificadores se resuelve vía `opciones_modificador.insumo_id` — si el insumo de una fila de receta coincide con el insumo de una opción del producto, esa fila es "variable" (solo se consume si esa opción fue elegida); si no coincide con ninguna opción, es "de siempre". `aplicar_consumo_receta()` ya implementa esta lógica — no la reinventes.
 
+## Reglas de diseño transversal — aplican a cualquier rediseño de pantalla
+
+Referencia común antes de tocar el diseño de una pantalla individual. Ver también `frontend/src/components/ui/tokens.ts`.
+
+1. **Dos patrones de ícono, nunca mezclados**: "acción con ícono" (círculo/cuadrado con tinte de color + etiqueta debajo, para acciones contextuales como Compartir/Mover/Cobrar) vs. "chip de filtro" (píldora de solo texto, sin ícono, para categorías y filtros de estado).
+2. **Semáforo de mesa**: usa exactamente los colores/significados definidos en `lib/colorMesa.ts` (hoy: verde=libre, naranja=ocupada, azul=cobro parcial, rojo=sin atender, gris=fuera de servicio) en cualquier pantalla que muestre estado de mesa — nunca una variación local. `lib/colorMesa.ts` es la fuente única de verdad; no dupliques la paleta en otro archivo. Los estados de ciclo de vida de un pedido (Cerrada/Abierta/Cancelada, en Historial) son un sistema visual **distinto** (píldora con ícono, no color sólido de tarjeta) — no reutilices el semáforo de mesa para eso.
+3. **Montos con decimales siempre** (`$X,XXX.00`, sin excepción) — usa `formatCurrency()` de `components/ui/tokens.ts` en vez de `.toFixed(2)` suelto en pantallas nuevas o rediseñadas.
+4. **Header A vs. Header B**, composición fija cada uno:
+   - Header A (pantallas raíz del bottom nav) = logo circular + nombre/marca + píldora de turno + campana de notificaciones.
+   - Header B (pantallas de detalle) = flecha atrás + título + acciones contextuales a la derecha.
+
 ## Verificación antes de reportar terminado
 
 - `npx tsc --noEmit` desde `frontend/` después de cualquier cambio de TypeScript.
