@@ -30,6 +30,12 @@ export type PedidoActivo = {
   enviados: number
   cancelados: number
   comensales: ComensalDetalle[]
+  // Para el atajo "Órdenes activas" de /mesas (?filtro=cocina|cobro) — mismos
+  // conceptos ya usados ahí: enCocina = algún producto 'enviado'; cobroParcial
+  // = algún subpedido 'pagado' y al menos uno que no (mismo criterio del
+  // semáforo azul en lib/colorMesa.ts).
+  enCocina: boolean
+  cobroParcial: boolean
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -51,7 +57,7 @@ export default async function PedidosPage() {
       `id, tipo, num_comensales, created_at, mesa_id,
        mesas(numero, nombre),
        subpedidos(
-         id, comensal_numero, nombre,
+         id, comensal_numero, nombre, estado,
          pedido_productos(id, cantidad, precio_unit, estado, nombre_libre, enviado_en, productos(nombre))
        )`,
     )
@@ -71,6 +77,12 @@ export default async function PedidosPage() {
     const pendientes = productos.filter((pp) => pp.estado === 'pendiente').length
     const enviados = productos.filter((pp) => pp.estado === 'enviado').length
     const cancelados = productos.filter((pp) => pp.estado === 'cancelado').length
+    const enCocina = productos.some((pp) => pp.estado === 'enviado')
+
+    const estadosSubpedidos: string[] = (p.subpedidos ?? []).map((s: any) => s.estado)
+    const algunoPagado = estadosSubpedidos.some((e) => e === 'pagado')
+    const todosPagados = estadosSubpedidos.length > 0 && estadosSubpedidos.every((e) => e === 'pagado')
+    const cobroParcial = algunoPagado && !todosPagados
 
     const comensales: ComensalDetalle[] = (p.subpedidos ?? [])
       .slice()
@@ -109,6 +121,8 @@ export default async function PedidosPage() {
       enviados,
       cancelados,
       comensales,
+      enCocina,
+      cobroParcial,
     }
   })
 

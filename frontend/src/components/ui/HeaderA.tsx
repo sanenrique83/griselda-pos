@@ -1,19 +1,24 @@
-import { Bell } from 'lucide-react'
+import { Bell, ChevronDown } from 'lucide-react'
 
 // Header tipo A (regla de diseño transversal #4, CLAUDE.md) — pantallas raíz
 // del bottom nav: logo circular + nombre/marca + píldora de turno + campana
 // de notificaciones. Reusable: cualquier pantalla raíz futura (Pedidos,
 // Historial, Dashboard, Más) debería montar este mismo componente en vez de
 // armar su propio header a mano.
+//
+// `onTurnoClick` es opcional — solo /mesas lo usa hoy (turno desplegable,
+// solo Admin, para ver turnos cerrados anteriores). Sin ese prop la píldora
+// se queda como texto no interactivo, igual que siempre.
 interface HeaderAProps {
   titulo: string
   subtitulo: string
   turnoId: number | null
   campanaCount?: number
   onCampanaClick?: () => void
+  onTurnoClick?: () => void
 }
 
-export function HeaderA({ titulo, subtitulo, turnoId, campanaCount = 0, onCampanaClick }: HeaderAProps) {
+export function HeaderA({ titulo, subtitulo, turnoId, campanaCount = 0, onCampanaClick, onTurnoClick }: HeaderAProps) {
   return (
     <div className="flex h-[64px] flex-shrink-0 items-center gap-3 border-b border-[#E5E5EA] bg-white px-4">
       <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#173F2E] text-[15px] font-bold text-white">
@@ -26,9 +31,19 @@ export function HeaderA({ titulo, subtitulo, turnoId, campanaCount = 0, onCampan
       </div>
 
       {turnoId ? (
-        <span className="flex-shrink-0 rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700">
-          ● Turno #{turnoId}
-        </span>
+        onTurnoClick ? (
+          <button
+            onClick={onTurnoClick}
+            className="flex flex-shrink-0 items-center gap-0.5 rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700 active:opacity-70"
+          >
+            ● Turno #{turnoId}
+            <ChevronDown size={12} strokeWidth={2.4} />
+          </button>
+        ) : (
+          <span className="flex-shrink-0 rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700">
+            ● Turno #{turnoId}
+          </span>
+        )
       ) : (
         <span className="flex-shrink-0 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-600">
           Sin turno

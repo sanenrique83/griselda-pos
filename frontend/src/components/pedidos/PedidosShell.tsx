@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useCallback, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { X } from 'lucide-react'
 import type { PedidoActivo, ProductoDetalle } from '@/app/(app)/pedidos/page'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -32,8 +33,22 @@ function fmtMoney(n: number) {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
+const LABEL_FILTRO: Record<'cocina' | 'cobro', string> = {
+  cocina: 'Cocina',
+  cobro: 'Cobro',
+}
+
 export function PedidosShell({ pedidos }: { pedidos: PedidoActivo[] }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Filtro llegado desde el atajo "Órdenes activas" de /mesas
+  // (?filtro=cocina|cobro) — ver punto 5 del rediseño de Mesas.
+  const filtroParam = searchParams.get('filtro')
+  const filtro = filtroParam === 'cocina' || filtroParam === 'cobro' ? filtroParam : null
+  const pedidosFiltrados = filtro
+    ? pedidos.filter((p) => (filtro === 'cocina' ? p.enCocina : p.cobroParcial))
+    : pedidos
 
   // Refresco automático cada 30 s
   const refresh = useCallback(() => router.refresh(), [router])
@@ -48,21 +63,35 @@ export function PedidosShell({ pedidos }: { pedidos: PedidoActivo[] }) {
       <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
         <div className="flex items-center justify-between">
           <h1 className="text-[20px] font-bold leading-tight">Pedidos</h1>
-          {pedidos.length > 0 && (
+          {pedidosFiltrados.length > 0 && (
             <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[13px] font-semibold text-blue-700">
-              {pedidos.length}
+              {pedidosFiltrados.length}
             </span>
           )}
         </div>
         <p className="mt-0.5 text-[13px] text-text-3">Pedidos abiertos actualmente</p>
       </div>
 
+      {filtro && (
+        <div className="flex items-center justify-between bg-[#173F2E]/5 px-4 py-2.5">
+          <span className="text-[13px] font-semibold text-[#173F2E]">
+            Filtrando: {LABEL_FILTRO[filtro]}
+          </span>
+          <button
+            onClick={() => router.push('/pedidos')}
+            className="flex items-center gap-1 text-[12px] font-semibold text-text-3 active:opacity-60"
+          >
+            <X size={13} strokeWidth={2.4} /> Quitar filtro
+          </button>
+        </div>
+      )}
+
       <div className="px-4 py-4">
-        {pedidos.length === 0 ? (
-          <EmptyState />
+        {pedidosFiltrados.length === 0 ? (
+          <EmptyState filtroActivo={filtro !== null} />
         ) : (
           <div className="space-y-3">
-            {pedidos.map((p) => (
+            {pedidosFiltrados.map((p) => (
               <PedidoCard key={p.id} pedido={p} />
             ))}
           </div>
@@ -192,7 +221,16 @@ function PedidoCard({ pedido: p }: { pedido: PedidoActivo }) {
 
 // ─── Estado vacío ─────────────────────────────────────────────────────────────
 
-function EmptyState() {
+function EmptyState({ filtroActivo }: { filtroActivo: boolean }) {
+  if (filtroActivo) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <p className="text-[48px] mb-3">🔍</p>
+        <p className="text-[15px] font-semibold text-text-2">Sin pedidos en este filtro</p>
+        <p className="mt-1 text-sm text-text-3">Prueba quitando el filtro para ver todos.</p>
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <p className="text-[48px] mb-3">🍽️</p>

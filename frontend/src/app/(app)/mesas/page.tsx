@@ -5,14 +5,36 @@ import { MesasShell } from '@/components/mesas/MesasShell'
 import { calcularOcupacionPorMesa } from '@/lib/asientos'
 import { calcularAlertaVentasBajas, type FilaAlertaVentasBajas } from '@/lib/alertaVentasBajas'
 import { primerNombreValido } from '@/lib/nombreUsuario'
-import { colorSemaforoMesa } from '@/lib/colorMesa'
+import { mostrarAvisoPrecuenta } from '@/lib/precuenta'
 import { horaActualMX } from '@/lib/horarioDisponibilidad'
+
+// Un ítem de la campana de notificaciones (regla de negocio del punto 1 del
+// rediseño de Mesas): alertas del SISTEMA, aparte del semáforo de mesa (ese
+// sigue siendo su propio sistema visual en el mapa, no se duplica aquí).
+export type AlertaPrecuentaMesa = {
+  pedidoId: number
+  mesaLabel: string
+  minutos: number
+}
 
 // Resumen operativo ("Panel del turno") — deliberadamente escopeado a mesas
 // ocupadas (pedidos con mesa_id), no a para-llevar/mostrador, porque es lo
 // que ya se carga en esta pantalla y es lo que el usuario ve en el plano de
 // abajo. Snapshot al momento de la carga (no live-tick) — igual que el resto
 // de esta página, que ya se recalcula por completo en cada navegación.
+// "Órdenes activas" (fila del mockup, agregada al rediseño) — mismo alcance
+// que PanelTurno (solo mesas, no llevar/mostrador). cocina = pedidos con al
+// menos un producto 'enviado'. cobro = pedidos con cobro parcial en curso
+// (algunoPagadoNoTodos, mismo concepto ya usado por el semáforo azul) — no
+// "cualquier pedido sin cobrar del todo", que sería casi cualquier mesa
+// abierta y no aportaría información. No incluye "Servir" (no existe un
+// estado de "listo para servir" distinto de "enviado" en el schema) ni
+// "Reservas" (no existe esa feature en la app).
+export type OrdenesActivas = {
+  cocina: number
+  cobro: number
+}
+
 export type PanelTurno = {
   mesasOcupadas: number
   clientes: number
@@ -55,6 +77,7 @@ export type MesaUI = {
     algunoPagadoNoTodos: boolean
     tieneProductos: boolean
     precuentaImpresaEn: string | null
+    monto: number
   } | null
 }
 
@@ -63,7 +86,86 @@ export type GrupoArea = {
   mesas: MesaUI[]
 }
 
-export default async function MesasPage() {
+// Turno desplegable (solo Admin, punto 3 del rediseño) — reusa las mismas
+// tablas de siempre con queries directas (Corte Z tampoco usa RPC; no existe
+// ninguna que calcule esto para un turno cerrado específico), nunca el turno
+// activo (ese sigue siendo panelTurno en vivo).
+export type TurnoCerradoResumen = { id: number; fechaCierre: string }
+export type TurnoVista = { id: number; fechaCierre: string } | null
+
+/** Fecha + hora corta, ej. "26 jul 14:32" (America/Mexico_City) — mismo
+ * formato que dashboard/page.tsx (duplicado a propósito, ninguna de las dos
+ * pantallas comparte un lib de formato de fecha todavía). */
+function fmtFechaHoraMX(iso: string): string {
+  return new Date(iso).toLocaleString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/Mexico_City',
+  })
+}
+
+/** PanelTurno de un turno YA CERRADO — mismo alcance (solo mesas) que el
+ * panel en vivo, pero con las métricas redefinidas para lo que sí existe en
+ * datos históricos: tiempoPromedioMin usa cerrado_en en vez de "ahora", y
+ * cobroPendiente aquí representa el total efectivamente cobrado (todo pedido
+ * cerrado ya se cobró por completo) — MesasShell relabela ese mismo campo
+ * como "Total cobrado" cuando turnoVista !== null. */
+async function cargarPanelTurnoHistorico(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  turnoId: number,
+): Promise<PanelTurno> {
+  const { data: pedidosTurno } = await supabase
+    .from('pedidos')
+    .select('id, created_at, cerrado_en, num_comensales')
+    .eq('turno_id', turnoId)
+    .eq('estado', 'cerrado')
+    .not('mesa_id', 'is', null)
+
+  const pedidoIds = (pedidosTurno ?? []).map((p) => p.id)
+  const { data: subpedidosTurno } = pedidoIds.length
+    ? await supabase
+        .from('subpedidos')
+        .select('pedido_id, pedido_productos(estado, cantidad, precio_unit)')
+        .in('pedido_id', pedidoIds)
+    : { data: [] as { pedido_id: number; pedido_productos: { estado: string; cantidad: number; precio_unit: number }[] }[] }
+
+  const totalPorPedido = new Map<number, number>()
+  for (const sub of subpedidosTurno ?? []) {
+    const totalSub = (sub.pedido_productos ?? [])
+      .filter((pp) => pp.estado !== 'cancelado')
+      .reduce((s, pp) => s + pp.cantidad * pp.precio_unit, 0)
+    totalPorPedido.set(sub.pedido_id, (totalPorPedido.get(sub.pedido_id) ?? 0) + totalSub)
+  }
+
+  const totalCobrado = [...totalPorPedido.values()].reduce((s, v) => s + v, 0)
+  const clientes = (pedidosTurno ?? []).reduce((s, p) => s + p.num_comensales, 0)
+  const conCierre = (pedidosTurno ?? []).filter((p) => p.cerrado_en !== null)
+  const tiempoPromedioMin =
+    conCierre.length > 0
+      ? conCierre.reduce(
+          (s, p) => s + (new Date(p.cerrado_en!).getTime() - new Date(p.created_at).getTime()) / 60_000,
+          0,
+        ) / conCierre.length
+      : 0
+
+  return {
+    mesasOcupadas: (pedidosTurno ?? []).length,
+    clientes,
+    ticketPromedio: (pedidosTurno ?? []).length > 0 ? totalCobrado / (pedidosTurno ?? []).length : 0,
+    tiempoPromedioMin: Math.round(tiempoPromedioMin),
+    cobroPendiente: totalCobrado,
+  }
+}
+
+export default async function MesasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ turno?: string }>
+}) {
+  const { turno: turnoParam } = await searchParams
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -153,6 +255,7 @@ export default async function MesasPage() {
   const sillasOcupadasPorPedido = new Map<number, number[]>()
   const algunoPagadoNoTodosPorPedido = new Map<number, boolean>()
   const tieneProductosPorPedido = new Map<number, boolean>()
+  const tieneEnviadoPorPedido = new Map<number, boolean>()
   for (const sub of subpedidosRaw ?? []) {
     if (sub.silla_numero !== null) {
       const arr = sillasOcupadasPorPedido.get(sub.pedido_id) ?? []
@@ -163,6 +266,9 @@ export default async function MesasPage() {
       (pp: any) => pp.estado === 'pendiente' || pp.estado === 'enviado',
     )
     if (tieneAlgunoActivo) tieneProductosPorPedido.set(sub.pedido_id, true)
+    if ((sub.pedido_productos ?? []).some((pp: any) => pp.estado === 'enviado')) {
+      tieneEnviadoPorPedido.set(sub.pedido_id, true)
+    }
   }
   // algunoPagadoNoTodos: al menos un subpedido 'pagado' y al menos uno que no.
   const subsPorPedido = new Map<number, { estado: string }[]>()
@@ -211,25 +317,10 @@ export default async function MesasPage() {
     cobroPendiente,
   }
 
-  // Campana de notificaciones del header — cuenta real de pedidos en mesa
-  // en rojo (sin atender por tiempo) al momento de la carga, no un contador
-  // inventado. Por pedido, no por mesa física, para no contar dos veces una
-  // mesa unida (misma alerta se repetiría en cada mesa satélite).
-  const campanaCount = (pedidosAbiertos ?? []).filter(
-    (p) =>
-      colorSemaforoMesa(
-        {
-          ocupada: true,
-          algunoPagadoNoTodos: algunoPagadoNoTodosPorPedido.get(p.id) ?? false,
-          tieneProductos: tieneProductosPorPedido.get(p.id) ?? false,
-          pedidoCreatedAt: p.created_at,
-          alertaActiva: config?.alerta_mesa_sin_atender ?? true,
-          alertaMinutos: config?.alerta_mesa_sin_atender_minutos ?? 10,
-          fueraDeServicio: false,
-        },
-        ahoraMs,
-      ) === 'rojo',
-  ).length
+  const ordenesActivas: OrdenesActivas = {
+    cocina: (pedidosAbiertos ?? []).filter((p) => tieneEnviadoPorPedido.get(p.id)).length,
+    cobro: (pedidosAbiertos ?? []).filter((p) => algunoPagadoNoTodosPorPedido.get(p.id)).length,
+  }
 
   const ocupacionPorMesa = calcularOcupacionPorMesa({
     pedidos: (pedidosAbiertos ?? [])
@@ -294,6 +385,7 @@ export default async function MesasPage() {
             algunoPagadoNoTodos: algunoPagadoNoTodosPorPedido.get(pedido.id) ?? false,
             tieneProductos: tieneProductosPorPedido.get(pedido.id) ?? false,
             precuentaImpresaEn: pedido.precuenta_impresa_en ?? null,
+            monto: totalPorPedido.get(pedido.id) ?? 0,
           }
         : null,
     }
@@ -309,21 +401,74 @@ export default async function MesasPage() {
 
   const hayMapa = mesas.some((m) => m.pos_x !== null && m.pos_y !== null)
 
+  // Alertas de precuenta impresa sin cobrar — misma condición ya usada por
+  // mesa individual (mostrarAvisoPrecuenta), aquí agregada para la campana
+  // centralizada del header (punto 1 del rediseño): agrupa alertas del
+  // SISTEMA, no el semáforo de mesa (ese sigue viviendo solo en el mapa).
+  const alertaPrecuentaActiva = config?.alerta_precuenta_activa ?? true
+  const alertaPrecuentaMinutos = config?.alerta_precuenta_minutos ?? 5
+  const alertasPrecuenta: AlertaPrecuentaMesa[] = mesas
+    .filter(
+      (m) =>
+        m.pedido_activo?.precuentaImpresaEn &&
+        mostrarAvisoPrecuenta(m.pedido_activo.precuentaImpresaEn, alertaPrecuentaActiva, alertaPrecuentaMinutos, ahoraMs),
+    )
+    .map((m) => ({
+      pedidoId: m.pedido_activo!.id,
+      mesaLabel: m.nombre ?? `Mesa ${m.numero}`,
+      minutos: Math.floor((ahoraMs - new Date(m.pedido_activo!.precuentaImpresaEn!).getTime()) / 60_000),
+    }))
+
+  const campanaCount = (alertaVentasBajas ? 1 : 0) + alertasPrecuenta.length
+
+  // Turno desplegable (solo Admin) — la lista de turnos cerrados solo se
+  // pide si quien mira es admin (un mesero ni la ve ni puede navegar a un
+  // ?turno= ajeno; si lo intenta, turnoVista se ignora más abajo por no ser
+  // admin). El mapa/lista de mesas de arriba SIEMPRE es en vivo — solo
+  // panelTurno cambia a modo histórico.
+  const { data: turnosCerradosRaw } = esAdmin
+    ? await supabase
+        .from('turnos')
+        .select('id, cerrado_en')
+        .eq('estado', 'cerrado')
+        .order('cerrado_en', { ascending: false })
+        .limit(10)
+    : { data: [] as { id: number; cerrado_en: string | null }[] }
+  const turnosCerrados: TurnoCerradoResumen[] = (turnosCerradosRaw ?? [])
+    .filter((t): t is { id: number; cerrado_en: string } => t.cerrado_en !== null)
+    .map((t) => ({ id: t.id, fechaCierre: fmtFechaHoraMX(t.cerrado_en) }))
+
+  let turnoVista: TurnoVista = null
+  let panelTurnoParaMostrar = panelTurno
+  if (esAdmin && turnoParam) {
+    const turnoIdParam = parseInt(turnoParam, 10)
+    const encontrado = turnosCerrados.find((t) => t.id === turnoIdParam)
+    if (encontrado) {
+      turnoVista = encontrado
+      panelTurnoParaMostrar = await cargarPanelTurnoHistorico(supabase, turnoIdParam)
+    }
+  }
+
   return (
     <MesasShell
       grupos={grupos}
       mesas={mesas}
       hayMapa={hayMapa}
       turnoId={turno?.id ?? null}
+      esAdmin={esAdmin}
+      turnosCerrados={turnosCerrados}
+      turnoVista={turnoVista}
       alertaActiva={config?.alerta_mesa_sin_atender ?? true}
       alertaMinutos={config?.alerta_mesa_sin_atender_minutos ?? 10}
       tiempoMesaAlertaMinutos={config?.tiempo_mesa_alerta_minutos ?? 60}
       alertaVentasBajas={alertaVentasBajas}
-      alertaPrecuentaActiva={config?.alerta_precuenta_activa ?? true}
-      alertaPrecuentaMinutos={config?.alerta_precuenta_minutos ?? 5}
+      alertaPrecuentaActiva={alertaPrecuentaActiva}
+      alertaPrecuentaMinutos={alertaPrecuentaMinutos}
+      alertasPrecuenta={alertasPrecuenta}
       nombreUsuario={nombreUsuario}
       saludo={saludoPorHora(horaActualMX())}
-      panelTurno={panelTurno}
+      panelTurno={panelTurnoParaMostrar}
+      ordenesActivas={ordenesActivas}
       campanaCount={campanaCount}
     />
   )

@@ -11,14 +11,27 @@ import {
   Receipt,
   Clock3,
   Wallet,
+  LayoutGrid,
+  ChefHat,
+  CreditCard,
   type LucideIcon,
 } from 'lucide-react'
 import { TarjetaMesa } from './TarjetaMesa'
 import { PlanoMesas } from './PlanoMesas'
 import { SheetParaLlevar } from './SheetParaLlevar'
 import { SheetMesaExtra } from './SheetMesaExtra'
+import { SheetNotificaciones } from './SheetNotificaciones'
+import { SheetTurnos } from './SheetTurnos'
 import { abrirPedidoMostrador } from '@/app/(app)/mesas/actions'
-import type { GrupoArea, MesaUI, PanelTurno } from '@/app/(app)/mesas/page'
+import type {
+  GrupoArea,
+  MesaUI,
+  PanelTurno,
+  AlertaPrecuentaMesa,
+  OrdenesActivas,
+  TurnoCerradoResumen,
+  TurnoVista,
+} from '@/app/(app)/mesas/page'
 import type { AlertaVentasBajas } from '@/lib/alertaVentasBajas'
 import { HeaderA } from '@/components/ui/HeaderA'
 import { AccionIcono } from '@/components/ui/AccionIcono'
@@ -38,10 +51,15 @@ interface MesasShellProps {
   alertaVentasBajas: AlertaVentasBajas | null
   alertaPrecuentaActiva: boolean
   alertaPrecuentaMinutos: number
+  alertasPrecuenta: AlertaPrecuentaMesa[]
   nombreUsuario: string
   saludo: string
   panelTurno: PanelTurno
+  ordenesActivas: OrdenesActivas
   campanaCount: number
+  esAdmin: boolean
+  turnosCerrados: TurnoCerradoResumen[]
+  turnoVista: TurnoVista
 }
 
 // Regla de diseño transversal #2 (CLAUDE.md): exactamente los 5 estados
@@ -87,14 +105,21 @@ export function MesasShell({
   alertaVentasBajas,
   alertaPrecuentaActiva,
   alertaPrecuentaMinutos,
+  alertasPrecuenta,
   nombreUsuario,
   saludo,
   panelTurno,
+  ordenesActivas,
   campanaCount,
+  esAdmin,
+  turnosCerrados,
+  turnoVista,
 }: MesasShellProps) {
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetMesaExtraOpen, setSheetMesaExtraOpen] = useState(false)
+  const [notificacionesOpen, setNotificacionesOpen] = useState(false)
+  const [sheetTurnosOpen, setSheetTurnosOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPendingMostrador, startMostrador] = useTransition()
   // Si hay al menos una mesa posicionada, el mapa es la vista por default;
@@ -193,6 +218,8 @@ export function MesasShell({
         subtitulo="La Menudería"
         turnoId={turnoId}
         campanaCount={campanaCount}
+        onCampanaClick={() => setNotificacionesOpen(true)}
+        onTurnoClick={esAdmin ? () => setSheetTurnosOpen(true) : undefined}
       />
 
       {/* Cuerpo scrolleable */}
@@ -247,23 +274,6 @@ export function MesasShell({
           />
         </div>
 
-        {/* Alerta de ventas bajas en tiempo real (F9-06) — solo admin */}
-        {alertaVentasBajas && (
-          <div className="mx-3 mt-3 flex items-start gap-2.5 rounded-xl bg-red-50 border border-red-100 px-3.5 py-3">
-            <span className="text-[18px]">📉</span>
-            <div>
-              <p className="text-xs font-semibold text-red-700">
-                Ventas {Math.abs(alertaVentasBajas.desviacionPct).toFixed(0)}% por debajo de lo normal
-                para esta hora
-              </p>
-              <p className="mt-0.5 text-[11px] text-red-600">
-                {formatCurrency(alertaVentasBajas.totalActual)} cobrado vs. {formatCurrency(alertaVentasBajas.promedioHistorico)}{' '}
-                en promedio a esta hora, mismo día de la semana.
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Banner de error */}
         {error && (
           <div className="mx-3 mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -286,6 +296,24 @@ export function MesasShell({
           </div>
         )}
 
+        {/* Aviso de turno histórico (punto 3 del rediseño, solo Admin) — para
+            que nunca se confunda un turno cerrado con el turno activo. Solo
+            afecta al Panel del turno de abajo; el mapa/lista de mesas sigue
+            siempre en vivo. */}
+        {turnoVista && (
+          <div className="mx-3 mt-3 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5">
+            <span className="text-[12px] font-semibold text-amber-800">
+              Viendo Turno #{turnoVista.id} — cerrado {turnoVista.fechaCierre}
+            </span>
+            <button
+              onClick={() => router.push('/mesas')}
+              className="flex-shrink-0 text-[12px] font-semibold text-amber-800 underline active:opacity-60"
+            >
+              Volver al activo
+            </button>
+          </div>
+        )}
+
         {/* Panel del turno — resumen operativo, escopeado a mesas ocupadas
             (ver PanelTurno en mesas/page.tsx). Fila horizontal deslizable:
             5 columnas no caben cómodo en una pantalla angosta. */}
@@ -294,14 +322,14 @@ export function MesasShell({
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.05em] text-text-3">
               Panel del turno
             </p>
-            <div className="flex gap-1 overflow-x-auto scrollbar-none rounded-2xl bg-white p-3 shadow-card">
-              <StatTile icon={Armchair} label="Mesas ocupadas" value={String(panelTurno.mesasOcupadas)} tintBg="bg-s2" tintText="text-text-2" />
-              <StatTile icon={Users} label="Clientes" value={String(panelTurno.clientes)} tintBg="bg-s2" tintText="text-text-2" />
-              <StatTile icon={Receipt} label="Ticket promedio" value={formatCurrency(panelTurno.ticketPromedio)} tintBg="bg-s2" tintText="text-text-2" />
-              <StatTile icon={Clock3} label="Tiempo promedio" value={`${panelTurno.tiempoPromedioMin} min`} tintBg="bg-s2" tintText="text-text-2" />
+            <div className="flex flex-wrap gap-x-1 gap-y-3 rounded-2xl bg-white p-3 shadow-card">
+              <StatTile icon={Armchair} label="Mesas ocupadas" value={String(panelTurno.mesasOcupadas)} valueClass="text-[#173F2E]" />
+              <StatTile icon={Users} label="Clientes" value={String(panelTurno.clientes)} valueClass="text-[#173F2E]" />
+              <StatTile icon={Receipt} label="Ticket promedio" value={formatCurrency(panelTurno.ticketPromedio)} valueClass="text-[#173F2E]" />
+              <StatTile icon={Clock3} label="Tiempo promedio" value={`${panelTurno.tiempoPromedioMin} min`} valueClass="text-text" />
               <StatTile
                 icon={Wallet}
-                label="Cobro pendiente"
+                label={turnoVista ? 'Total cobrado' : 'Cobro pendiente'}
                 value={formatCurrency(panelTurno.cobroPendiente)}
                 tintBg="bg-red-50"
                 tintText="text-red-600"
@@ -319,11 +347,11 @@ export function MesasShell({
               <div className="inline-flex rounded-xl bg-s2 p-1">
                 <button
                   onClick={() => setVista('mapa')}
-                  className={`rounded-lg px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+                  className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
                     vista === 'mapa' ? 'bg-[#173F2E] text-white shadow-card' : 'text-text-3'
                   }`}
                 >
-                  🗺️ Mapa
+                  <LayoutGrid size={15} strokeWidth={2.2} /> Mapa
                 </button>
                 <button
                   onClick={() => setVista('lista')}
@@ -338,17 +366,23 @@ export function MesasShell({
           </div>
         )}
 
-        {/* Leyenda de colores — los 5 estados reales de lib/colorMesa.ts,
-            no los 3 del mockup de referencia (no existe "Reservada"). */}
+        {/* Leyenda de colores — los 5 estados reales de lib/colorMesa.ts, sin
+            cambiar cuáles son ni lo que significan (solo el estilo visual:
+            chip con borde/fondo tenue del mismo color, en vez de un punto
+            suelto). flex-wrap para no desbordar a ancho de iPhone (~375px). */}
         {grupos.length > 0 && (
-          <div className="flex gap-3 overflow-x-auto scrollbar-none px-3 pt-3">
+          <div className="flex flex-wrap gap-2 px-3 pt-3">
             {ORDEN_LEYENDA.map((c) => (
-              <span key={c} className="flex flex-shrink-0 items-center gap-1.5 text-[12px] text-text-3">
+              <span
+                key={c}
+                className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] text-text-2"
+                style={{ backgroundColor: ESTILO_COLOR_MESA[c].bg, borderColor: ESTILO_COLOR_MESA[c].border }}
+              >
                 <span
-                  className="h-2 w-2 rounded-full"
+                  className="h-2 w-2 flex-shrink-0 rounded-full"
                   style={{ backgroundColor: ESTILO_COLOR_MESA[c].dot }}
                 />
-                {LABEL_LEYENDA[c]} <span className="font-semibold text-text-2">{conteoLeyenda[c]}</span>
+                {LABEL_LEYENDA[c]} <span className="font-semibold">{conteoLeyenda[c]}</span>
               </span>
             ))}
           </div>
@@ -416,6 +450,55 @@ export function MesasShell({
             </div>
           ))}
 
+        {/* Órdenes activas — atajo, no resumen pasivo (punto 5 del rediseño):
+            cada tile navega a /pedidos ya filtrado. Escopeado a mesas, igual
+            que Panel del turno arriba. Sin "Servir" (no hay estado real de
+            "listo para servir" distinto de "enviado") ni "Reservas" (no
+            existe esa feature en la app). */}
+        {grupos.length > 0 && (ordenesActivas.cocina > 0 || ordenesActivas.cobro > 0) && (
+          <div className="px-3 pt-5">
+            <div className="flex items-center justify-between">
+              <p className={texto.encabezadoSeccion}>Órdenes activas</p>
+              <button
+                onClick={() => router.push('/pedidos')}
+                className="text-[13px] font-semibold text-[#173F2E] active:opacity-60"
+              >
+                Ver todas
+              </button>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2.5">
+              {ordenesActivas.cocina > 0 && (
+                <button
+                  onClick={() => router.push('/pedidos?filtro=cocina')}
+                  className="flex items-center gap-3 rounded-xl bg-white p-3 text-left shadow-card transition-transform active:scale-[.98]"
+                >
+                  <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+                    <ChefHat size={18} strokeWidth={2.2} />
+                  </span>
+                  <div>
+                    <p className="text-lg font-bold leading-none">{ordenesActivas.cocina}</p>
+                    <p className={`${texto.caption} mt-0.5`}>Cocina</p>
+                  </div>
+                </button>
+              )}
+              {ordenesActivas.cobro > 0 && (
+                <button
+                  onClick={() => router.push('/pedidos?filtro=cobro')}
+                  className="flex items-center gap-3 rounded-xl bg-white p-3 text-left shadow-card transition-transform active:scale-[.98]"
+                >
+                  <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                    <CreditCard size={18} strokeWidth={2.2} />
+                  </span>
+                  <div>
+                    <p className="text-lg font-bold leading-none">{ordenesActivas.cobro}</p>
+                    <p className={`${texto.caption} mt-0.5`}>Cobro</p>
+                  </div>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="h-4" />
       </div>
 
@@ -431,6 +514,26 @@ export function MesasShell({
         onClose={() => setSheetMesaExtraOpen(false)}
         areaId={areaMapaSeleccionada === 'sin_area' ? null : areaMapaSeleccionada}
       />
+
+      {/* Campana de notificaciones centralizada — alertas del sistema, aparte
+          del semáforo de mesa (que se queda solo en el mapa/lista). */}
+      <SheetNotificaciones
+        open={notificacionesOpen}
+        onClose={() => setNotificacionesOpen(false)}
+        alertaVentasBajas={alertaVentasBajas}
+        alertasPrecuenta={alertasPrecuenta}
+      />
+
+      {/* Turno desplegable — solo se monta si es Admin (esAdmin ya controla
+          si onTurnoClick existe en HeaderA para siquiera poder abrirlo). */}
+      {esAdmin && (
+        <SheetTurnos
+          open={sheetTurnosOpen}
+          onClose={() => setSheetTurnosOpen(false)}
+          turnosCerrados={turnosCerrados}
+          turnoActivoId={turnoId}
+        />
+      )}
     </>
   )
 }
@@ -439,15 +542,15 @@ function StatTile({
   icon: Icon,
   label,
   value,
-  tintBg,
-  tintText,
+  tintBg = 'bg-[#173F2E]/10',
+  tintText = 'text-[#173F2E]',
   valueClass = 'text-text',
 }: {
   icon: LucideIcon
   label: string
   value: string
-  tintBg: string
-  tintText: string
+  tintBg?: string
+  tintText?: string
   valueClass?: string
 }) {
   return (

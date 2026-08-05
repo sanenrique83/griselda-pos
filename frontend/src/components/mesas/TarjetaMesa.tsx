@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Users, Wallet, Clock3 } from 'lucide-react'
 import type { MesaUI } from '@/app/(app)/mesas/page'
 import { colorSemaforoMesa, type ColorMesa } from '@/lib/colorMesa'
 import { mostrarAvisoPrecuenta } from '@/lib/precuenta'
+import { formatCurrency } from '@/components/ui/tokens'
 import { TiempoMesa } from './TiempoMesa'
 import { AvisoPrecuenta } from './AvisoPrecuenta'
 
@@ -109,14 +111,25 @@ export function TarjetaMesa({
       {/* Info del pedido activo */}
       {mesa.pedido_activo && (
         <>
-          <div className="mt-1 text-[11px] text-text-3">
-            {mesa.pedido_activo.mesero_nombre} · {mesa.pedido_activo.num_comensales} com.
-          </div>
-          <div className="mt-0.5 text-xs">
-            <TiempoMesa
-              desde={mesa.pedido_activo.created_at}
-              umbralMinutos={tiempoMesaAlertaMinutos}
-            />
+          <div className="mt-1 text-[11px] text-text-3">{mesa.pedido_activo.mesero_nombre}</div>
+          <div className="mt-1 flex items-center gap-2.5 text-[11px] text-text-3">
+            <span className="flex items-center gap-1">
+              <Users size={12} strokeWidth={2.2} />
+              {mesa.pedido_activo.num_comensales}
+            </span>
+            <span className="flex items-center gap-1">
+              <Clock3 size={12} strokeWidth={2.2} />
+              <TiempoMesa
+                desde={mesa.pedido_activo.created_at}
+                umbralMinutos={tiempoMesaAlertaMinutos}
+              />
+            </span>
+            {mesa.pedido_activo.monto > 0 && (
+              <span className="flex items-center gap-1 font-mono font-semibold text-text-2">
+                <Wallet size={12} strokeWidth={2.2} />
+                {formatCurrency(mesa.pedido_activo.monto)}
+              </span>
+            )}
           </div>
         </>
       )}

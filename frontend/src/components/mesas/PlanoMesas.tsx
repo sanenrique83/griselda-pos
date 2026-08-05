@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Users, Wallet } from 'lucide-react'
 import {
   DndContext,
   PointerSensor,
@@ -14,6 +15,7 @@ import {
 } from '@dnd-kit/core'
 import { MesaShape, dimensionesMesa, colorParaGrupo } from './MesaShape'
 import { TiempoMesa } from './TiempoMesa'
+import { formatCurrency } from '@/components/ui/tokens'
 import { calcularPosicionesSillas } from '@/lib/asientos'
 import { colorSemaforoMesa, ESTILO_COLOR_MESA } from '@/lib/colorMesa'
 import { mostrarAvisoPrecuenta } from '@/lib/precuenta'
@@ -415,14 +417,26 @@ function MesaArrastrable({
         {mesa.fuera_de_servicio && <span className="text-[11px] leading-none">🔧</span>}
         {mesa.pedido_activo && (
           <>
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ backgroundColor: ESTILO_COLOR_MESA[colorEstado].dot }}
-            />
+            {mesa.tamano !== 'chico' && (
+              <span className="flex items-center gap-1 text-[9px] leading-none text-text-3">
+                <Users size={9} strokeWidth={2.4} />
+                {mesa.pedido_activo.num_comensales}
+              </span>
+            )}
             <TiempoMesa
               desde={mesa.pedido_activo.created_at}
               umbralMinutos={tiempoMesaAlertaMinutos}
               className="text-[9px] leading-none"
+            />
+            {mesa.tamano !== 'chico' && mesa.pedido_activo.monto > 0 && (
+              <span className="flex items-center gap-1 text-[9px] font-mono font-semibold leading-none text-text-2">
+                <Wallet size={9} strokeWidth={2.4} />
+                {formatCurrency(mesa.pedido_activo.monto)}
+              </span>
+            )}
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: ESTILO_COLOR_MESA[colorEstado].dot }}
             />
           </>
         )}
