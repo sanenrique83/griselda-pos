@@ -327,14 +327,23 @@ export function MesasShell({
               <StatTile icon={Users} label="Clientes" value={String(panelTurno.clientes)} valueClass="text-[#173F2E]" />
               <StatTile icon={Receipt} label="Ticket promedio" value={formatCurrency(panelTurno.ticketPromedio)} valueClass="text-[#173F2E]" />
               <StatTile icon={Clock3} label="Tiempo promedio" value={`${panelTurno.tiempoPromedioMin} min`} valueClass="text-text" />
-              <StatTile
-                icon={Wallet}
-                label={turnoVista ? 'Total cobrado' : 'Cobro pendiente'}
-                value={formatCurrency(panelTurno.cobroPendiente)}
-                tintBg="bg-red-50"
-                tintText="text-red-600"
-                valueClass="text-red-600"
-              />
+              {turnoVista ? (
+                <StatTile
+                  icon={Wallet}
+                  label="Total cobrado"
+                  value={formatCurrency(panelTurno.cobroPendiente)}
+                  valueClass="text-[#173F2E]"
+                />
+              ) : (
+                <StatTile
+                  icon={Wallet}
+                  label="Cobro pendiente"
+                  value={formatCurrency(panelTurno.cobroPendiente)}
+                  tintBg="bg-red-50"
+                  tintText="text-red-600"
+                  valueClass="text-red-600"
+                />
+              )}
             </div>
           </div>
         )}
