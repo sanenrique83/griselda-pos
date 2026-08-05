@@ -319,17 +319,21 @@ export function MesasShell({
         {/* Panel del turno — resumen operativo, escopeado a mesas ocupadas
             (ver PanelTurno en mesas/page.tsx). Compactado a propósito para
             que los tiles quepan en una sola fila a ~375-390px (etiquetas de
-            una palabra, ícono/tipografía chicos, gap mínimo) — flex-nowrap +
-            overflow-x-auto es solo un colchón por si un dispositivo aún más
-            angosto no alcanza a mostrar los 5, nunca envuelve a 2 filas.
-            Ticket/Cobro solo se muestran si panelTurnoFinanciero (Admin
-            siempre; mesero solo con el permiso de /mas/permisos activo). */}
+            una palabra, ícono/tipografía chicos) y repartidos con
+            justify-between a lo ancho completo del contenedor (en vez de
+            amontonados a la izquierda) — flex-nowrap + overflow-x-auto es
+            solo un colchón por si un dispositivo aún más angosto no alcanza
+            a mostrar los 5 ni distribuidos, nunca envuelve a 2 filas
+            (justify-between no aplica una vez que ya no cabe, así que no
+            estorba ese caso de respaldo). Ticket/Cobro solo se muestran si
+            panelTurnoFinanciero (Admin siempre; mesero solo con el permiso
+            de /mas/permisos activo). */}
         {grupos.length > 0 && (
           <div className="px-3 pt-4">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.05em] text-text-3">
               Panel del turno
             </p>
-            <div className="flex flex-nowrap gap-x-2 overflow-x-auto scrollbar-none rounded-2xl bg-white px-2.5 py-2.5 shadow-card">
+            <div className="flex flex-nowrap justify-between gap-x-2 overflow-x-auto scrollbar-none rounded-2xl bg-white px-2.5 py-2.5 shadow-card">
               <StatTile icon={Armchair} label="Mesas" value={String(panelTurno.mesasOcupadas)} valueClass="text-[#173F2E]" />
               <StatTile icon={Users} label="Clientes" value={String(panelTurno.clientes)} valueClass="text-[#173F2E]" />
               {panelTurnoFinanciero && (
