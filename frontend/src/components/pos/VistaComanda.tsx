@@ -2,11 +2,22 @@
 
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import {
+  Armchair,
+  Printer,
+  Trash2,
+  CreditCard,
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  UserPlus2,
+} from 'lucide-react'
 import { ItemComandaRow } from './ItemComanda'
 import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem, eliminarProductoPendiente, moverProducto, dividirProducto, anularPedidoCompleto, asignarSilla } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { SubpedidoPOS, ItemComanda, MesaSillas, MesaCadenaItem } from '@/app/(app)/pos/[pedidoId]/page'
 import { imprimirTicket, type TicketConfig } from '@/lib/print'
 import { agruparPorGrupo, construirDescripcionNatural, type OpcionConGrupo } from '@/lib/descripcionNatural'
+import { formatCurrency } from '@/components/ui/tokens'
 import { SheetAsientos } from './SheetAsientos'
 import { siguienteSillaLibre } from '@/lib/asientos'
 
@@ -88,6 +99,17 @@ export function VistaComanda({
   const [motivoAnularIdx, setMotivoAnularIdx] = useState(0)
   const [isPendingAnular, startAnular] = useTransition()
   const [sheetAsientosOpen, setSheetAsientosOpen] = useState(false)
+  // Tarjetas de comensal expandibles — puramente de vista (no toca datos),
+  // todas expandidas por default para no cambiar lo que ya se veía antes.
+  const [colapsados, setColapsados] = useState<Set<number>>(new Set())
+  function toggleColapsado(subId: number) {
+    setColapsados((prev) => {
+      const next = new Set(prev)
+      if (next.has(subId)) next.delete(subId)
+      else next.add(subId)
+      return next
+    })
+  }
 
   useEffect(() => {
     if (printError) {
@@ -102,6 +124,10 @@ export function VistaComanda({
   )
   const hayEnviados = subpedidos.some((s) =>
     s.items.some((i) => i.estado === 'enviado'),
+  )
+  const totalPendientes = subpedidos.reduce(
+    (s, sp) => s + sp.items.filter((i) => i.estado === 'pendiente').length,
+    0,
   )
 
   // Formato 'texto_natural' del ticket de cocina: una sola frase en vez del
@@ -333,33 +359,39 @@ export function VistaComanda({
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Barra de acciones globales del pedido (fuera del scroll de comensales) */}
+      {/* Fila secundaria: Sillas/Reimprimir a la izquierda, Anular pedido
+          (texto rojo) a la derecha — mismas condiciones de siempre, solo
+          restyled con el patrón ícono+etiqueta. */}
       {hayAccionesGlobales && (
-        <div className="flex flex-shrink-0 items-center gap-1 overflow-x-auto border-b border-[#E5E5EA] bg-white px-2 py-1.5 scrollbar-none">
-          {hayEnviados && (
-            <button
-              onClick={handleReimprimirCocina}
-              disabled={isPendingReimprimir}
-              title="Reimprimir comanda de cocina"
-              className="flex-shrink-0 px-2.5 py-1.5 text-[13px] font-medium text-text-3 active:opacity-60 disabled:opacity-40"
-            >
-              {isPendingReimprimir ? '…' : '🖨 Reimprimir'}
-            </button>
-          )}
-          {mesaSillas && (
-            <button
-              onClick={() => setSheetAsientosOpen(true)}
-              className="flex-shrink-0 px-2.5 py-1.5 text-[13px] font-medium text-text-3 active:opacity-60"
-            >
-              🪑 Sillas
-            </button>
-          )}
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-[#E5E5EA] bg-white px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            {mesaSillas && (
+              <button
+                onClick={() => setSheetAsientosOpen(true)}
+                className="flex items-center gap-1.5 text-[13px] font-semibold text-text-2 active:opacity-60"
+              >
+                <Armchair size={16} strokeWidth={2.2} />
+                Sillas
+              </button>
+            )}
+            {hayEnviados && (
+              <button
+                onClick={handleReimprimirCocina}
+                disabled={isPendingReimprimir}
+                className="flex items-center gap-1.5 border-l border-[#E5E5EA] pl-3 text-[13px] font-medium text-text-3 active:opacity-60 disabled:opacity-40"
+              >
+                <Printer size={15} strokeWidth={2.2} />
+                {isPendingReimprimir ? '…' : 'Reimprimir'}
+              </button>
+            )}
+          </div>
           {puedeAnularPedido && (
             <button
               onClick={() => { setMotivoAnularIdx(0); setSheetAnularOpen(true) }}
-              className="flex-shrink-0 px-2.5 py-1.5 text-[13px] font-medium text-red-600 active:opacity-60"
+              className="flex items-center gap-1.5 text-[13px] font-semibold text-red-600 active:opacity-60"
             >
-              🗑 Anular pedido
+              <Trash2 size={16} strokeWidth={2.2} />
+              Anular pedido
             </button>
           )}
         </div>
@@ -371,83 +403,122 @@ export function VistaComanda({
         </div>
       )}
 
-      {/* Cascada: una sección por comensal, todas visibles en scroll continuo */}
+      {/* Cascada: una sección por comensal, todas visibles en scroll continuo
+          (colapsables — ver estado `colapsados`, puramente de vista). */}
       <div className="flex-1 overflow-y-auto space-y-3 px-3 pt-3 pb-32">
         {subpedidos.map((sub) => {
           const label = sub.nombre ?? `Comensal ${sub.comensal_numero}`
           const vacio = sub.items.length === 0
           const puedeEliminar = vacio && subpedidos.length > 1
           const rondas = contarRondas(sub.items)
+          const pendientesComensal = sub.items.filter((i) => i.estado === 'pendiente').length
+          const colapsado = colapsados.has(sub.id)
 
           return (
             <div key={sub.id} className="rounded-2xl bg-white shadow-card overflow-hidden">
-              {/* Encabezado de la sección */}
-              <div className="flex items-center justify-between border-b border-[#F2F2F7] px-3.5 py-2.5">
-                <div className="flex items-center gap-1.5">
-                  <p className="text-[14px] font-semibold leading-tight">{label}</p>
+              {/* Encabezado de la sección — tocable para expandir/colapsar */}
+              <button
+                onClick={() => toggleColapsado(sub.id)}
+                className="flex w-full items-center justify-between gap-2 px-3.5 py-3 text-left"
+              >
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#173F2E] text-[11px] font-bold text-white">
+                    {sub.comensal_numero}
+                  </span>
+                  <p className="truncate text-[14px] font-bold leading-tight text-text">{label}</p>
+                  <span className="flex-shrink-0 whitespace-nowrap rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-semibold text-[#173F2E]">
+                    {sub.items.length} producto{sub.items.length !== 1 ? 's' : ''}
+                  </span>
                   {sub.silla_numero && (
-                    <span className="inline-flex items-center rounded-full bg-s3 px-1.5 py-0.5 text-[10px] font-bold leading-none text-text-2">
+                    <span className="flex-shrink-0 whitespace-nowrap rounded-full bg-s3 px-1.5 py-0.5 text-[10px] font-bold leading-none text-text-2">
                       🪑{sub.silla_numero}
                     </span>
                   )}
                   {rondas >= 2 && (
                     <span
                       title={`${rondas} tandas mandadas a cocina`}
-                      className="inline-flex items-center rounded-full bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold leading-none text-purple-600"
+                      className="flex-shrink-0 whitespace-nowrap rounded-full bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold leading-none text-purple-600"
                     >
-                      🔁 {rondas} rondas
+                      🔁 {rondas}
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-[13px] font-semibold text-text-2">
-                    ${sub.total.toFixed(2)}
-                  </span>
+                <div className="flex flex-shrink-0 items-center gap-2">
                   {puedeEliminar && (
-                    <button
-                      onClick={() => handleEliminarComensal(sub.id)}
-                      disabled={isPendingEliminar}
-                      className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-red-100 text-[11px] font-bold text-red-600 active:scale-90 disabled:opacity-40"
+                    <span
+                      role="button"
+                      onClick={(e) => { e.stopPropagation(); handleEliminarComensal(sub.id) }}
+                      className="flex h-6 w-6 items-center justify-center rounded-full bg-red-100 text-red-600 active:scale-90"
+                      aria-label="Eliminar comensal vacío"
                     >
-                      ×
-                    </button>
+                      <Trash2 size={12} strokeWidth={2.2} />
+                    </span>
+                  )}
+                  <span className="font-mono text-[14px] font-bold text-text">
+                    {formatCurrency(sub.total)}
+                  </span>
+                  {colapsado ? (
+                    <ChevronDown size={18} strokeWidth={2.2} className="text-text-3" />
+                  ) : (
+                    <ChevronUp size={18} strokeWidth={2.2} className="text-text-3" />
                   )}
                 </div>
-              </div>
-
-              {/* Ítems de este comensal */}
-              <div className="space-y-2 px-3 py-2.5">
-                {sub.items.length === 0 ? (
-                  <p className="py-1.5 text-center text-xs text-text-4">Sin productos aún.</p>
-                ) : (
-                  sub.items.map((item) => (
-                    <ItemComandaRow
-                      key={item.id}
-                      item={item}
-                      onCancelar={
-                        item.estado === 'pendiente'
-                          ? () => handleEliminarPendiente(item.id)
-                          : puedesCancelar && item.estado === 'enviado'
-                            ? () => { setItemACancelar(item); setMotivoIdx(0) }
-                            : undefined
-                      }
-                      onMover={
-                        item.estado !== 'cancelado'
-                          ? () => { setItemAMover({ item, origenSubId: sub.id }); setCantidadMover(item.cantidad) }
-                          : undefined
-                      }
-                    />
-                  ))
-                )}
-              </div>
-
-              {/* + Agregar de este comensal — activa el destino y va a Menú */}
-              <button
-                onClick={() => handleAgregarASeccion(sub.id)}
-                className="w-full border-t border-[#F2F2F7] py-2.5 text-[13px] font-semibold text-blue-600 active:bg-s2"
-              >
-                + Agregar
               </button>
+
+              {!colapsado && (
+                <>
+                  {/* "N pendiente(s)" + caption del total — solo si hay algo que mostrar */}
+                  {sub.items.length > 0 && (
+                    <div className="flex items-center gap-2 border-t border-[#F2F2F7] px-3.5 py-2 text-[12px]">
+                      {pendientesComensal > 0 && (
+                        <>
+                          <span className="flex items-center gap-1 font-semibold text-amber-600">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                            {pendientesComensal} pendiente{pendientesComensal !== 1 ? 's' : ''}
+                          </span>
+                          <span className="text-text-4">|</span>
+                        </>
+                      )}
+                      <span className="text-text-3">Total comensal</span>
+                    </div>
+                  )}
+
+                  {/* Ítems de este comensal */}
+                  <div className={`space-y-2 px-3 py-2.5 ${sub.items.length > 0 ? '' : 'border-t border-[#F2F2F7]'}`}>
+                    {sub.items.length === 0 ? (
+                      <p className="py-1.5 text-center text-xs text-text-4">Sin productos aún.</p>
+                    ) : (
+                      sub.items.map((item) => (
+                        <ItemComandaRow
+                          key={item.id}
+                          item={item}
+                          onCancelar={
+                            item.estado === 'pendiente'
+                              ? () => handleEliminarPendiente(item.id)
+                              : puedesCancelar && item.estado === 'enviado'
+                                ? () => { setItemACancelar(item); setMotivoIdx(0) }
+                                : undefined
+                          }
+                          onMover={
+                            item.estado !== 'cancelado'
+                              ? () => { setItemAMover({ item, origenSubId: sub.id }); setCantidadMover(item.cantidad) }
+                              : undefined
+                          }
+                        />
+                      ))
+                    )}
+                  </div>
+
+                  {/* + Agregar producto de este comensal — activa el destino y va a Menú */}
+                  <button
+                    onClick={() => handleAgregarASeccion(sub.id)}
+                    className="flex w-full items-center justify-center gap-1.5 border-t border-dashed border-border py-2.5 text-[13px] font-semibold text-[#173F2E] active:bg-s2"
+                  >
+                    <Plus size={15} strokeWidth={2.4} />
+                    Agregar producto
+                  </button>
+                </>
+              )}
             </div>
           )
         })}
@@ -456,9 +527,10 @@ export function VistaComanda({
         <button
           onClick={handleAgregarComensal}
           disabled={isPendingComensal}
-          className="w-full rounded-2xl border-[1.5px] border-dashed border-border bg-white py-3.5 text-[13px] font-semibold text-blue-600 active:scale-[.98] disabled:opacity-40"
+          className="flex w-full items-center justify-center gap-1.5 rounded-2xl border-[1.5px] border-dashed border-border bg-white py-3.5 text-[13px] font-semibold text-[#173F2E] active:scale-[.98] disabled:opacity-40"
         >
-          {isPendingComensal ? 'Agregando…' : '+ Nuevo comensal'}
+          <UserPlus2 size={15} strokeWidth={2.4} />
+          {isPendingComensal ? 'Agregando…' : 'Nuevo comensal'}
         </button>
 
         {error && (
@@ -578,16 +650,16 @@ export function VistaComanda({
                       {s.nombre ?? `Comensal ${s.comensal_numero}`}
                     </span>
                     <span className="font-mono text-xs text-text-3">
-                      ${s.total.toFixed(2)}
+                      {formatCurrency(s.total)}
                     </span>
                   </button>
                 ))}
               <button
                 onClick={handleMoverANuevoComensal}
                 disabled={isPendingMover}
-                className="w-full flex items-center gap-2 rounded-xl border-[1.5px] border-dashed border-border px-4 py-3.5 text-left text-blue-600 active:scale-[.98] disabled:opacity-40"
+                className="w-full flex items-center gap-2 rounded-xl border-[1.5px] border-dashed border-border px-4 py-3.5 text-left text-[#173F2E] active:scale-[.98] disabled:opacity-40"
               >
-                <span className="text-lg leading-none">+</span>
+                <Plus size={16} strokeWidth={2.4} />
                 <span className="text-[14px] font-semibold">Nuevo comensal</span>
               </button>
             </div>
@@ -675,12 +747,14 @@ export function VistaComanda({
       />
 
       {/* Footer fijo — total del pedido completo (ya no "del comensal activo":
-          en la cascada se ve todo a la vez, no hay una pestaña resaltada) */}
+          en la cascada se ve todo a la vez, no hay una pestaña resaltada).
+          Enviar a cocina se queda azul (no verde bosque) tal como en el
+          mockup — Cobrar es la única acción de marca aquí. */}
       <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 border-t border-[#E5E5EA] bg-white px-4 py-3.5">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-[13px] text-text-3">Total pedido</span>
-          <span className="font-mono text-xl font-bold text-green-600">
-            ${totalPedido.toFixed(2)}
+          <span className="text-[13px] text-text-3">Total del pedido</span>
+          <span className="font-mono text-xl font-bold text-[#173F2E]">
+            {formatCurrency(totalPedido)}
           </span>
         </div>
 
@@ -688,15 +762,25 @@ export function VistaComanda({
           <button
             onClick={handleEnviar}
             disabled={!hayPendientes || isPendingEnviar}
-            className="flex-1 rounded-xl bg-blue-600 py-[13px] text-sm font-semibold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.97] disabled:opacity-40"
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl bg-blue-600 py-2.5 text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.97] disabled:opacity-40"
           >
-            {isPendingEnviar ? '…' : '📮 Enviar'}
+            <span className="flex items-center gap-1.5 text-sm font-semibold">
+              <Printer size={16} strokeWidth={2.2} />
+              {isPendingEnviar ? 'Enviando…' : 'Enviar a cocina'}
+            </span>
+            <span className="text-[11px] opacity-90">
+              {totalPendientes} pendiente{totalPendientes !== 1 ? 's' : ''}
+            </span>
           </button>
           <button
             onClick={() => router.push(`/cobro/${pedidoId}`)}
-            className="flex-1 rounded-xl bg-green-600 py-[13px] text-sm font-semibold text-white shadow-[0_3px_10px_rgba(22,163,74,.28)] active:scale-[.97]"
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl bg-[#173F2E] py-2.5 text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.97] active:bg-[#0F2E21]"
           >
-            💳 Cobrar
+            <span className="flex items-center gap-1.5 text-sm font-semibold">
+              <CreditCard size={16} strokeWidth={2.2} />
+              Cobrar
+            </span>
+            <span className="text-[11px] opacity-90">{formatCurrency(totalPedido)}</span>
           </button>
         </div>
       </div>

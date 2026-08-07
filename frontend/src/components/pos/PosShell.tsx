@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Share2, ArrowLeftRight, UserCog, MoreHorizontal, Merge, Split, Users2, Clock3, ArrowRight } from 'lucide-react'
 import { VistaMenu } from './VistaMenu'
 import { VistaComanda } from './VistaComanda'
 import { SheetModificadores, type ConfirmarModPayload } from './SheetModificadores'
@@ -12,6 +13,10 @@ import { SheetMoverMesa, type MesaLibre } from './SheetMoverMesa'
 import { SheetSepararMesa, type MesaSatelite } from './SheetSepararMesa'
 import { SheetReasignarMesero, type MeseroActivo } from './SheetReasignarMesero'
 import { SheetProductoLibre } from './SheetProductoLibre'
+import { HeaderB } from '@/components/ui/HeaderB'
+import { AccionPill } from '@/components/ui/AccionPill'
+import { Sheet } from '@/components/ui/Sheet'
+import { formatCurrency } from '@/components/ui/tokens'
 import {
   agregarProducto,
   agregarProductoRapido,
@@ -98,6 +103,7 @@ export function PosShell({
   const [sheetSepararOpen, setSheetSepararOpen] = useState(false)
   const [sheetReasignarOpen, setSheetReasignarOpen] = useState(false)
   const [sheetLibreOpen, setSheetLibreOpen] = useState(false)
+  const [sheetMasOpen, setSheetMasOpen] = useState(false)
   const [errorAccion, setErrorAccion] = useState<string | null>(null)
   const [isPendingCompartir, setIsPendingCompartir] = useState(false)
   const [isPendingComensalMenu, setIsPendingComensalMenu] = useState(false)
@@ -253,111 +259,88 @@ export function PosShell({
           'calc(100dvh - 4rem - env(safe-area-inset-bottom, 0px))',
       }}
     >
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 bg-white border-b border-[#E5E5EA]">
-        {/* Fila principal */}
-        <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-          <button
-            onClick={() => router.push('/mesas')}
-            className="-ml-1 px-1 py-1 text-[15px] font-medium text-blue-600 active:opacity-60"
-          >
-            ‹ Mesas
-          </button>
-
-          <div className="flex-1 min-w-0 text-center">
-            <p className="text-[15px] font-semibold leading-tight truncate">
-              {mesaLabel}
-            </p>
-            <p className="text-[11px] text-text-3">
-              {numComensales} comensal{numComensales !== 1 ? 'es' : ''} · desde{' '}
-              {horaApertura}
-            </p>
+      {/* ── Header B: flecha atrás + título + Cobrar (regla #4 CLAUDE.md) ───── */}
+      <HeaderB
+        backLabel="Mesas"
+        onBack={() => router.push('/mesas')}
+        titulo={mesaLabel}
+        subtitulo={
+          <div className="flex items-center gap-3 text-[12px] text-text-3">
+            <span className="flex items-center gap-1">
+              <Users2 size={13} strokeWidth={2.2} />
+              {numComensales} comensal{numComensales !== 1 ? 'es' : ''}
+            </span>
+            <span className="flex items-center gap-1">
+              <Clock3 size={13} strokeWidth={2.2} />
+              desde {horaApertura}
+            </span>
           </div>
+        }
+      >
+        <button
+          onClick={() => router.push(`/cobro/${pedidoId}`)}
+          className="flex items-center gap-1 rounded-full bg-[#173F2E] px-4 py-2 text-[13px] font-bold text-white active:scale-[.97] active:bg-[#0F2E21]"
+        >
+          Cobrar
+          <ArrowRight size={14} strokeWidth={2.4} />
+        </button>
+      </HeaderB>
 
-          <div className="flex items-center gap-1">
-            {mesasOcupadas.length > 0 && (
-              <button
-                onClick={() => setSheetUnirOpen(true)}
-                className="px-1 py-1 text-[12px] font-medium text-text-3 active:opacity-60"
-                title="Unir con otra mesa"
-              >
-                Unir
-              </button>
-            )}
-            {mesaId && (
-              <button
-                onClick={handleCompartirMesa}
-                disabled={isPendingCompartir}
-                className="px-1 py-1 text-[12px] font-medium text-text-3 active:opacity-60 disabled:opacity-40"
-                title="Compartir mesa"
-              >
-                {isPendingCompartir ? '…' : 'Compartir'}
-              </button>
-            )}
-            {mesaId && mesasLibres.length > 0 && (
-              <button
-                onClick={() => setSheetMoverOpen(true)}
-                className="px-1 py-1 text-[12px] font-medium text-text-3 active:opacity-60"
-                title="Mover a otra mesa"
-              >
-                Mover
-              </button>
-            )}
-            {mesasSatelite.length > 0 && (
-              <button
-                onClick={() => setSheetSepararOpen(true)}
-                className="px-1 py-1 text-[12px] font-medium text-text-3 active:opacity-60"
-                title="Separar mesa de la cadena"
-              >
-                Separar
-              </button>
-            )}
-            {rol === 'admin' && (
-              <button
-                onClick={() => setSheetReasignarOpen(true)}
-                className="px-1 py-1 text-[12px] font-medium text-text-3 active:opacity-60"
-                title="Reasignar mesero"
-              >
-                Reasignar
-              </button>
-            )}
-            <button
-              onClick={() => router.push(`/cobro/${pedidoId}`)}
-              className="px-1 py-1 text-[13px] font-semibold text-green-600 whitespace-nowrap active:opacity-60"
-            >
-              Cobrar →
-            </button>
-          </div>
+      {/* Fila de acciones con ícono (regla #1 CLAUDE.md) — Compartir/Mover/
+          Reasignar siguen el mockup 1:1; Unir/Separar (funcionalidad real que
+          el mockup no contempla, y que pueden coexistir con las otras 3) se
+          agrupan detrás de "Más" en vez de sumar hasta 5 pills a la fila —
+          decisión confirmada con Rober. "Más" desaparece si ninguna de las
+          dos aplica en este pedido. */}
+      {(mesaId || rol === 'admin') && (
+        <div className="flex flex-shrink-0 items-center gap-2 overflow-x-auto border-b border-[#E5E5EA] bg-white px-4 py-2.5 scrollbar-none">
+          {mesaId && (
+            <AccionPill
+              icon={Share2}
+              label={isPendingCompartir ? '…' : 'Compartir'}
+              onClick={handleCompartirMesa}
+              disabled={isPendingCompartir}
+            />
+          )}
+          {mesaId && mesasLibres.length > 0 && (
+            <AccionPill icon={ArrowLeftRight} label="Mover" onClick={() => setSheetMoverOpen(true)} />
+          )}
+          {rol === 'admin' && (
+            <AccionPill icon={UserCog} label="Reasignar" onClick={() => setSheetReasignarOpen(true)} />
+          )}
+          {(mesasOcupadas.length > 0 || mesasSatelite.length > 0) && (
+            <AccionPill icon={MoreHorizontal} label="Más" onClick={() => setSheetMasOpen(true)} />
+          )}
         </div>
+      )}
 
-        {/* Tabs Menú / Comanda */}
-        <div className="flex">
-          <button
-            onClick={() => setVista('menu')}
-            className={`flex-1 py-2.5 text-[13px] font-semibold border-b-2 transition-colors ${
-              vista === 'menu'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-text-3'
-            }`}
-          >
-            Menú
-          </button>
-          <button
-            onClick={() => setVista('comanda')}
-            className={`flex-1 py-2.5 text-[13px] font-semibold border-b-2 transition-colors ${
-              vista === 'comanda'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-text-3'
-            }`}
-          >
-            Comanda
-            {totalPedido > 0 && (
-              <span className="ml-1.5 font-mono text-[11px]">
-                ${totalPedido.toFixed(2)}
-              </span>
-            )}
-          </button>
-        </div>
+      {/* Tabs Menú / Comanda */}
+      <div className="flex flex-shrink-0 border-b border-[#E5E5EA] bg-white">
+        <button
+          onClick={() => setVista('menu')}
+          className={`flex-1 py-2.5 text-[13px] font-semibold border-b-2 transition-colors ${
+            vista === 'menu'
+              ? 'border-[#173F2E] text-[#173F2E]'
+              : 'border-transparent text-text-3'
+          }`}
+        >
+          Menú
+        </button>
+        <button
+          onClick={() => setVista('comanda')}
+          className={`flex-1 py-2.5 text-[13px] font-semibold border-b-2 transition-colors ${
+            vista === 'comanda'
+              ? 'border-[#173F2E] text-[#173F2E]'
+              : 'border-transparent text-text-3'
+          }`}
+        >
+          Comanda
+          {totalPedido > 0 && (
+            <span className="ml-1.5 rounded-full bg-green-50 px-2 py-0.5 font-mono text-[11px] font-bold text-[#173F2E]">
+              {formatCurrency(totalPedido)}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* ── Error de acciones del header (compartir / nuevo comensal) ───────── */}
@@ -455,6 +438,30 @@ export function PosShell({
         onConfirmar={handleConfirmarLibre}
         onClose={() => setSheetLibreOpen(false)}
       />
+      <Sheet open={sheetMasOpen} onClose={() => setSheetMasOpen(false)} title="Más acciones">
+        {mesasOcupadas.length > 0 && (
+          <button
+            onClick={() => { setSheetMasOpen(false); setSheetUnirOpen(true) }}
+            className="flex w-full items-center gap-3 rounded-xl bg-s2 px-4 py-3.5 text-left active:scale-[.98]"
+          >
+            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#173F2E]/10 text-[#173F2E]">
+              <Merge size={18} strokeWidth={2.2} />
+            </span>
+            <span className="text-[14px] font-semibold text-text">Unir mesa</span>
+          </button>
+        )}
+        {mesasSatelite.length > 0 && (
+          <button
+            onClick={() => { setSheetMasOpen(false); setSheetSepararOpen(true) }}
+            className="flex w-full items-center gap-3 rounded-xl bg-s2 px-4 py-3.5 text-left active:scale-[.98]"
+          >
+            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#173F2E]/10 text-[#173F2E]">
+              <Split size={18} strokeWidth={2.2} />
+            </span>
+            <span className="text-[14px] font-semibold text-text">Separar mesa</span>
+          </button>
+        )}
+      </Sheet>
     </div>
   )
 }
