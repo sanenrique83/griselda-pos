@@ -1,9 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
+import { X, Check, Minus, Plus } from 'lucide-react'
 import { cargarModificadores } from '@/app/(app)/pos/[pedidoId]/actions'
-import type { GrupoMod } from '@/app/(app)/pos/[pedidoId]/actions'
+import type { GrupoMod, OpcionMod } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { ProductoCatalogo } from '@/app/(app)/pos/[pedidoId]/page'
+import { Sheet } from '@/components/ui/Sheet'
+import { formatCurrency } from '@/components/ui/tokens'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -20,6 +23,14 @@ interface SheetModificadoresProps {
   onConfirmar: (payload: ConfirmarModPayload) => Promise<{ error?: string }>
   onClose: () => void
 }
+
+// Umbral "pocas vs. muchas opciones" para elegir tarjetas en fila vs. lista
+// de radio buttons en un grupo de selección única — no existe un campo en
+// grupos_modificadores que distinga esto explícitamente, así que se infiere
+// del conteo de opciones (5 = Tamaño en el mockup usa tarjetas; 6 = el
+// grupo de "surtido/pedacito" usa lista). Ajustable si en la práctica el
+// corte se siente mal en algún producto real.
+const MAX_OPCIONES_TARJETA = 5
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -70,6 +81,80 @@ function precioTotal(
   return (base + extras) * cantidad
 }
 
+// ─── Subcomponentes de opción ──────────────────────────────────────────────────
+
+// Tarjeta (fila horizontal con scroll) — selección única con pocas opciones
+// (ej. Tamaño) o selección múltiple (ej. adicionales, en grid que envuelve).
+function TarjetaOpcion({
+  opcion,
+  seleccionada,
+  multi,
+  onClick,
+}: {
+  opcion: OpcionMod
+  seleccionada: boolean
+  multi: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-[92px] flex-shrink-0 flex-col items-center gap-2 rounded-xl border-[1.5px] p-3 text-center transition-all active:scale-[.97] ${
+        seleccionada ? 'border-[#173F2E] bg-[#173F2E]/5' : 'border-[#D1D1D6] bg-white'
+      }`}
+    >
+      <span className="text-[13px] font-bold leading-tight text-text">{opcion.nombre}</span>
+      {opcion.precio_extra > 0 && (
+        <span className="font-mono text-[11px] font-semibold text-amber-600">
+          +{formatCurrency(opcion.precio_extra)}
+        </span>
+      )}
+      <span
+        className={`flex h-5 w-5 flex-shrink-0 items-center justify-center border-2 text-white ${
+          multi ? 'rounded-[5px]' : 'rounded-full'
+        } ${seleccionada ? 'border-[#173F2E] bg-[#173F2E]' : 'border-border bg-white'}`}
+      >
+        {seleccionada && <Check size={12} strokeWidth={3} />}
+      </span>
+    </button>
+  )
+}
+
+// Fila completa — selección única con muchas opciones (radio real: círculo,
+// nunca cuadrado, para no sugerir multi-selección donde no la hay).
+function FilaRadio({
+  opcion,
+  seleccionada,
+  onClick,
+}: {
+  opcion: OpcionMod
+  seleccionada: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 rounded-xl border-[1.5px] p-3.5 text-left transition-all active:scale-[.98] ${
+        seleccionada ? 'border-[#173F2E] bg-[#173F2E]/5' : 'border-[#D1D1D6] bg-white'
+      }`}
+    >
+      <span
+        className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full border-2 text-white ${
+          seleccionada ? 'border-[#173F2E] bg-[#173F2E]' : 'border-border bg-white'
+        }`}
+      >
+        {seleccionada && <Check size={13} strokeWidth={3} />}
+      </span>
+      <span className="flex-1 text-sm font-semibold text-text">{opcion.nombre}</span>
+      {opcion.precio_extra > 0 && (
+        <span className="font-mono text-[13px] font-semibold text-amber-600">
+          +{formatCurrency(opcion.precio_extra)}
+        </span>
+      )}
+    </button>
+  )
+}
+
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export function SheetModificadores({
@@ -87,19 +172,6 @@ export function SheetModificadores({
   const [notas, setNotas] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const renderCount = useRef(0)
-
-  // Debug: confirmar que seleccion cambia y el componente re-renderiza
-  useEffect(() => {
-    renderCount.current += 1
-    console.log(
-      `[SheetModificadores] seleccion update #${renderCount.current}`,
-      'entries:', seleccion.size,
-      Object.fromEntries(
-        Array.from(seleccion.entries()).map(([k, v]) => [k, Array.from(v)])
-      ),
-    )
-  }, [seleccion])
 
   // Cargar modificadores via Server Action cuando se abre el sheet
   useEffect(() => {
@@ -123,7 +195,6 @@ export function SheetModificadores({
   }, [producto?.id])
 
   function toggleOpcion(grupo: GrupoMod, opcionId: number) {
-    console.log('[toggleOpcion] fired → grupo.id:', grupo.id, 'opcionId:', opcionId, 'maximo:', grupo.maximo)
     setSeleccion((prev) => {
       if (grupo.maximo === 1) {
         // Radio — selección única: nuevo Map + nuevo Set
@@ -184,216 +255,77 @@ export function SheetModificadores({
       grupoVisible(g, seleccion) && g.requerido && !grupoCumplido(g, seleccion),
   )
 
-  const resumenOpciones = grupos
+  // Resumen del pie — las selecciones de grupos "tarjeta" (pocas opciones,
+  // única selección — ej. Tamaño) se muestran en mayúsculas para que
+  // resalten como el atributo principal, igual que el mockup ("CHICO ·
+  // Surtido con pata"); el resto en su capitalización normal. No hay un
+  // campo real que marque "este es el grupo de tamaño", así que se
+  // reutiliza el mismo criterio de conteo de opciones que decide el layout.
+  const resumenPartes = grupos
     .filter((g) => grupoVisible(g, seleccion))
-    .flatMap((g) =>
-      g.opciones
+    .flatMap((g) => {
+      const esTarjeta = g.maximo === 1 && g.opciones.length <= MAX_OPCIONES_TARJETA
+      return g.opciones
         .filter((o) => seleccion.get(g.id)?.has(o.id))
-        .map((o) => o.nombre),
-    )
-    .join(' · ')
+        .map((o) => ({ texto: o.nombre, destacar: esTarjeta }))
+    })
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className={`fixed inset-0 z-[60] bg-black/40 transition-opacity duration-200 ${
-          open ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-        onClick={onClose}
-      />
-
-      {/* Sheet */}
-      <div
-        className={`fixed bottom-0 left-0 right-0 z-[60] flex max-h-[92vh] flex-col rounded-t-[20px] bg-white transition-transform duration-300 ease-out ${
-          open ? 'translate-y-0' : 'translate-y-full'
-        }`}
-      >
-        {/* Handle */}
-        <div className="mx-auto mt-3 h-1 w-10 flex-shrink-0 rounded-full bg-s3" />
-
-        {/* Header */}
-        <div className="flex-shrink-0 border-b border-[#E5E5EA] px-5 py-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="text-[17px] font-bold leading-tight">
-                {producto?.nombre}
-              </h2>
-              <p className="mt-0.5 text-[13px] text-text-3">
-                Selecciona las opciones
-              </p>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      maxHeightClass="max-h-[92vh]"
+      header={
+        <div className="flex flex-shrink-0 items-start gap-3 border-b border-[#E5E5EA] px-5 py-4">
+          {producto?.foto_url ? (
+            <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-s2">
+              <img src={producto.foto_url} alt={producto.nombre} className="h-full w-full object-cover" />
+            </div>
+          ) : (
+            <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-s2 text-2xl">
+              {producto?.emoji ?? '🍽️'}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h2 className="truncate text-[17px] font-bold leading-tight text-text">
+                  {producto?.nombre}
+                </h2>
+                <p className="mt-0.5 text-[13px] text-text-3">Personaliza tu pedido</p>
+              </div>
+              <button
+                onClick={onClose}
+                aria-label="Cerrar"
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-[#E5E5EA] text-text-2 active:opacity-60"
+              >
+                <X size={16} strokeWidth={2.4} />
+              </button>
             </div>
             {producto && (
-              <span className="flex-shrink-0 font-mono text-[17px] font-bold text-green-600">
-                ${producto.precio.toFixed(2)}
-              </span>
+              <p className="mt-1.5 text-right font-mono text-xl font-bold text-green-600">
+                {formatCurrency(producto.precio)}
+              </p>
             )}
           </div>
         </div>
-
-        {/* Cuerpo scrolleable */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
-
-          {/* Skeleton */}
-          {cargando && (
-            <div className="space-y-5 pt-1">
-              {[0, 1].map((i) => (
-                <div key={i} className="space-y-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="h-4 w-28 animate-pulse rounded-md bg-s3" />
-                    <div className="h-[18px] w-16 animate-pulse rounded-full bg-s2" />
-                  </div>
-                  <div className="h-[54px] animate-pulse rounded-xl bg-s2" />
-                  <div className="h-[54px] animate-pulse rounded-xl bg-s2" />
-                  {i === 0 && (
-                    <div className="h-[54px] animate-pulse rounded-xl bg-s2" />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Sin modificadores */}
-          {!cargando && grupos.length === 0 && !error && (
-            <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-text-2">
-              Este producto no tiene modificadores. Puedes agregarlo
-              directamente.
-            </div>
-          )}
-
-          {/* Grupos */}
-          {grupos.map((grupo) => {
-            const visible = grupoVisible(grupo, seleccion)
-            if (!visible) return null
-
-            const esMulti = grupo.maximo !== 1
-            const selGrupo = seleccion.get(grupo.id) ?? new Set<number>()
-            const esCondicional = grupo.opciones_padre.length > 0
-            const cumplido = grupoCumplido(grupo, seleccion)
-
-            return (
-              <div key={grupo.id}>
-                {/* Encabezado del grupo */}
-                <div className="mb-2.5 flex items-center gap-2">
-                  <span className="text-[15px] font-semibold">
-                    {grupo.nombre}
-                  </span>
-                  {esCondicional ? (
-                    <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-600">
-                      Condicional
-                    </span>
-                  ) : grupo.requerido ? (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors ${
-                        cumplido
-                          ? 'bg-green-50 text-green-600'
-                          : 'bg-blue-50 text-blue-600'
-                      }`}
-                    >
-                      {cumplido ? '✓ Listo' : `Elige ${grupo.minimo}`}
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-s2 px-2 py-0.5 text-[11px] font-semibold text-text-3">
-                      Opcional
-                      {grupo.maximo > 1 ? ` — máx. ${grupo.maximo}` : ''}
-                    </span>
-                  )}
-                </div>
-
-                {/* Opciones */}
-                <div
-                  className={
-                    esCondicional
-                      ? 'rounded-xl border border-purple-100 bg-purple-50 p-3.5'
-                      : ''
-                  }
-                >
-                  {esCondicional && (
-                    <p className="mb-2.5 text-[11px] font-semibold text-purple-600">
-                      Visible por opción seleccionada anteriormente
-                    </p>
-                  )}
-
-                  <div className="space-y-2">
-                    {grupo.opciones
-                      .filter((o) => o.activa)
-                      .map((opcion) => {
-                        const sel = selGrupo.has(opcion.id)
-                        return (
-                          <button
-                            key={opcion.id}
-                            onClick={() => toggleOpcion(grupo, opcion.id)}
-                            className={`flex w-full items-center gap-3 rounded-xl border-[1.5px] p-3.5 text-left transition-all active:scale-[.98] ${
-                              sel
-                                ? 'border-blue-500 bg-blue-50'
-                                : 'border-[#D1D1D6] bg-white'
-                            }`}
-                          >
-                            {/* Radio / Checkbox */}
-                            <div
-                              className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center border-2 text-xs font-bold text-white transition-all ${
-                                esMulti ? 'rounded-[5px]' : 'rounded-full'
-                              } ${
-                                sel
-                                  ? 'border-blue-600 bg-blue-600'
-                                  : 'border-border'
-                              }`}
-                            >
-                              {sel && '✓'}
-                            </div>
-
-                            <span className="flex-1 text-sm font-medium">
-                              {opcion.nombre}
-                            </span>
-
-                            {opcion.precio_extra > 0 && (
-                              <span className="font-mono text-[13px] text-amber-600">
-                                +${opcion.precio_extra.toFixed(2)}
-                              </span>
-                            )}
-                          </button>
-                        )
-                      })}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-
-          {/* Notas */}
-          {!cargando && (
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-3">
-                Nota para cocina (opcional)
-              </label>
-              <input
-                type="text"
-                value={notas}
-                onChange={(e) => setNotas(e.target.value)}
-                placeholder="Ej: sin cebolla, extra limón…"
-                className="w-full rounded-card border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-600"
-              />
-            </div>
-          )}
-
-          {error && (
-            <p className="rounded-card bg-red-50 px-4 py-3 text-sm text-red-600">
-              {error}
-            </p>
-          )}
-
-          <div className="h-2" />
-        </div>
-
-        {/* Pie fijo */}
-        <div className="flex-shrink-0 border-t border-[#E5E5EA] px-4 pb-[calc(env(safe-area-inset-bottom,0px)+14px)] pt-3.5">
+      }
+      footer={
+        <>
           {/* Resumen + precio */}
-          <div className="mb-3 flex items-center justify-between">
-            <p className="max-w-[60%] truncate text-[13px] text-text-2">
-              {resumenOpciones || (producto?.nombre ?? '')}
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="min-w-0 flex-1 truncate text-[13px] text-text-2">
+              {resumenPartes.length > 0
+                ? resumenPartes.map((p, i) => (
+                    <span key={i}>
+                      {i > 0 && ' · '}
+                      <span className={p.destacar ? 'font-semibold uppercase' : ''}>{p.texto}</span>
+                    </span>
+                  ))
+                : (producto?.nombre ?? '')}
             </p>
-            <span className="font-mono text-xl font-bold text-amber-600">
-              ${total.toFixed(2)}
+            <span className="flex-shrink-0 font-mono text-xl font-bold text-amber-600">
+              {formatCurrency(total)}
             </span>
           </div>
 
@@ -402,35 +334,176 @@ export function SheetModificadores({
             <div className="flex overflow-hidden rounded-card border-[1.5px] border-border">
               <button
                 onClick={() => setCantidad((n) => Math.max(1, n - 1))}
-                className="flex h-[38px] w-[38px] items-center justify-center text-lg text-text-2 active:bg-s2"
+                className="flex h-[38px] w-[38px] items-center justify-center text-text-2 active:bg-s2"
               >
-                −
+                <Minus size={16} strokeWidth={2.4} />
               </button>
               <div className="flex h-[38px] w-[40px] items-center justify-center border-x-[1.5px] border-border font-mono text-base font-bold">
                 {cantidad}
               </div>
               <button
                 onClick={() => setCantidad((n) => n + 1)}
-                className="flex h-[38px] w-[38px] items-center justify-center text-lg text-text-2 active:bg-s2"
+                className="flex h-[38px] w-[38px] items-center justify-center text-text-2 active:bg-s2"
               >
-                +
+                <Plus size={16} strokeWidth={2.4} />
               </button>
             </div>
 
             <button
               onClick={handleConfirmar}
               disabled={!valido || isPending || cargando}
-              className="flex-1 rounded-xl bg-blue-600 py-[11px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#173F2E] py-[13px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] active:bg-[#0F2E21] disabled:opacity-40"
             >
-              {isPending
-                ? 'Agregando…'
-                : primerPendiente
-                  ? `Elige ${primerPendiente.nombre}`
-                  : '✓ Agregar a comanda'}
+              {isPending ? (
+                'Agregando…'
+              ) : primerPendiente ? (
+                `Elige ${primerPendiente.nombre}`
+              ) : (
+                <>
+                  <Check size={16} strokeWidth={2.8} />
+                  Agregar a comanda
+                </>
+              )}
             </button>
           </div>
+        </>
+      }
+    >
+      {/* Skeleton */}
+      {cargando && (
+        <div className="space-y-5 pt-1">
+          {[0, 1].map((i) => (
+            <div key={i} className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-28 animate-pulse rounded-md bg-s3" />
+                <div className="h-[18px] w-16 animate-pulse rounded-full bg-s2" />
+              </div>
+              <div className="h-[54px] animate-pulse rounded-xl bg-s2" />
+              <div className="h-[54px] animate-pulse rounded-xl bg-s2" />
+              {i === 0 && (
+                <div className="h-[54px] animate-pulse rounded-xl bg-s2" />
+              )}
+            </div>
+          ))}
         </div>
-      </div>
-    </>
+      )}
+
+      {/* Sin modificadores */}
+      {!cargando && grupos.length === 0 && !error && (
+        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-text-2">
+          Este producto no tiene modificadores. Puedes agregarlo
+          directamente.
+        </div>
+      )}
+
+      {/* Grupos — condicionales (opciones_padre) siguen ocultos hasta que su
+          condición se cumple (grupoVisible), sin ningún tratamiento visual
+          especial una vez visibles: se ven exactamente como cualquier otro
+          grupo (mismo badge Requerido/Opcional según su propio
+          grupo.requerido) — el mockup no distingue condicionales de
+          normales, así que se dejó de mostrar el badge "Condicional" que
+          había antes. */}
+      {grupos.map((grupo) => {
+        const visible = grupoVisible(grupo, seleccion)
+        if (!visible) return null
+
+        const esMulti = grupo.maximo !== 1
+        const selGrupo = seleccion.get(grupo.id) ?? new Set<number>()
+        const opcionesActivas = grupo.opciones.filter((o) => o.activa)
+        const modoTarjeta = !esMulti && opcionesActivas.length <= MAX_OPCIONES_TARJETA
+        const cumplido = grupoCumplido(grupo, seleccion)
+
+        return (
+          <div key={grupo.id}>
+            {/* Encabezado del grupo — el badge de un grupo requerido es
+                dinámico ("✓ Listo"/"Elige N"): es retroalimentación
+                funcional real (permite ver de un vistazo si falta completar
+                un grupo antes de agregar a la comanda), no decoración —
+                restaurado a pedido explícito de Rober tras la primera
+                pasada, que lo había dejado estático por error. */}
+            <div className="mb-2.5 flex items-center gap-2">
+              <span className="text-[15px] font-semibold text-text">{grupo.nombre}</span>
+              {grupo.requerido ? (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+                    cumplido ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-600'
+                  }`}
+                >
+                  {cumplido ? '✓ Listo' : `Elige ${grupo.minimo}`}
+                </span>
+              ) : (
+                <span className="rounded-full bg-s2 px-2 py-0.5 text-[11px] font-semibold text-text-3">
+                  Opcional
+                </span>
+              )}
+            </div>
+
+            {/* Opciones: tarjetas en fila (única, pocas) / lista de radio
+                (única, muchas) / grid que envuelve (múltiple) */}
+            {modoTarjeta ? (
+              <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+                {opcionesActivas.map((opcion) => (
+                  <TarjetaOpcion
+                    key={opcion.id}
+                    opcion={opcion}
+                    seleccionada={selGrupo.has(opcion.id)}
+                    multi={false}
+                    onClick={() => toggleOpcion(grupo, opcion.id)}
+                  />
+                ))}
+              </div>
+            ) : esMulti ? (
+              <div className="grid grid-cols-2 gap-2.5">
+                {opcionesActivas.map((opcion) => (
+                  <TarjetaOpcion
+                    key={opcion.id}
+                    opcion={opcion}
+                    seleccionada={selGrupo.has(opcion.id)}
+                    multi
+                    onClick={() => toggleOpcion(grupo, opcion.id)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {opcionesActivas.map((opcion) => (
+                  <FilaRadio
+                    key={opcion.id}
+                    opcion={opcion}
+                    seleccionada={selGrupo.has(opcion.id)}
+                    onClick={() => toggleOpcion(grupo, opcion.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {/* Nota para cocina — no aparece en el mockup, pero es funcionalidad
+          real existente (llega hasta el ticket de cocina); se mantiene. */}
+      {!cargando && (
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-3">
+            Nota para cocina (opcional)
+          </label>
+          <input
+            type="text"
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+            placeholder="Ej: sin cebolla, extra limón…"
+            className="w-full rounded-card border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
+          />
+        </div>
+      )}
+
+      {error && (
+        <p className="rounded-card bg-red-50 px-4 py-3 text-sm text-red-600">
+          {error}
+        </p>
+      )}
+
+      <div className="h-2" />
+    </Sheet>
   )
 }
