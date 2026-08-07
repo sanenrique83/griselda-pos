@@ -327,13 +327,17 @@ export function MesasShell({
             (justify-between no aplica una vez que ya no cabe, así que no
             estorba ese caso de respaldo). Ticket/Cobro solo se muestran si
             panelTurnoFinanciero (Admin siempre; mesero solo con el permiso
-            de /mas/permisos activo). */}
+            de /mas/permisos activo). Ícono de StatTile a 30px (antes 24px)
+            — el círculo ganó espacio comprimiendo gap-x y el padding
+            interno de la tarjeta (px-2.5→px-2, gap-x-2→gap-x-1.5) primero;
+            no hizo falta tocar las etiquetas de 9px/11px, ver cálculo en
+            docs/ESTADO_PROYECTO.md. */}
         {grupos.length > 0 && (
           <div className="px-3 pt-4">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.05em] text-text-3">
               Panel del turno
             </p>
-            <div className="flex flex-nowrap justify-between gap-x-2 overflow-x-auto scrollbar-none rounded-2xl bg-white px-2.5 py-2.5 shadow-card">
+            <div className="flex flex-nowrap justify-between gap-x-1.5 overflow-x-auto scrollbar-none rounded-2xl bg-white px-2 py-2.5 shadow-card">
               <StatTile icon={Armchair} label="Mesas" value={String(panelTurno.mesasOcupadas)} valueClass="text-[#173F2E]" />
               <StatTile icon={Users} label="Clientes" value={String(panelTurno.clientes)} valueClass="text-[#173F2E]" />
               {panelTurnoFinanciero && (
@@ -573,8 +577,8 @@ function StatTile({
 }) {
   return (
     <div className="flex flex-shrink-0 flex-col items-center gap-0.5 text-center">
-      <span className={`flex h-6 w-6 items-center justify-center rounded-full ${tintBg} ${tintText}`}>
-        <Icon size={12} strokeWidth={2.2} />
+      <span className={`flex h-[30px] w-[30px] items-center justify-center rounded-full ${tintBg} ${tintText}`}>
+        <Icon size={14} strokeWidth={2.2} />
       </span>
       <span className="whitespace-nowrap text-[9px] leading-tight text-text-4">{label}</span>
       <span className={`whitespace-nowrap text-[11px] font-bold leading-none ${valueClass}`}>{value}</span>
