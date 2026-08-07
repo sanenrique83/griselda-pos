@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { CobroShell } from '@/components/cobro/CobroShell'
 import type { ItemCliente, TicketConfig } from '@/lib/print'
-import { agruparPorGrupo, construirDescripcionNatural, type OpcionConGrupo } from '@/lib/descripcionNatural'
+import { agruparPorGrupo, construirFraseModificadores, type OpcionConGrupo } from '@/lib/descripcionNatural'
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -92,9 +92,12 @@ export default async function CobroPage({
       const extras = opciones.reduce((e: number, o: any) => e + o.precio_extra, 0)
       const nombreBase = pp.nombre_libre || pp.productos?.nombre || ''
 
-      // Formato 'texto_natural': una sola frase en vez del arreglo de
-      // modificadores — ver lib/descripcionNatural.ts. 'lista'/'agrupado'
-      // (existentes) siguen mandando el arreglo tal cual, sin cambios.
+      // Formato 'texto_natural': el nombre del producto se queda puro (para
+      // que el precio alinee contra la primera línea) y la frase de
+      // modificadores se manda como una sola entrada en `modificadores`, en
+      // su propia línea debajo — ver lib/descripcionNatural.ts.
+      // 'lista'/'agrupado' (existentes) siguen mandando el arreglo tal
+      // cual, sin cambios.
       if (formatoModificadores === 'texto_natural') {
         const conGrupo: OpcionConGrupo[] = opciones
           .filter((o: any) => o.opciones_modificador?.grupos_modificadores)
@@ -105,10 +108,12 @@ export default async function CobroPage({
             grupoConector: o.opciones_modificador.grupos_modificadores.conector,
             grupoPrefijoSeleccionUnica: o.opciones_modificador.grupos_modificadores.prefijo_seleccion_unica,
           }))
+        const frase = construirFraseModificadores(agruparPorGrupo(conGrupo))
         return {
-          nombre: construirDescripcionNatural(nombreBase, agruparPorGrupo(conGrupo)),
+          nombre: nombreBase,
           cantidad: pp.cantidad,
           precio: pp.precio_unit + extras,
+          ...(frase ? { modificadores: [frase] } : {}),
         }
       }
 

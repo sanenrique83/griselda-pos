@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { imprimirTicket, consolidarItemsCliente, type ItemCliente, type TicketConfig } from '@/lib/print'
-import { agruparPorGrupo, construirDescripcionNatural, type OpcionConGrupo } from '@/lib/descripcionNatural'
+import { agruparPorGrupo, construirFraseModificadores, type OpcionConGrupo } from '@/lib/descripcionNatural'
 
 const METODO_LABEL: Record<string, string> = {
   efectivo: 'Efectivo',
@@ -103,10 +103,12 @@ export async function reimprimirTicketCliente(
           grupoConector: o.opciones_modificador.grupos_modificadores.conector,
           grupoPrefijoSeleccionUnica: o.opciones_modificador.grupos_modificadores.prefijo_seleccion_unica,
         }))
+      const frase = construirFraseModificadores(agruparPorGrupo(conGrupo))
       return {
-        nombre: construirDescripcionNatural(nombreBase, agruparPorGrupo(conGrupo)),
+        nombre: nombreBase,
         cantidad: pp.cantidad,
         precio: pp.precio_unit + extras,
+        ...(frase ? { modificadores: [frase] } : {}),
       }
     }
 

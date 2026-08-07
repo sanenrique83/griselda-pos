@@ -273,7 +273,7 @@ Verde bosque (`#173F2E`, hover `#0F2E21`) decidido como color de marca — **nun
 **Fundación construida** (`frontend/src/components/ui/`): `tokens.ts` (brand, `formatCurrency`, escala `texto`/`espaciado`), `Boton.tsx`, `Sheet.tsx`, `Tarjeta.tsx`, `HeaderA.tsx`, `AccionIcono.tsx`. Los ~40 archivos que aún usan `bg-blue-600` **no se migran automáticamente** — se migran pantalla por pantalla al rediseñar cada una.
 
 **`/mesas` — primera pantalla rediseñada, completa** (`MesasShell.tsx` + `mesas/page.tsx`):
-- Header A con saludo personalizado, 3 accesos rápidos, Panel del turno (íconos con tinte verde bosque, compactado a una sola línea — etiquetas de una palabra, ícono/tipografía chicos, `flex-nowrap` + `overflow-x-auto` solo como colchón, nunca envuelve a 2 filas), toggle Mapa/Lista (ícono `LayoutGrid`, igual al bottom nav), leyenda de 5 colores restyled (chips, sin cambiar estados).
+- Header A con saludo personalizado, 3 accesos rápidos, Panel del turno (íconos con tinte verde bosque, compactado a una sola línea — etiquetas de una palabra, ícono/tipografía chicos, `justify-between` para repartir los tiles a lo ancho completo en vez de amontonarse a la izquierda, `flex-nowrap` + `overflow-x-auto` solo como colchón para pantallas genuinamente angostas, nunca envuelve a 2 filas), toggle Mapa/Lista (ícono `LayoutGrid`, igual al bottom nav), leyenda de 5 colores restyled (chips, sin cambiar estados).
 - **Campana de notificaciones centralizada** (`SheetNotificaciones.tsx`) — agrupa alertas de ventas bajas y precuenta impresa sin cobrar; el semáforo de mesa NO se duplica ahí.
 - **Turno desplegable, solo Admin** (`SheetTurnos.tsx`, `?turno=<id>` en `/mesas`) — ve los últimos 10 turnos cerrados en modo de solo lectura (`cargarPanelTurnoHistorico()` en `mesas/page.tsx`, queries directas, sin RPC — mismo patrón que Corte Z, que tampoco usa RPC). El mapa de mesas siempre es en vivo; solo el Panel del turno cambia a histórico, con aviso "Viendo Turno #N — cerrado" y el tile "Cobro pendiente" relabeleado a "Total cobrado" (con tinte verde neutro, no rojo — ese color es solo para la alerta de cobro pendiente en vivo).
 - **Fila "Órdenes activas"** (Cocina + Cobro, sin "Servir" ni "Reservas" — no existen esos datos/esa feature) — tiles tocables que navegan a `/pedidos?filtro=cocina|cobro` (soporte de filtro agregado a `PedidosShell.tsx`).
@@ -281,6 +281,14 @@ Verde bosque (`#173F2E`, hover `#0F2E21`) decidido como color de marca — **nun
 - **Permiso nuevo `config_sistema.panel_turno_mesero_financiero`** (migración `20260801000024`, sin aplicar) — sin él, un mesero solo ve Mesas/Clientes/Tiempo en el Panel del turno; Ticket y Cobro quedan ocultos hasta que Admin lo active en `/mas/permisos` (Admin siempre ve los 5).
 
 **Pendiente de Bloque F**: migrar el resto de pantallas (Pedidos, Historial, Dashboard, Más, etc.) a Boton/Sheet/Tarjeta + verde bosque, una por una.
+
+---
+
+## Ticket de cliente (texto_natural) + manejo global de errores de carga
+
+- **`lib/descripcionNatural.ts`** — se separó `construirFraseModificadores(grupos)` (solo la frase, sin nombre) de `construirDescripcionNatural(nombre, grupos)` (que ahora la usa internamente). `VistaComanda.tsx` (comanda de cocina) sigue igual, sin cambios de comportamiento.
+- **Ticket de cliente con `formato_modificadores_ticket === 'texto_natural'`** (`cobro/[pedidoId]/page.tsx` y `historial/actions.ts::reimprimirTicketCliente`, mismo bug en ambos por ser el mismo patrón duplicado) — antes juntaba nombre + frase de modificadores en una sola línea larga, descuadrando el precio contra `_item_cliente()` en `print_server.py`. Ahora `nombre` se manda puro y la frase entra como única entrada de `modificadores`, reusando el mecanismo que ya imprime modificadores en su propia línea debajo (`  + frase`). Sin cambios en `print_server.py` — `_item_cliente()` ya soportaba esto, el bug era solo de cómo se armaba el payload.
+- **`global-error.tsx`** (raíz, con su propio `<html>/<body>`, estilos inline por resiliencia) y **`(app)/error.tsx`** (dentro del layout, hereda BottomNav) — capturan pantalla en blanco al navegar. `lib/errorCarga.ts::esErrorDeCarga()` detecta `ChunkLoadError`/mensajes de import dinámico fallido típicos de un deploy nuevo en Vercel mientras la app ya estaba abierta → recarga automática con mensaje "Actualizando…". Cualquier otro error se muestra normal con botón "Reintentar" (`reset()`), sin ocultar bugs reales detrás de un reload silencioso.
 
 ---
 

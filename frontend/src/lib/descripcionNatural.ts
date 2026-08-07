@@ -52,15 +52,17 @@ function fragmentoGrupo(nombresOpciones: string[], prefijoSeleccionUnica: string
 }
 
 /**
- * Frase completa: nombre del producto + el fragmento de cada grupo (en su
- * orden), con el conector del grupo antepuesto si tiene uno, o pegado
- * directo si no.
+ * Solo la frase de modificadores (sin el nombre del producto): el fragmento
+ * de cada grupo (en su orden), con el conector del grupo antepuesto si
+ * tiene uno, o pegado directo si no. Cadena vacía si no hay selecciones.
+ * Separado de construirDescripcionNatural() para el ticket de cliente
+ * (cobro/[pedidoId]/page.tsx, historial/actions.ts), donde el nombre del
+ * producto necesita quedarse solo en su propia línea para que el precio
+ * alinee bien — la comanda de cocina (VistaComanda.tsx) sigue usando la
+ * frase completa vía construirDescripcionNatural().
  */
-export function construirDescripcionNatural(
-  nombreProducto: string,
-  gruposConSelecciones: GrupoConSelecciones[],
-): string {
-  const partes = [nombreProducto]
+export function construirFraseModificadores(gruposConSelecciones: GrupoConSelecciones[]): string {
+  const partes: string[] = []
   const gruposOrdenados = [...gruposConSelecciones]
     .filter((g) => g.opciones.length > 0)
     .sort((a, b) => a.orden - b.orden)
@@ -72,4 +74,15 @@ export function construirDescripcionNatural(
   }
 
   return partes.join(' ')
+}
+
+/**
+ * Frase completa: nombre del producto + la frase de modificadores.
+ */
+export function construirDescripcionNatural(
+  nombreProducto: string,
+  gruposConSelecciones: GrupoConSelecciones[],
+): string {
+  const frase = construirFraseModificadores(gruposConSelecciones)
+  return frase ? `${nombreProducto} ${frase}` : nombreProducto
 }
