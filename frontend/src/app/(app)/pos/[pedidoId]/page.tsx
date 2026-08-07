@@ -78,6 +78,7 @@ export type ProductoCatalogo = {
   descripcion: string | null
   precio: number
   emoji: string | null
+  foto_url: string | null
   // Ya combina el toggle manual con la ventana horaria del producto (F9-04)
   // — si cualquiera de las dos lo marca no disponible, esto es false.
   disponible: boolean
@@ -289,7 +290,7 @@ export default async function PosPage({
     supabase
       .from('productos')
       .select(
-        'id, nombre, descripcion, precio, emoji, disponible, modo_captura, categoria_id, es_combo, horario_desde, horario_hasta',
+        'id, nombre, descripcion, precio, emoji, foto_url, disponible, modo_captura, categoria_id, es_combo, horario_desde, horario_hasta',
       )
       .eq('activo', true)
       .order(ordenProductos.column, { ascending: ordenProductos.ascending }),
@@ -411,6 +412,7 @@ export default async function PosPage({
     descripcion: p.descripcion ?? null,
     precio: p.precio,
     emoji: p.emoji ?? null,
+    foto_url: p.foto_url ?? null,
     disponible:
       p.disponible && dentroDeHorario(p.horario_desde ?? null, p.horario_hasta ?? null, horaActual),
     modo_captura: p.modo_captura ?? 'estandar',

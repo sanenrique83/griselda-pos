@@ -293,7 +293,14 @@ Verde bosque (`#173F2E`, hover `#0F2E21`) decidido como color de marca — **nun
 - Pie fijo: "Enviar a cocina" se queda **azul** (no verde bosque) tal como el mockup — Cobrar es la única acción de marca ahí; ambos con ícono + sub-etiqueta (conteo de pendientes / monto).
 - Semáforo de mesa (regla #2) no aplica en esta pantalla — no hay ningún indicador de color de mesa en Comanda.
 
-**Pendiente de Bloque F**: migrar el resto de pantallas (Menú del POS, Cobro, Pedidos, Historial, Dashboard, Más, etc.) a Boton/Sheet/Tarjeta + verde bosque, una por una.
+**Menú del POS (`/pos/[pedidoId]`, tab Menú) — tercera pantalla rediseñada, completa** (`VistaMenu.tsx`, contra `docs/mockups/03-mesa-menu.png`; el header/tabs/Header B ya construidos para Comanda no se tocaron, el mockup de esta ronda traía un header genérico tipo A que se ignoró a propósito).
+- Chips de categoría restyled a "chip de filtro" real (píldora sin ícono, activa = fondo verde bosque sólido) — antes eran tabs con borde inferior azul.
+- **Búsqueda de productos — no existía.** El encargo decía "la funcionalidad ya existe", pero `VistaMenu.tsx` no tenía ningún input de búsqueda ni estado asociado. Se agregó como filtro client-side simple (substring sobre `nombre`, sin acentos/case-insensitive básico) sobre los productos ya cargados — no toca ninguna query ni server action. Sin ícono de escaneo ni botón de filtro aparte del de categoría/nombre: ninguno de los dos tiene función real detrás en esta pantalla, mismo criterio ya aplicado a la manija de arrastre de Comanda (no prometer una función que no existe).
+- Tarjetas de producto: imagen real (`productos.foto_url`, mismo patrón `<img>` que `SeccionProductos.tsx` en Catálogo — antes esta pantalla no pedía `foto_url` en su query, solo `emoji`; ahora cae a emoji si no hay foto) + nombre + badges REALES únicamente (categoría vía `categoria_id`→`categorias.nombre`; "Personalizable" si `es_combo`; "Agotado" si `!disponible`, mismo rojo de siempre) — se omitieron a propósito "Más vendido"/"Picante"/"Vegetariano" del mockup: no existe ningún campo en `productos` que los respalde, e inventar esa columna/lógica quedaba fuera de un cambio "puramente visual".
+- Botón `+`/`−` cuadrado verde bosque (antes círculo azul).
+- Pie fijo: "Nuevo comensal" sólido verde bosque + "Siguiente (X de Y)" ahora en contorno verde bosque (antes ambos sólidos, verde y azul) — el mockup lo muestra así; distinto del "+ Agregar producto"/"+ Nuevo comensal" **punteados** que viven dentro de las tarjetas de comensal en la pestaña Comanda (esos no se tocaron, siguen igual).
+
+**Pendiente de Bloque F**: migrar el resto de pantallas (Cobro, Pedidos, Historial, Dashboard, Más, etc.) a Boton/Sheet/Tarjeta + verde bosque, una por una.
 
 ---
 
