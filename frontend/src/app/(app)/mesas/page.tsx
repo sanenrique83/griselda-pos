@@ -107,56 +107,89 @@ function fmtFechaHoraMX(iso: string): string {
   })
 }
 
-/** PanelTurno de un turno YA CERRADO — mismo alcance (solo mesas) que el
- * panel en vivo, pero con las métricas redefinidas para lo que sí existe en
- * datos históricos: tiempoPromedioMin usa cerrado_en en vez de "ahora", y
- * cobroPendiente aquí representa el total efectivamente cobrado (todo pedido
- * cerrado ya se cobró por completo) — MesasShell relabela ese mismo campo
- * como "Total cobrado" cuando turnoVista !== null. */
-async function cargarPanelTurnoHistorico(
+/** Métricas ACUMULADAS de un turno (en vivo o cerrado) — comparten la misma
+ * fuente porque un turno cerrado no es más que el caso donde ya no queda
+ * ningún pedido 'abierto'. `clientes` suma TODOS los pedidos del turno
+ * (abiertos + cerrados: alguien ya sentado cuenta aunque su cuenta no se
+ * haya cerrado). `ticketPromedio`/`tiempoPromedioMin`/`totalCobrado` solo
+ * consideran los YA CERRADOS del turno — una cuenta todavía abierta no
+ * tiene un total "cobrado" final ni una duración de visita completa, así
+ * que promediarla ahí metería ceros/parciales que no representan nada. Sin
+ * esto, el panel en vivo mostraba $0.00/0 en Ticket/Clientes/Tiempo en
+ * cuanto una mesa se cobraba y cerraba, porque esos 3 tiles solo miraban
+ * pedidosAbiertos. Mesas ocupadas y Cobro pendiente NO usan esta función —
+ * son intrínsecamente "ahora mismo" (mesas activas / lo que sigue sin
+ * pagar), sin equivalente histórico razonable. */
+async function cargarMetricasAcumuladasTurno(
   supabase: Awaited<ReturnType<typeof createClient>>,
   turnoId: number,
-): Promise<PanelTurno> {
+): Promise<{
+  clientes: number
+  ticketPromedio: number
+  tiempoPromedioMin: number
+  visitasCerradas: number
+  totalCobradoCerradas: number
+}> {
   const { data: pedidosTurno } = await supabase
     .from('pedidos')
-    .select('id, created_at, cerrado_en, num_comensales')
+    .select('id, estado, created_at, cerrado_en, num_comensales')
     .eq('turno_id', turnoId)
-    .eq('estado', 'cerrado')
     .not('mesa_id', 'is', null)
 
-  const pedidoIds = (pedidosTurno ?? []).map((p) => p.id)
-  const { data: subpedidosTurno } = pedidoIds.length
+  const clientes = (pedidosTurno ?? []).reduce((s, p) => s + p.num_comensales, 0)
+  const cerrados = (pedidosTurno ?? []).filter((p) => p.estado === 'cerrado' && p.cerrado_en !== null)
+
+  const pedidoIdsCerrados = cerrados.map((p) => p.id)
+  const { data: subpedidosCerrados } = pedidoIdsCerrados.length
     ? await supabase
         .from('subpedidos')
         .select('pedido_id, pedido_productos(estado, cantidad, precio_unit)')
-        .in('pedido_id', pedidoIds)
+        .in('pedido_id', pedidoIdsCerrados)
     : { data: [] as { pedido_id: number; pedido_productos: { estado: string; cantidad: number; precio_unit: number }[] }[] }
 
   const totalPorPedido = new Map<number, number>()
-  for (const sub of subpedidosTurno ?? []) {
+  for (const sub of subpedidosCerrados ?? []) {
     const totalSub = (sub.pedido_productos ?? [])
       .filter((pp) => pp.estado !== 'cancelado')
       .reduce((s, pp) => s + pp.cantidad * pp.precio_unit, 0)
     totalPorPedido.set(sub.pedido_id, (totalPorPedido.get(sub.pedido_id) ?? 0) + totalSub)
   }
 
-  const totalCobrado = [...totalPorPedido.values()].reduce((s, v) => s + v, 0)
-  const clientes = (pedidosTurno ?? []).reduce((s, p) => s + p.num_comensales, 0)
-  const conCierre = (pedidosTurno ?? []).filter((p) => p.cerrado_en !== null)
+  const totalCobradoCerradas = [...totalPorPedido.values()].reduce((s, v) => s + v, 0)
   const tiempoPromedioMin =
-    conCierre.length > 0
-      ? conCierre.reduce(
+    cerrados.length > 0
+      ? cerrados.reduce(
           (s, p) => s + (new Date(p.cerrado_en!).getTime() - new Date(p.created_at).getTime()) / 60_000,
           0,
-        ) / conCierre.length
+        ) / cerrados.length
       : 0
 
   return {
-    mesasOcupadas: (pedidosTurno ?? []).length,
     clientes,
-    ticketPromedio: (pedidosTurno ?? []).length > 0 ? totalCobrado / (pedidosTurno ?? []).length : 0,
+    ticketPromedio: cerrados.length > 0 ? totalCobradoCerradas / cerrados.length : 0,
     tiempoPromedioMin: Math.round(tiempoPromedioMin),
-    cobroPendiente: totalCobrado,
+    visitasCerradas: cerrados.length,
+    totalCobradoCerradas,
+  }
+}
+
+/** PanelTurno de un turno YA CERRADO — mismo alcance (solo mesas) que el
+ * panel en vivo. Como un turno cerrado ya no tiene pedidos 'abierto',
+ * cargarMetricasAcumuladasTurno() por sí sola cubre las 5 métricas: sus
+ * "cerrados" son efectivamente todos los pedidos del turno. cobroPendiente
+ * aquí representa el total efectivamente cobrado — MesasShell relabela ese
+ * mismo campo como "Total cobrado" cuando turnoVista !== null. */
+async function cargarPanelTurnoHistorico(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  turnoId: number,
+): Promise<PanelTurno> {
+  const m = await cargarMetricasAcumuladasTurno(supabase, turnoId)
+  return {
+    mesasOcupadas: m.visitasCerradas,
+    clientes: m.clientes,
+    ticketPromedio: m.ticketPromedio,
+    tiempoPromedioMin: m.tiempoPromedioMin,
+    cobroPendiente: m.totalCobradoCerradas,
   }
 }
 
@@ -295,25 +328,21 @@ export default async function MesasPage({
     // siguen 'activo', no 'pagado') entre las mesas ocupadas ahorita.
     if (sub.estado === 'activo') cobroPendiente += totalSub
   }
-  const clientes = (pedidosAbiertos ?? []).reduce((s, p) => s + p.num_comensales, 0)
   const ahoraMs = Date.now()
-  const tiempoPromedioMin =
-    (pedidosAbiertos ?? []).length > 0
-      ? (pedidosAbiertos ?? []).reduce(
-          (s, p) => s + (ahoraMs - new Date(p.created_at).getTime()) / 60_000,
-          0,
-        ) / (pedidosAbiertos ?? []).length
-      : 0
-  const ticketPromedio =
-    (pedidosAbiertos ?? []).length > 0
-      ? (pedidosAbiertos ?? []).reduce((s, p) => s + (totalPorPedido.get(p.id) ?? 0), 0) /
-        (pedidosAbiertos ?? []).length
-      : 0
+
+  // Clientes/Ticket promedio/Tiempo promedio son ACUMULADOS de todo el
+  // turno (no solo lo que sigue abierto ahorita) — ver
+  // cargarMetricasAcumuladasTurno(). Mesas ocupadas y Cobro pendiente se
+  // quedan en vivo, calculados arriba/abajo a partir de pedidosAbiertos.
+  const metricasAcumuladas = turno
+    ? await cargarMetricasAcumuladasTurno(supabase, turno.id)
+    : { clientes: 0, ticketPromedio: 0, tiempoPromedioMin: 0, visitasCerradas: 0, totalCobradoCerradas: 0 }
+
   const panelTurno: PanelTurno = {
     mesasOcupadas: (pedidosAbiertos ?? []).length,
-    clientes,
-    ticketPromedio,
-    tiempoPromedioMin: Math.round(tiempoPromedioMin),
+    clientes: metricasAcumuladas.clientes,
+    ticketPromedio: metricasAcumuladas.ticketPromedio,
+    tiempoPromedioMin: metricasAcumuladas.tiempoPromedioMin,
     cobroPendiente,
   }
 
