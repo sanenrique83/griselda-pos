@@ -132,6 +132,15 @@ def _item_cliente(nombre: str, cantidad: int, precio_unit: float, modificadores:
     monto_str = f'${precio_unit * cantidad:.2f}'
     espacios  = COL - len(linea) - len(monto_str)
     b = _encode(linea + ' ' * max(1, espacios) + monto_str) + CMD_LF
+    # Precio unitario solo si hay mas de 1 — evita la linea redundante
+    # "$X.XX c/u" cuando ya es obvio por la linea principal. Se arma aqui
+    # (no en el frontend) porque `nombre`/`modificadores` ya vienen resueltos
+    # segun formato_modificadores_ticket ANTES de llegar al print server (ver
+    # TicketConfig en lib/print.ts) — este punto es el unico comun a los 3
+    # formatos (lista/agrupado/texto_natural) y a los 5 escenarios de
+    # _build_cliente que listan items.
+    if cantidad > 1:
+        b += _encode(f'  ${precio_unit:.2f} c/u') + CMD_LF
     for grupo in _agrupar_modificadores(modificadores or [], modificadores_por_linea):
         b += _encode(f'  + {grupo}') + CMD_LF
     return b
