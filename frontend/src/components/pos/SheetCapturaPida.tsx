@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { Search, X, ShoppingCart, Trash2, Check, Minus, Plus } from 'lucide-react'
+import { Search, X, ShoppingCart, Trash2, Check, Minus, Plus, SlidersHorizontal } from 'lucide-react'
 import { cargarGuisados } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { ProductoCatalogo } from '@/app/(app)/pos/[pedidoId]/page'
 import { Sheet } from '@/components/ui/Sheet'
@@ -46,6 +46,7 @@ export function SheetCapturaPida({
   const [isPending, startTransition] = useTransition()
   const [busqueda, setBusqueda] = useState('')
   const [grupoActivo, setGrupoActivo] = useState<number | null>(null)
+  const [ocultarAgotados, setOcultarAgotados] = useState(false)
 
   // Cargar guisados via Server Action cuando se abre el sheet
   useEffect(() => {
@@ -54,6 +55,7 @@ export function SheetCapturaPida({
     setError(null)
     setBusqueda('')
     setGrupoActivo(null)
+    setOcultarAgotados(false)
     setCargando(true)
 
     cargarGuisados(producto.id).then((result) => {
@@ -104,11 +106,14 @@ export function SheetCapturaPida({
     ? todasOpcionesPlano.reduce((s, g) => s + g.cantidad * (producto.precio + g.precio_extra), 0)
     : 0
 
-  // Búsqueda + chip de categoría — filtro client-side simple sobre lo ya
-  // cargado, mismo patrón que VistaMenu.tsx (sin query nueva).
+  // Búsqueda + chip de categoría + "Filtros" (ocultar agotados) — todo
+  // client-side simple sobre lo ya cargado, mismo patrón que VistaMenu.tsx
+  // (sin query nueva). "Filtros" solo controla algo real (disponible=false
+  // ya viene de insumos.disponible en cargarGuisados) — no un botón decorativo.
   const opcionesVisibles = todasOpcionesPlano
     .filter((o) => (grupoActivo ? o.grupoId === grupoActivo : true))
     .filter((o) => (busqueda.trim() ? o.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()) : true))
+    .filter((o) => (ocultarAgotados ? o.disponible : true))
 
   function handleConfirmar() {
     if (!producto || totalTacos === 0) return
@@ -234,23 +239,37 @@ export function SheetCapturaPida({
         </>
       }
     >
-      {/* Búsqueda — sin botón "Filtros" aparte: los chips de categoría de
-          abajo ya cubren el único filtro real que existe aquí, y no hay
-          ninguna función de escaneo, mismo criterio ya aplicado en Menú y
-          en Comanda (no prometer algo que no funciona). */}
-      <div className="flex items-center gap-2 rounded-xl bg-s2 px-3 py-2.5">
-        <Search size={17} strokeWidth={2.2} className="flex-shrink-0 text-text-3" />
-        <input
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar presentación…"
-          className="min-w-0 flex-1 bg-transparent text-[14px] text-text placeholder:text-text-3 focus:outline-none"
-        />
-        {busqueda && (
-          <button onClick={() => setBusqueda('')} aria-label="Limpiar búsqueda" className="flex-shrink-0 text-text-3 active:opacity-60">
-            <X size={15} strokeWidth={2.4} />
-          </button>
-        )}
+      {/* Búsqueda + Filtros (ocultar agotados) — único filtro real más allá
+          de los chips de categoría; no hay función de escaneo, mismo
+          criterio ya aplicado en Menú y en Comanda (no prometer algo que no
+          funciona). */}
+      <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-s2 px-3 py-2.5">
+          <Search size={17} strokeWidth={2.2} className="flex-shrink-0 text-text-3" />
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar presentación…"
+            className="min-w-0 flex-1 bg-transparent text-[14px] text-text placeholder:text-text-3 focus:outline-none"
+          />
+          {busqueda && (
+            <button onClick={() => setBusqueda('')} aria-label="Limpiar búsqueda" className="flex-shrink-0 text-text-3 active:opacity-60">
+              <X size={15} strokeWidth={2.4} />
+            </button>
+          )}
+        </div>
+        <button
+          onClick={() => setOcultarAgotados((v) => !v)}
+          aria-pressed={ocultarAgotados}
+          className={`flex flex-shrink-0 items-center gap-1.5 rounded-xl border-[1.5px] px-3 py-2.5 text-[13px] font-semibold transition-colors ${
+            ocultarAgotados
+              ? 'border-[#173F2E] bg-[#173F2E] text-white'
+              : 'border-[#E5E5EA] bg-white text-text-2'
+          }`}
+        >
+          <SlidersHorizontal size={15} strokeWidth={2.2} />
+          Filtros
+        </button>
       </div>
 
       {/* Banner de instrucción */}
@@ -287,9 +306,9 @@ export function SheetCapturaPida({
 
       {/* Skeleton */}
       {cargando && (
-        <div className="grid grid-cols-2 gap-2.5 pt-1">
+        <div className="flex flex-col gap-2 pt-1">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-[150px] animate-pulse rounded-xl bg-s2" />
+            <div key={i} className="h-[72px] animate-pulse rounded-xl bg-s2" />
           ))}
         </div>
       )}
@@ -306,16 +325,18 @@ export function SheetCapturaPida({
         <p className="py-10 text-center text-sm text-text-3">Sin resultados para tu búsqueda.</p>
       )}
 
-      {/* Cuadrícula 2 columnas — imagen propia de la opción si existe, si
+      {/* Lista de filas horizontales — thumbnail cuadrado a la izquierda,
+          nombre/precio/stepper a la derecha, para que quepan más opciones
+          visibles sin tanto scroll. Imagen propia de la opción si existe, si
           no la del producto padre (nunca queda vacía). */}
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="flex flex-col gap-2">
         {opcionesVisibles.map((g) => {
           const fotoUrl = g.foto_url ?? producto?.foto_url ?? null
           const activa = g.cantidad > 0
           return (
             <div
               key={g.id}
-              className={`overflow-hidden rounded-xl border-[1.5px] transition-colors ${
+              className={`flex items-center gap-3 rounded-xl border-[1.5px] p-2 transition-colors ${
                 !g.disponible
                   ? 'pointer-events-none border-[#E5E5EA] bg-white opacity-40'
                   : activa
@@ -323,24 +344,24 @@ export function SheetCapturaPida({
                     : 'border-[#E5E5EA] bg-white'
               }`}
             >
-              <div className="relative h-[88px] w-full bg-s2">
+              <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-s2">
                 {fotoUrl ? (
                   <img src={fotoUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-3xl">
+                  <div className="flex h-full w-full items-center justify-center text-xl">
                     {producto?.emoji ?? '🍽️'}
                   </div>
                 )}
                 {activa && (
-                  <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#173F2E] text-white shadow">
-                    <Check size={13} strokeWidth={3} />
+                  <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#173F2E] text-white shadow">
+                    <Check size={9} strokeWidth={3} />
                   </span>
                 )}
               </div>
 
-              <div className="p-2.5">
-                <p className="line-clamp-2 text-[13px] font-bold leading-tight text-text">{g.nombre}</p>
-                <p className="mt-1 font-mono text-[12px] text-text-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-bold leading-tight text-text">{g.nombre}</p>
+                <p className="mt-0.5 font-mono text-[12px] text-text-3">
                   {formatCurrency((producto?.precio ?? 0) + g.precio_extra)} c/u
                 </p>
                 {!g.disponible && (
@@ -348,24 +369,24 @@ export function SheetCapturaPida({
                     Agotado
                   </span>
                 )}
+              </div>
 
-                <div className="mt-2 flex items-center justify-center gap-2">
-                  <button
-                    onClick={() => ajustar(g.id, -1)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-border text-text-2 active:scale-90 active:bg-s2"
-                  >
-                    <Minus size={14} strokeWidth={2.4} />
-                  </button>
-                  <span className={`w-6 text-center font-mono text-[15px] font-bold ${activa ? 'text-[#173F2E]' : 'text-text-4'}`}>
-                    {g.cantidad}
-                  </span>
-                  <button
-                    onClick={() => ajustar(g.id, 1)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-border text-text-2 active:scale-90 active:bg-s2"
-                  >
-                    <Plus size={14} strokeWidth={2.4} />
-                  </button>
-                </div>
+              <div className="flex flex-shrink-0 items-center gap-1.5">
+                <button
+                  onClick={() => ajustar(g.id, -1)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-border text-text-2 active:scale-90 active:bg-s2"
+                >
+                  <Minus size={14} strokeWidth={2.4} />
+                </button>
+                <span className={`w-5 text-center font-mono text-[15px] font-bold ${activa ? 'text-[#173F2E]' : 'text-text-4'}`}>
+                  {g.cantidad}
+                </span>
+                <button
+                  onClick={() => ajustar(g.id, 1)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-border text-text-2 active:scale-90 active:bg-s2"
+                >
+                  <Plus size={14} strokeWidth={2.4} />
+                </button>
               </div>
             </div>
           )
