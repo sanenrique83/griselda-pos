@@ -24,14 +24,6 @@ interface SheetModificadoresProps {
   onClose: () => void
 }
 
-// Umbral "pocas vs. muchas opciones" para elegir tarjetas en fila vs. lista
-// de radio buttons en un grupo de selección única — no existe un campo en
-// grupos_modificadores que distinga esto explícitamente, así que se infiere
-// del conteo de opciones (5 = Tamaño en el mockup usa tarjetas; 6 = el
-// grupo de "surtido/pedacito" usa lista). Ajustable si en la práctica el
-// corte se siente mal en algún producto real.
-const MAX_OPCIONES_TARJETA = 5
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function grupoVisible(
@@ -82,10 +74,16 @@ function precioTotal(
 }
 
 // ─── Subcomponentes de opción ──────────────────────────────────────────────────
+//
+// El círculo (selección única) vs. cuadrado (selección múltiple) del
+// indicador es independiente de si el GRUPO se ve en cajas o lista — viene
+// de `multi` (grupo.maximo !== 1) en ambos subcomponentes, sin tocar esa
+// lógica ya resuelta en la ronda anterior.
 
-// Tarjeta (fila horizontal con scroll) — selección única con pocas opciones
-// (ej. Tamaño) o selección múltiple (ej. adicionales, en grid que envuelve).
-function TarjetaOpcion({
+// Caja — estilo_visual === 'cajas': grid de 4 columnas que envuelve, tanto
+// para selección única (ej. Tamaño) como múltiple (ej. adicionales). Ancho
+// fluido (lo controla el grid contenedor), nunca se desborda.
+function CajaOpcion({
   opcion,
   seleccionada,
   multi,
@@ -99,13 +97,13 @@ function TarjetaOpcion({
   return (
     <button
       onClick={onClick}
-      className={`flex w-[92px] flex-shrink-0 flex-col items-center gap-2 rounded-xl border-[1.5px] p-3 text-center transition-all active:scale-[.97] ${
+      className={`flex min-w-0 flex-col items-center gap-1.5 rounded-xl border-[1.5px] p-2.5 text-center transition-all active:scale-[.97] ${
         seleccionada ? 'border-[#173F2E] bg-[#173F2E]/5' : 'border-[#D1D1D6] bg-white'
       }`}
     >
-      <span className="text-[13px] font-bold leading-tight text-text">{opcion.nombre}</span>
+      <span className="line-clamp-2 text-[12px] font-bold leading-tight text-text">{opcion.nombre}</span>
       {opcion.precio_extra > 0 && (
-        <span className="font-mono text-[11px] font-semibold text-amber-600">
+        <span className="font-mono text-[10px] font-semibold text-amber-600">
           +{formatCurrency(opcion.precio_extra)}
         </span>
       )}
@@ -120,15 +118,19 @@ function TarjetaOpcion({
   )
 }
 
-// Fila completa — selección única con muchas opciones (radio real: círculo,
-// nunca cuadrado, para no sugerir multi-selección donde no la hay).
-function FilaRadio({
+// Fila — estilo_visual === 'lista': ancho completo, indicador a la
+// izquierda del texto (círculo o cuadrado según `multi`, misma lógica que
+// CajaOpcion). Antes solo existía para selección única (radio); ahora
+// también sirve para grupos múltiples marcados como "lista".
+function FilaOpcion({
   opcion,
   seleccionada,
+  multi,
   onClick,
 }: {
   opcion: OpcionMod
   seleccionada: boolean
+  multi: boolean
   onClick: () => void
 }) {
   return (
@@ -139,9 +141,9 @@ function FilaRadio({
       }`}
     >
       <span
-        className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full border-2 text-white ${
-          seleccionada ? 'border-[#173F2E] bg-[#173F2E]' : 'border-border bg-white'
-        }`}
+        className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center border-2 text-white ${
+          multi ? 'rounded-[5px]' : 'rounded-full'
+        } ${seleccionada ? 'border-[#173F2E] bg-[#173F2E]' : 'border-border bg-white'}`}
       >
         {seleccionada && <Check size={13} strokeWidth={3} />}
       </span>
@@ -255,19 +257,19 @@ export function SheetModificadores({
       grupoVisible(g, seleccion) && g.requerido && !grupoCumplido(g, seleccion),
   )
 
-  // Resumen del pie — las selecciones de grupos "tarjeta" (pocas opciones,
-  // única selección — ej. Tamaño) se muestran en mayúsculas para que
-  // resalten como el atributo principal, igual que el mockup ("CHICO ·
-  // Surtido con pata"); el resto en su capitalización normal. No hay un
-  // campo real que marque "este es el grupo de tamaño", así que se
-  // reutiliza el mismo criterio de conteo de opciones que decide el layout.
+  // Resumen del pie — las selecciones de un grupo de selección única en
+  // 'cajas' (ej. Tamaño) se muestran en mayúsculas para que resalten como
+  // el atributo principal, igual que el mockup ("CHICO · Surtido con
+  // pata"); el resto en su capitalización normal. No hay un campo real que
+  // marque "este es el grupo de tamaño" — se aproxima con estilo_visual
+  // (ahora un control explícito del admin) + selección única.
   const resumenPartes = grupos
     .filter((g) => grupoVisible(g, seleccion))
     .flatMap((g) => {
-      const esTarjeta = g.maximo === 1 && g.opciones.length <= MAX_OPCIONES_TARJETA
+      const destacar = g.maximo === 1 && g.estilo_visual === 'cajas'
       return g.opciones
         .filter((o) => seleccion.get(g.id)?.has(o.id))
-        .map((o) => ({ texto: o.nombre, destacar: esTarjeta }))
+        .map((o) => ({ texto: o.nombre, destacar }))
     })
 
   return (
@@ -410,7 +412,6 @@ export function SheetModificadores({
         const esMulti = grupo.maximo !== 1
         const selGrupo = seleccion.get(grupo.id) ?? new Set<number>()
         const opcionesActivas = grupo.opciones.filter((o) => o.activa)
-        const modoTarjeta = !esMulti && opcionesActivas.length <= MAX_OPCIONES_TARJETA
         const cumplido = grupoCumplido(grupo, seleccion)
 
         return (
@@ -438,39 +439,31 @@ export function SheetModificadores({
               )}
             </div>
 
-            {/* Opciones: tarjetas en fila (única, pocas) / lista de radio
-                (única, muchas) / grid que envuelve (múltiple) */}
-            {modoTarjeta ? (
-              <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+            {/* Opciones: 2 layouts posibles, gobernados por
+                grupo.estilo_visual (control explícito del admin en
+                Catálogo, ya no inferido por conteo de opciones). El círculo
+                vs. cuadrado del indicador viene de `esMulti`, independiente
+                de esto. */}
+            {grupo.estilo_visual === 'lista' ? (
+              <div className="space-y-2">
                 {opcionesActivas.map((opcion) => (
-                  <TarjetaOpcion
+                  <FilaOpcion
                     key={opcion.id}
                     opcion={opcion}
                     seleccionada={selGrupo.has(opcion.id)}
-                    multi={false}
-                    onClick={() => toggleOpcion(grupo, opcion.id)}
-                  />
-                ))}
-              </div>
-            ) : esMulti ? (
-              <div className="grid grid-cols-2 gap-2.5">
-                {opcionesActivas.map((opcion) => (
-                  <TarjetaOpcion
-                    key={opcion.id}
-                    opcion={opcion}
-                    seleccionada={selGrupo.has(opcion.id)}
-                    multi
+                    multi={esMulti}
                     onClick={() => toggleOpcion(grupo, opcion.id)}
                   />
                 ))}
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-4 gap-2">
                 {opcionesActivas.map((opcion) => (
-                  <FilaRadio
+                  <CajaOpcion
                     key={opcion.id}
                     opcion={opcion}
                     seleccionada={selGrupo.has(opcion.id)}
+                    multi={esMulti}
                     onClick={() => toggleOpcion(grupo, opcion.id)}
                   />
                 ))}

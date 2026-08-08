@@ -51,6 +51,9 @@ type GrupoLocal = {
   // Formato 'texto_natural' del ticket (ver lib/descripcionNatural.ts).
   conector: string | null
   prefijo_seleccion_unica: string | null
+  // Estilo de visualización en el sheet de personalización (POS) — ver
+  // SheetModificadores.tsx.
+  estilo_visual: 'cajas' | 'lista'
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -122,6 +125,7 @@ export function SeccionProductos({
   const [fgMax, setFgMax] = useState('1')
   const [fgRapido, setFgRapido] = useState(false)
   const [fgOpcionesPadre, setFgOpcionesPadre] = useState<number[]>([])
+  const [fgEstiloVisual, setFgEstiloVisual] = useState<'cajas' | 'lista'>('cajas')
   // Formato 'texto_natural' del ticket (ver lib/descripcionNatural.ts)
   const [fgConector, setFgConector] = useState('')
   const [fgPrefijoUnica, setFgPrefijoUnica] = useState('')
@@ -180,6 +184,7 @@ export function SeccionProductos({
             opciones_padre: g.opciones_padre,
             conector: g.conector,
             prefijo_seleccion_unica: g.prefijo_seleccion_unica,
+            estilo_visual: g.estilo_visual,
           })),
         )
         setLoadingGrupos(false)
@@ -358,6 +363,7 @@ export function SeccionProductos({
     setFgOpcionesPadre([])
     setFgConector('')
     setFgPrefijoUnica('')
+    setFgEstiloVisual('cajas')
     setGrupoEditandoId(null)
     setShowFormGrupo(false)
   }
@@ -374,6 +380,7 @@ export function SeccionProductos({
       setFgOpcionesPadre(grupo.opciones_padre)
       setFgConector(grupo.conector ?? '')
       setFgPrefijoUnica(grupo.prefijo_seleccion_unica ?? '')
+      setFgEstiloVisual(grupo.estilo_visual)
     } else {
       setGrupoEditandoId(null)
       setFgNombre('')
@@ -384,6 +391,7 @@ export function SeccionProductos({
       setFgOpcionesPadre([])
       setFgConector('')
       setFgPrefijoUnica('')
+      setFgEstiloVisual('cajas')
     }
     setShowFormGrupo(true)
   }
@@ -404,6 +412,7 @@ export function SeccionProductos({
           mostrar_en_rapido: fgRapido,
           conector: fgConector.trim() || null,
           prefijo_seleccion_unica: fgPrefijoUnica.trim() || null,
+          estilo_visual: fgEstiloVisual,
         })
         if (result?.error) { setGrupoError(result.error); return }
 
@@ -431,6 +440,7 @@ export function SeccionProductos({
                   opciones_padre: opcionesPadreGuardadas,
                   conector: fgConector.trim() || null,
                   prefijo_seleccion_unica: fgPrefijoUnica.trim() || null,
+                  estilo_visual: fgEstiloVisual,
                 }
               : g,
           ),
@@ -451,6 +461,7 @@ export function SeccionProductos({
         mostrar_en_rapido: fgRapido,
         conector: fgConector.trim() || null,
         prefijo_seleccion_unica: fgPrefijoUnica.trim() || null,
+        estilo_visual: fgEstiloVisual,
       })
       if ('error' in result) { setGrupoError(result.error); return }
 
@@ -477,6 +488,7 @@ export function SeccionProductos({
           opciones_padre: opcionesPadreGuardadas,
           conector: fgConector.trim() || null,
           prefijo_seleccion_unica: fgPrefijoUnica.trim() || null,
+          estilo_visual: fgEstiloVisual,
         },
       ])
       resetFormGrupo()
@@ -1042,6 +1054,8 @@ export function SeccionProductos({
                           {grupo.requerido
                             ? `Requerido · elige ${grupo.minimo}–${grupo.maximo}`
                             : `Opcional · máx. ${grupo.maximo}`}
+                          {' · '}
+                          {grupo.estilo_visual === 'lista' ? 'Lista' : 'Cajas'}
                           {grupo.mostrar_en_rapido && ' · Modo rápido'}
                         </p>
                         {grupo.opciones_padre.length > 0 && (
@@ -1235,6 +1249,35 @@ export function SeccionProductos({
                       placeholder="Ej: Guisado, Salsas, Extras…"
                       className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
                     />
+                  </div>
+
+                  {/* Estilo de visualización en el sheet de personalización
+                      (POS) — control explícito, ya no se infiere por
+                      conteo de opciones. */}
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                      Estilo de visualización
+                    </label>
+                    <div className="flex overflow-hidden rounded-lg border-[1.5px] border-border">
+                      <button
+                        type="button"
+                        onClick={() => setFgEstiloVisual('cajas')}
+                        className={`flex-1 py-2 text-[13px] font-semibold transition-colors ${
+                          fgEstiloVisual === 'cajas' ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
+                        }`}
+                      >
+                        Cajas
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFgEstiloVisual('lista')}
+                        className={`flex-1 py-2 text-[13px] font-semibold transition-colors ${
+                          fgEstiloVisual === 'lista' ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
+                        }`}
+                      >
+                        Lista
+                      </button>
+                    </div>
                   </div>
 
                   {/* Formato 'texto_natural' del ticket (/mas/permisos) — ver

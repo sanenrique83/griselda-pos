@@ -227,6 +227,11 @@ export interface GrupoModificador {
   // única se muestra sin prefijo.
   conector: string | null
   prefijo_seleccion_unica: string | null
+  // Cómo se ve el grupo en el sheet de personalización de producto (POS) —
+  // 'cajas' = grid de 4 columnas que envuelve, 'lista' = filas de ancho
+  // completo. Control explícito del admin, ya no se infiere por conteo de
+  // opciones (ver SheetModificadores.tsx).
+  estilo_visual: 'cajas' | 'lista'
 }
 
 export interface GrupoModificadorPadre {

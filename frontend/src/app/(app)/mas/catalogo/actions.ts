@@ -282,6 +282,7 @@ export async function crearGrupoModificador(data: {
   mostrar_en_rapido?: boolean
   conector?: string | null
   prefijo_seleccion_unica?: string | null
+  estilo_visual?: 'cajas' | 'lista'
 }): Promise<{ id: number } | Err> {
   const supabase = await createClient()
   const { data: grupo, error } = await supabase
@@ -296,6 +297,7 @@ export async function crearGrupoModificador(data: {
       mostrar_en_rapido: data.mostrar_en_rapido ?? false,
       conector: data.conector ?? null,
       prefijo_seleccion_unica: data.prefijo_seleccion_unica ?? null,
+      estilo_visual: data.estilo_visual ?? 'cajas',
       activo: true,
     })
     .select('id')
@@ -315,6 +317,7 @@ export async function actualizarGrupoModificador(
     mostrar_en_rapido?: boolean
     conector?: string | null
     prefijo_seleccion_unica?: string | null
+    estilo_visual?: 'cajas' | 'lista'
   },
 ): Promise<Err | undefined> {
   const supabase = await createClient()

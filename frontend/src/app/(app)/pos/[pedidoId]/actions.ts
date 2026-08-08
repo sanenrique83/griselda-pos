@@ -41,6 +41,11 @@ export type GrupoMod = {
   // Formato 'texto_natural' del ticket (ver lib/descripcionNatural.ts).
   conector: string | null
   prefijo_seleccion_unica: string | null
+  // Estilo de visualización en el sheet de personalización (POS) — control
+  // explícito del admin desde Catálogo, ya no se infiere por conteo de
+  // opciones. 'cajas' = grid de 4 columnas que envuelve, 'lista' = filas de
+  // ancho completo.
+  estilo_visual: 'cajas' | 'lista'
 }
 
 export type GuisadoMod = {
@@ -97,7 +102,6 @@ export async function cargarModificadores(
   opts: { soloDisponiblesAhora?: boolean } = {},
 ): Promise<{ grupos: GrupoMod[] } | Err> {
   const soloDisponiblesAhora = opts.soloDisponiblesAhora ?? true
-  console.log('[cargarModificadores] start → productoId:', productoId, typeof productoId)
   const supabase = await createClient()
 
   const { data: configOrden } = await supabase
@@ -111,23 +115,14 @@ export async function cargarModificadores(
   const { data, error } = await supabase
     .from('grupos_modificadores')
     .select(
-      'id, nombre, requerido, minimo, maximo, orden, mostrar_en_rapido, conector, prefijo_seleccion_unica, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, orden, horario_desde, horario_hasta, insumos!insumo_id(disponible)), grupo_modificador_padres!grupo_id(opcion_id)',
+      'id, nombre, requerido, minimo, maximo, orden, mostrar_en_rapido, conector, prefijo_seleccion_unica, estilo_visual, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, orden, horario_desde, horario_hasta, insumos!insumo_id(disponible)), grupo_modificador_padres!grupo_id(opcion_id)',
     )
     .eq('producto_id', productoId)
     .eq('activo', true)
     .order('orden')
     .order(ordenOpciones.column, { referencedTable: 'opciones_modificador', ascending: ordenOpciones.ascending })
 
-  console.log('[cargarModificadores] raw data:', JSON.stringify(data))
-
   if (error) {
-    console.error('[cargarModificadores] Supabase error:', {
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint,
-      productoId,
-    })
     return { error: `Error al cargar modificadores: ${error.message}` }
   }
 
@@ -144,6 +139,7 @@ export async function cargarModificadores(
     mostrar_en_rapido: gr.mostrar_en_rapido ?? false,
     conector: gr.conector ?? null,
     prefijo_seleccion_unica: gr.prefijo_seleccion_unica ?? null,
+    estilo_visual: gr.estilo_visual === 'lista' ? 'lista' : 'cajas',
     opciones: (gr.opciones_modificador ?? [])
       .filter(
         (o: any) =>
