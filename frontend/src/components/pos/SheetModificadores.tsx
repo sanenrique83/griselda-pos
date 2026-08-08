@@ -82,18 +82,26 @@ function precioTotal(
 
 // Caja — estilo_visual === 'cajas': grid de 4 columnas que envuelve, tanto
 // para selección única (ej. Tamaño) como múltiple (ej. adicionales). Ancho
-// fluido (lo controla el grid contenedor), nunca se desborda.
+// fluido (lo controla el grid contenedor), nunca se desborda. Imagen
+// opcional: opcion.foto_url si existe, si no cae en la foto/emoji del
+// producto padre (fallbackFotoUrl/fallbackEmoji) — así una opción sin
+// imagen propia no se ve vacía, y las que sí tienen imagen se distinguen.
 function CajaOpcion({
   opcion,
   seleccionada,
   multi,
+  fallbackFotoUrl,
+  fallbackEmoji,
   onClick,
 }: {
   opcion: OpcionMod
   seleccionada: boolean
   multi: boolean
+  fallbackFotoUrl: string | null
+  fallbackEmoji: string | null
   onClick: () => void
 }) {
+  const fotoUrl = opcion.foto_url ?? fallbackFotoUrl
   return (
     <button
       onClick={onClick}
@@ -101,6 +109,13 @@ function CajaOpcion({
         seleccionada ? 'border-[#173F2E] bg-[#173F2E]/5' : 'border-[#D1D1D6] bg-white'
       }`}
     >
+      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-s2">
+        {fotoUrl ? (
+          <img src={fotoUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span className="text-lg">{fallbackEmoji ?? '🍽️'}</span>
+        )}
+      </div>
       <span className="line-clamp-2 text-[12px] font-bold leading-tight text-text">{opcion.nombre}</span>
       {opcion.precio_extra > 0 && (
         <span className="font-mono text-[10px] font-semibold text-amber-600">
@@ -150,6 +165,37 @@ function FilaOpcion({
       <span className="flex-1 text-sm font-semibold text-text">{opcion.nombre}</span>
       {opcion.precio_extra > 0 && (
         <span className="font-mono text-[13px] font-semibold text-amber-600">
+          +{formatCurrency(opcion.precio_extra)}
+        </span>
+      )}
+    </button>
+  )
+}
+
+// Chip — estilo_visual === 'chips': píldora compacta, mismo patrón visual
+// que los chips de categoría de VistaMenu.tsx, pero en fila que ENVUELVE
+// (flex-wrap) en vez de scroll horizontal. Sin ícono de check aparte — el
+// estado activo se marca solo con relleno de color (círculo/cuadrado no
+// aplica aquí, es la excepción explícita a esa lógica para este estilo).
+function ChipOpcion({
+  opcion,
+  seleccionada,
+  onClick,
+}: {
+  opcion: OpcionMod
+  seleccionada: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+        seleccionada ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
+      }`}
+    >
+      {opcion.nombre}
+      {opcion.precio_extra > 0 && (
+        <span className={`ml-1.5 font-mono text-[11px] font-bold ${seleccionada ? 'text-white/80' : 'text-amber-600'}`}>
           +{formatCurrency(opcion.precio_extra)}
         </span>
       )}
@@ -439,11 +485,12 @@ export function SheetModificadores({
               )}
             </div>
 
-            {/* Opciones: 2 layouts posibles, gobernados por
+            {/* Opciones: 3 layouts posibles, gobernados por
                 grupo.estilo_visual (control explícito del admin en
                 Catálogo, ya no inferido por conteo de opciones). El círculo
                 vs. cuadrado del indicador viene de `esMulti`, independiente
-                de esto. */}
+                de esto — excepto en 'chips', que no usa ese ícono en
+                absoluto (el relleno de color ya marca la selección). */}
             {grupo.estilo_visual === 'lista' ? (
               <div className="space-y-2">
                 {opcionesActivas.map((opcion) => (
@@ -456,6 +503,17 @@ export function SheetModificadores({
                   />
                 ))}
               </div>
+            ) : grupo.estilo_visual === 'chips' ? (
+              <div className="flex flex-wrap gap-2">
+                {opcionesActivas.map((opcion) => (
+                  <ChipOpcion
+                    key={opcion.id}
+                    opcion={opcion}
+                    seleccionada={selGrupo.has(opcion.id)}
+                    onClick={() => toggleOpcion(grupo, opcion.id)}
+                  />
+                ))}
+              </div>
             ) : (
               <div className="grid grid-cols-4 gap-2">
                 {opcionesActivas.map((opcion) => (
@@ -464,6 +522,8 @@ export function SheetModificadores({
                     opcion={opcion}
                     seleccionada={selGrupo.has(opcion.id)}
                     multi={esMulti}
+                    fallbackFotoUrl={producto?.foto_url ?? null}
+                    fallbackEmoji={producto?.emoji ?? null}
                     onClick={() => toggleOpcion(grupo, opcion.id)}
                   />
                 ))}

@@ -23,6 +23,9 @@ export type OpcionMod = {
   // Disponibilidad automática por horario (F9-04) — NULL en ambos = sin restricción.
   horario_desde: string | null
   horario_hasta: string | null
+  // Imagen propia opcional — NULL cae en la foto/emoji del producto padre
+  // donde se muestre (ver SheetModificadores.tsx, estilo 'cajas').
+  foto_url: string | null
 }
 
 export type GrupoMod = {
@@ -44,8 +47,8 @@ export type GrupoMod = {
   // Estilo de visualización en el sheet de personalización (POS) — control
   // explícito del admin desde Catálogo, ya no se infiere por conteo de
   // opciones. 'cajas' = grid de 4 columnas que envuelve, 'lista' = filas de
-  // ancho completo.
-  estilo_visual: 'cajas' | 'lista'
+  // ancho completo, 'chips' = píldoras compactas sin ícono de check.
+  estilo_visual: 'cajas' | 'lista' | 'chips'
 }
 
 export type GuisadoMod = {
@@ -53,6 +56,9 @@ export type GuisadoMod = {
   nombre: string
   precio_extra: number
   disponible: boolean
+  // Imagen propia opcional — NULL cae en la foto/emoji del producto padre
+  // (ver SheetCapturaPida.tsx).
+  foto_url: string | null
 }
 
 export type GrupoRapido = {
@@ -115,7 +121,7 @@ export async function cargarModificadores(
   const { data, error } = await supabase
     .from('grupos_modificadores')
     .select(
-      'id, nombre, requerido, minimo, maximo, orden, mostrar_en_rapido, conector, prefijo_seleccion_unica, estilo_visual, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, orden, horario_desde, horario_hasta, insumos!insumo_id(disponible)), grupo_modificador_padres!grupo_id(opcion_id)',
+      'id, nombre, requerido, minimo, maximo, orden, mostrar_en_rapido, conector, prefijo_seleccion_unica, estilo_visual, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, orden, horario_desde, horario_hasta, foto_url, insumos!insumo_id(disponible)), grupo_modificador_padres!grupo_id(opcion_id)',
     )
     .eq('producto_id', productoId)
     .eq('activo', true)
@@ -139,7 +145,8 @@ export async function cargarModificadores(
     mostrar_en_rapido: gr.mostrar_en_rapido ?? false,
     conector: gr.conector ?? null,
     prefijo_seleccion_unica: gr.prefijo_seleccion_unica ?? null,
-    estilo_visual: gr.estilo_visual === 'lista' ? 'lista' : 'cajas',
+    estilo_visual:
+      gr.estilo_visual === 'lista' || gr.estilo_visual === 'chips' ? gr.estilo_visual : 'cajas',
     opciones: (gr.opciones_modificador ?? [])
       .filter(
         (o: any) =>
@@ -156,6 +163,7 @@ export async function cargarModificadores(
         orden: o.orden ?? 0,
         horario_desde: o.horario_desde ?? null,
         horario_hasta: o.horario_hasta ?? null,
+        foto_url: o.foto_url ?? null,
       })),
   }))
 
@@ -166,7 +174,6 @@ export async function cargarModificadores(
     await ordenarPorPopularidad(supabase, grupos, (configOrden as any)?.orden_popularidad_dias ?? 30)
   }
 
-  console.log(`[cargarModificadores] productoId=${productoId} → ${grupos.length} grupos`)
   return { grupos }
 }
 
@@ -174,7 +181,6 @@ export async function cargarModificadores(
 export async function cargarGuisados(
   productoId: number,
 ): Promise<{ grupos: GrupoRapido[] } | Err> {
-  console.log('[cargarGuisados] start → productoId:', productoId, typeof productoId)
   const supabase = await createClient()
 
   const { data: configOrden } = await supabase
@@ -195,11 +201,8 @@ export async function cargarGuisados(
     .order('orden')
 
   if (gruposErr) {
-    console.error('[cargarGuisados] error grupos:', gruposErr.message)
     return { error: `Error al cargar grupos: ${gruposErr.message}` }
   }
-
-  console.log('[cargarGuisados] grupos raw:', JSON.stringify(gruposData))
 
   if (!gruposData || gruposData.length === 0) {
     return { grupos: [] }
@@ -212,17 +215,14 @@ export async function cargarGuisados(
   // porque este action es exclusivo de POS, nunca del editor de Catálogo)
   const { data: opcionesData, error: opcionesErr } = await supabase
     .from('opciones_modificador')
-    .select('id, grupo_id, nombre, precio_extra, activa, horario_desde, horario_hasta, insumos!insumo_id(disponible)')
+    .select('id, grupo_id, nombre, precio_extra, activa, horario_desde, horario_hasta, foto_url, insumos!insumo_id(disponible)')
     .in('grupo_id', grupoIds)
     .is('activa', true)
     .order(ordenOpciones.column, { ascending: ordenOpciones.ascending })
 
   if (opcionesErr) {
-    console.error('[cargarGuisados] error opciones:', opcionesErr.message)
     return { error: `Error al cargar opciones: ${opcionesErr.message}` }
   }
-
-  console.log('[cargarGuisados] opciones raw:', JSON.stringify(opcionesData))
 
   const horaActual = horaActualMX()
 
@@ -242,6 +242,7 @@ export async function cargarGuisados(
         nombre: o.nombre,
         precio_extra: o.precio_extra,
         disponible: true,
+        foto_url: o.foto_url ?? null,
       })),
   }))
 
@@ -251,8 +252,6 @@ export async function cargarGuisados(
     await ordenarPorPopularidad(supabase, grupos, (configOrden as any)?.orden_popularidad_dias ?? 30)
   }
 
-  console.log(`[cargarGuisados] productoId=${productoId} → ${grupos.length} grupos`)
-  console.log('[cargarGuisados] grupos resultado:', JSON.stringify(grupos))
   return { grupos }
 }
 

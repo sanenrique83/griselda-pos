@@ -229,9 +229,10 @@ export interface GrupoModificador {
   prefijo_seleccion_unica: string | null
   // Cómo se ve el grupo en el sheet de personalización de producto (POS) —
   // 'cajas' = grid de 4 columnas que envuelve, 'lista' = filas de ancho
-  // completo. Control explícito del admin, ya no se infiere por conteo de
-  // opciones (ver SheetModificadores.tsx).
-  estilo_visual: 'cajas' | 'lista'
+  // completo, 'chips' = píldoras compactas sin ícono de check. Control
+  // explícito del admin, ya no se infiere por conteo de opciones (ver
+  // SheetModificadores.tsx).
+  estilo_visual: 'cajas' | 'lista' | 'chips'
 }
 
 export interface GrupoModificadorPadre {
@@ -251,6 +252,9 @@ export interface OpcionModificador {
   // horario del producto que la contiene — NULL en ambos = sin restricción.
   horario_desde: string | null
   horario_hasta: string | null
+  // Imagen propia opcional — NULL cae en la foto/emoji del producto padre
+  // (ver SheetCapturaPida.tsx / SheetModificadores.tsx, estilo 'cajas').
+  foto_url: string | null
 }
 
 export interface Turno {

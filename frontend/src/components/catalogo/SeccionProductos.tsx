@@ -35,6 +35,9 @@ type OpcionLocal = {
   insumo_id: number | null
   horario_desde: string | null
   horario_hasta: string | null
+  // Imagen propia opcional — NULL cae en la foto/emoji del producto padre
+  // donde se muestre (ver SheetCapturaPida.tsx / SheetModificadores.tsx).
+  foto_url: string | null
 }
 
 type GrupoLocal = {
@@ -53,7 +56,7 @@ type GrupoLocal = {
   prefijo_seleccion_unica: string | null
   // Estilo de visualización en el sheet de personalización (POS) — ver
   // SheetModificadores.tsx.
-  estilo_visual: 'cajas' | 'lista'
+  estilo_visual: 'cajas' | 'lista' | 'chips'
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -125,7 +128,7 @@ export function SeccionProductos({
   const [fgMax, setFgMax] = useState('1')
   const [fgRapido, setFgRapido] = useState(false)
   const [fgOpcionesPadre, setFgOpcionesPadre] = useState<number[]>([])
-  const [fgEstiloVisual, setFgEstiloVisual] = useState<'cajas' | 'lista'>('cajas')
+  const [fgEstiloVisual, setFgEstiloVisual] = useState<'cajas' | 'lista' | 'chips'>('cajas')
   // Formato 'texto_natural' del ticket (ver lib/descripcionNatural.ts)
   const [fgConector, setFgConector] = useState('')
   const [fgPrefijoUnica, setFgPrefijoUnica] = useState('')
@@ -139,6 +142,12 @@ export function SeccionProductos({
   // Disponibilidad automática por horario (F9-04) — '' = sin restricción
   const [foHorarioDesde, setFoHorarioDesde] = useState('')
   const [foHorarioHasta, setFoHorarioHasta] = useState('')
+  // Imagen propia de la opción (opcional) — mismo patrón que imgFile/
+  // imgPreview/existingFotoUrl del producto, reusando subirImagenProducto().
+  const [foImgFile, setFoImgFile] = useState<File | null>(null)
+  const [foImgPreview, setFoImgPreview] = useState<string | null>(null)
+  const [foExistingFotoUrl, setFoExistingFotoUrl] = useState<string | null>(null)
+  const foImgInputRef = useRef<HTMLInputElement>(null)
 
   // ── Abrir / cerrar sheet ───────────────────────────────────────────────────
 
@@ -525,6 +534,9 @@ export function SeccionProductos({
     setFoInsumoId(null)
     setFoHorarioDesde('')
     setFoHorarioHasta('')
+    setFoImgFile(null)
+    setFoImgPreview(null)
+    setFoExistingFotoUrl(null)
     setGrupoError(null)
   }
 
@@ -536,7 +548,20 @@ export function SeccionProductos({
     setFoInsumoId(null)
     setFoHorarioDesde(opcion.horario_desde?.slice(0, 5) ?? '')
     setFoHorarioHasta(opcion.horario_hasta?.slice(0, 5) ?? '')
+    setFoImgFile(null)
+    setFoImgPreview(opcion.foto_url)
+    setFoExistingFotoUrl(opcion.foto_url)
     setGrupoError(null)
+  }
+
+  function handleFoImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null
+    setFoImgFile(file)
+    if (file) {
+      setFoImgPreview(URL.createObjectURL(file))
+    } else {
+      setFoImgPreview(foExistingFotoUrl)
+    }
   }
 
   function handleGuardarOpcion(grupoId: number) {
@@ -552,11 +577,20 @@ export function SeccionProductos({
       const nombre = foNombre.trim()
       const precio_extra = parseFloat(foPrecio) || 0
       startGrupoTransition(async () => {
+        let fotoUrl: string | null = foExistingFotoUrl
+        if (foImgFile) {
+          const fd = new FormData()
+          fd.append('file', foImgFile)
+          const uploaded = await subirImagenProducto(fd)
+          if ('error' in uploaded) { setGrupoError(uploaded.error); return }
+          fotoUrl = uploaded.url
+        }
         const result = await actualizarOpcion(id, {
           nombre,
           precio_extra,
           horario_desde: horarioDesde,
           horario_hasta: horarioHasta,
+          foto_url: fotoUrl,
         })
         if (result?.error) { setGrupoError(result.error); return }
         setGrupos((prev) =>
@@ -566,7 +600,7 @@ export function SeccionProductos({
                   ...g,
                   opciones: g.opciones.map((o) =>
                     o.id === id
-                      ? { ...o, nombre, precio_extra, horario_desde: horarioDesde, horario_hasta: horarioHasta }
+                      ? { ...o, nombre, precio_extra, horario_desde: horarioDesde, horario_hasta: horarioHasta, foto_url: fotoUrl }
                       : o,
                   ),
                 }
@@ -578,6 +612,9 @@ export function SeccionProductos({
         setFoInsumoId(null)
         setFoHorarioDesde('')
         setFoHorarioHasta('')
+        setFoImgFile(null)
+        setFoImgPreview(null)
+        setFoExistingFotoUrl(null)
         setOpFormId(null)
         setOpEditandoId(null)
       })
@@ -595,6 +632,14 @@ export function SeccionProductos({
     const horarioDesde = foHorarioDesde || null
     const horarioHasta = foHorarioHasta || null
     startGrupoTransition(async () => {
+      let fotoUrl: string | null = null
+      if (foImgFile) {
+        const fd = new FormData()
+        fd.append('file', foImgFile)
+        const uploaded = await subirImagenProducto(fd)
+        if ('error' in uploaded) { setGrupoError(uploaded.error); return }
+        fotoUrl = uploaded.url
+      }
       const result = await crearOpcion({
         grupoId,
         nombre: foNombre.trim(),
@@ -602,6 +647,7 @@ export function SeccionProductos({
         insumoId: foInsumoId,
         horario_desde: horarioDesde,
         horario_hasta: horarioHasta,
+        foto_url: fotoUrl,
       })
       if ('error' in result) { setGrupoError(result.error); return }
       setGrupos((prev) =>
@@ -619,6 +665,7 @@ export function SeccionProductos({
                     insumo_id: foInsumoId,
                     horario_desde: horarioDesde,
                     horario_hasta: horarioHasta,
+                    foto_url: fotoUrl,
                   },
                 ],
               }
@@ -630,6 +677,9 @@ export function SeccionProductos({
       setFoInsumoId(null)
       setFoHorarioDesde('')
       setFoHorarioHasta('')
+      setFoImgFile(null)
+      setFoImgPreview(null)
+      setFoExistingFotoUrl(null)
       setOpFormId(null)
     })
   }
@@ -1055,7 +1105,7 @@ export function SeccionProductos({
                             ? `Requerido · elige ${grupo.minimo}–${grupo.maximo}`
                             : `Opcional · máx. ${grupo.maximo}`}
                           {' · '}
-                          {grupo.estilo_visual === 'lista' ? 'Lista' : 'Cajas'}
+                          {grupo.estilo_visual === 'lista' ? 'Lista' : grupo.estilo_visual === 'chips' ? 'Chips' : 'Cajas'}
                           {grupo.mostrar_en_rapido && ' · Modo rápido'}
                         </p>
                         {grupo.opciones_padre.length > 0 && (
@@ -1096,6 +1146,11 @@ export function SeccionProductos({
                             >
                               ⠿
                             </span>
+                          )}
+                          {opcion.foto_url && (
+                            <div className="h-6 w-6 flex-shrink-0 overflow-hidden rounded bg-s2">
+                              <img src={opcion.foto_url} alt="" className="h-full w-full object-cover" />
+                            </div>
                           )}
                           <span className="flex-1 text-[13px]">{opcion.nombre}</span>
                           {opcion.precio_extra > 0 && (
@@ -1164,6 +1219,48 @@ export function SeccionProductos({
                           placeholder="Nombre de la opción"
                           className="w-full rounded-lg border-[1.5px] border-border bg-white px-3 py-2 text-[13px] outline-none focus:border-blue-500"
                         />
+
+                        {/* Imagen propia (opcional) — mismo mecanismo de
+                            subida que la imagen del producto, sin duplicar
+                            lógica (subirImagenProducto, bucket "productos").
+                            Sin imagen propia, esta opción cae en la foto/
+                            emoji del producto padre donde se muestre. */}
+                        <input
+                          ref={foImgInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFoImageChange}
+                          className="hidden"
+                        />
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg bg-s2">
+                            {foImgPreview && (
+                              <img src={foImgPreview} alt="Preview" className="h-full w-full object-cover" />
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => foImgInputRef.current?.click()}
+                            className="rounded-lg bg-s2 px-2.5 py-1.5 text-[11px] font-semibold text-blue-600 active:opacity-60"
+                          >
+                            {foImgPreview ? 'Cambiar imagen' : 'Imagen (opcional)'}
+                          </button>
+                          {foImgPreview && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFoImgFile(null)
+                                setFoImgPreview(null)
+                                setFoExistingFotoUrl(null)
+                                if (foImgInputRef.current) foImgInputRef.current.value = ''
+                              }}
+                              className="rounded-lg bg-s2 px-2.5 py-1.5 text-[11px] font-semibold text-red-500 active:opacity-60"
+                            >
+                              Quitar
+                            </button>
+                          )}
+                        </div>
+
                         <div className="relative flex-1">
                           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-[11px] text-text-3">
                             +$
@@ -1213,6 +1310,9 @@ export function SeccionProductos({
                               setOpEditandoId(null)
                               setFoHorarioDesde('')
                               setFoHorarioHasta('')
+                              setFoImgFile(null)
+                              setFoImgPreview(null)
+                              setFoExistingFotoUrl(null)
                             }}
                             className="rounded-lg bg-s2 px-3 py-2 text-[13px] font-semibold text-text-3 active:opacity-80"
                           >
@@ -1256,27 +1356,21 @@ export function SeccionProductos({
                       conteo de opciones. */}
                   <div>
                     <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-3">
-                      Estilo de visualización
+                      Estilo
                     </label>
                     <div className="flex overflow-hidden rounded-lg border-[1.5px] border-border">
-                      <button
-                        type="button"
-                        onClick={() => setFgEstiloVisual('cajas')}
-                        className={`flex-1 py-2 text-[13px] font-semibold transition-colors ${
-                          fgEstiloVisual === 'cajas' ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
-                        }`}
-                      >
-                        Cajas
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFgEstiloVisual('lista')}
-                        className={`flex-1 py-2 text-[13px] font-semibold transition-colors ${
-                          fgEstiloVisual === 'lista' ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
-                        }`}
-                      >
-                        Lista
-                      </button>
+                      {(['cajas', 'lista', 'chips'] as const).map((estilo) => (
+                        <button
+                          key={estilo}
+                          type="button"
+                          onClick={() => setFgEstiloVisual(estilo)}
+                          className={`flex-1 py-2 text-[13px] font-semibold capitalize transition-colors ${
+                            fgEstiloVisual === estilo ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
+                          }`}
+                        >
+                          {estilo}
+                        </button>
+                      ))}
                     </div>
                   </div>
 

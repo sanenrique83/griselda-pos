@@ -282,7 +282,7 @@ export async function crearGrupoModificador(data: {
   mostrar_en_rapido?: boolean
   conector?: string | null
   prefijo_seleccion_unica?: string | null
-  estilo_visual?: 'cajas' | 'lista'
+  estilo_visual?: 'cajas' | 'lista' | 'chips'
 }): Promise<{ id: number } | Err> {
   const supabase = await createClient()
   const { data: grupo, error } = await supabase
@@ -317,7 +317,7 @@ export async function actualizarGrupoModificador(
     mostrar_en_rapido?: boolean
     conector?: string | null
     prefijo_seleccion_unica?: string | null
-    estilo_visual?: 'cajas' | 'lista'
+    estilo_visual?: 'cajas' | 'lista' | 'chips'
   },
 ): Promise<Err | undefined> {
   const supabase = await createClient()
@@ -372,6 +372,7 @@ export async function crearOpcion(data: {
   insumoId?: number | null
   horario_desde?: string | null
   horario_hasta?: string | null
+  foto_url?: string | null
 }): Promise<{ id: number } | Err> {
   const supabase = await createClient()
   const { data: op, error } = await supabase
@@ -384,6 +385,7 @@ export async function crearOpcion(data: {
       insumo_id: data.insumoId ?? null,
       horario_desde: data.horario_desde ?? null,
       horario_hasta: data.horario_hasta ?? null,
+      foto_url: data.foto_url ?? null,
     })
     .select('id')
     .single()
@@ -399,6 +401,7 @@ export async function actualizarOpcion(
     orden?: number
     horario_desde?: string | null
     horario_hasta?: string | null
+    foto_url?: string | null
   },
 ): Promise<Err | undefined> {
   const supabase = await createClient()
