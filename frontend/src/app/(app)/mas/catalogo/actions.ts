@@ -373,6 +373,7 @@ export async function crearOpcion(data: {
   horario_desde?: string | null
   horario_hasta?: string | null
   foto_url?: string | null
+  etiqueta_captura_rapida?: string | null
 }): Promise<{ id: number } | Err> {
   const supabase = await createClient()
   const { data: op, error } = await supabase
@@ -386,6 +387,7 @@ export async function crearOpcion(data: {
       horario_desde: data.horario_desde ?? null,
       horario_hasta: data.horario_hasta ?? null,
       foto_url: data.foto_url ?? null,
+      etiqueta_captura_rapida: data.etiqueta_captura_rapida ?? null,
     })
     .select('id')
     .single()
@@ -402,6 +404,7 @@ export async function actualizarOpcion(
     horario_desde?: string | null
     horario_hasta?: string | null
     foto_url?: string | null
+    etiqueta_captura_rapida?: string | null
   },
 ): Promise<Err | undefined> {
   const supabase = await createClient()

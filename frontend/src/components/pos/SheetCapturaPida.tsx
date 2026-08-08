@@ -13,6 +13,7 @@ type GuisadoConCantidad = {
   precio_extra: number
   disponible: boolean
   foto_url: string | null
+  etiqueta_captura_rapida: string | null
   cantidad: number
 }
 
@@ -45,7 +46,7 @@ export function SheetCapturaPida({
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [busqueda, setBusqueda] = useState('')
-  const [grupoActivo, setGrupoActivo] = useState<number | null>(null)
+  const [etiquetaActiva, setEtiquetaActiva] = useState<string | null>(null)
   const [ocultarAgotados, setOcultarAgotados] = useState(false)
 
   // Cargar guisados via Server Action cuando se abre el sheet
@@ -54,7 +55,7 @@ export function SheetCapturaPida({
     setGrupos([])
     setError(null)
     setBusqueda('')
-    setGrupoActivo(null)
+    setEtiquetaActiva(null)
     setOcultarAgotados(false)
     setCargando(true)
 
@@ -92,11 +93,12 @@ export function SheetCapturaPida({
     setGrupos((prev) => prev.map((gr) => ({ ...gr, opciones: gr.opciones.map((g) => ({ ...g, cantidad: 0 })) })))
   }
 
-  // Plano con grupoId para filtrar por chip de categoría — las categorías
-  // SON los grupos con mostrar_en_rapido=true (no hay un concepto de
-  // categoría aparte en captura rápida), "Todas" es la unión de todos.
+  // Plano de todas las opciones de todos los grupos mostrar_en_rapido del
+  // producto — los grupos ya no delimitan categorías (casi siempre hay uno
+  // solo activo); la categorización real es etiqueta_captura_rapida, por
+  // opción individual.
   const todasOpcionesPlano = useMemo(
-    () => grupos.flatMap((gr) => gr.opciones.map((o) => ({ ...o, grupoId: gr.id }))),
+    () => grupos.flatMap((gr) => gr.opciones),
     [grupos],
   )
   const totalTacos = todasOpcionesPlano.reduce((s, g) => s + g.cantidad, 0)
@@ -106,12 +108,27 @@ export function SheetCapturaPida({
     ? todasOpcionesPlano.reduce((s, g) => s + g.cantidad * (producto.precio + g.precio_extra), 0)
     : 0
 
+  // Chips de categoría = etiquetas distintas presentes entre las opciones
+  // (orden de primera aparición) — una opción sin etiqueta solo cuenta para
+  // "Todas", no queda fuera de nada.
+  const etiquetasUnicas = useMemo(() => {
+    const vistas = new Set<string>()
+    const orden: string[] = []
+    for (const o of todasOpcionesPlano) {
+      if (o.etiqueta_captura_rapida && !vistas.has(o.etiqueta_captura_rapida)) {
+        vistas.add(o.etiqueta_captura_rapida)
+        orden.push(o.etiqueta_captura_rapida)
+      }
+    }
+    return orden
+  }, [todasOpcionesPlano])
+
   // Búsqueda + chip de categoría + "Filtros" (ocultar agotados) — todo
   // client-side simple sobre lo ya cargado, mismo patrón que VistaMenu.tsx
   // (sin query nueva). "Filtros" solo controla algo real (disponible=false
   // ya viene de insumos.disponible en cargarGuisados) — no un botón decorativo.
   const opcionesVisibles = todasOpcionesPlano
-    .filter((o) => (grupoActivo ? o.grupoId === grupoActivo : true))
+    .filter((o) => (etiquetaActiva ? o.etiqueta_captura_rapida === etiquetaActiva : true))
     .filter((o) => (busqueda.trim() ? o.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()) : true))
     .filter((o) => (ocultarAgotados ? o.disponible : true))
 
@@ -278,27 +295,28 @@ export function SheetCapturaPida({
         Selecciona la presentación. Ajusta cantidad con [+] [−].
       </div>
 
-      {/* Chips de categoría — las categorías SON los grupos mostrar_en_rapido
-          de este producto; solo tiene sentido filtrar si hay más de uno. */}
-      {grupos.length > 1 && (
+      {/* Chips de categoría — a partir de las etiquetas distintas entre las
+          opciones (etiqueta_captura_rapida), no de grupos separados. Solo
+          se muestran si al menos una opción tiene etiqueta. */}
+      {etiquetasUnicas.length > 0 && (
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => setGrupoActivo(null)}
+            onClick={() => setEtiquetaActiva(null)}
             className={`flex-shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
-              grupoActivo === null ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
+              etiquetaActiva === null ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
             }`}
           >
             Todas ({todasOpcionesPlano.length})
           </button>
-          {grupos.map((gr) => (
+          {etiquetasUnicas.map((etiqueta) => (
             <button
-              key={gr.id}
-              onClick={() => setGrupoActivo(gr.id)}
+              key={etiqueta}
+              onClick={() => setEtiquetaActiva(etiqueta)}
               className={`flex-shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
-                grupoActivo === gr.id ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
+                etiquetaActiva === etiqueta ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
               }`}
             >
-              {gr.nombre}
+              {etiqueta}
             </button>
           ))}
         </div>
@@ -306,9 +324,9 @@ export function SheetCapturaPida({
 
       {/* Skeleton */}
       {cargando && (
-        <div className="flex flex-col gap-2 pt-1">
+        <div className="grid grid-cols-2 gap-2.5 pt-1">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-[72px] animate-pulse rounded-xl bg-s2" />
+            <div key={i} className="h-[150px] animate-pulse rounded-xl bg-s2" />
           ))}
         </div>
       )}
@@ -325,18 +343,16 @@ export function SheetCapturaPida({
         <p className="py-10 text-center text-sm text-text-3">Sin resultados para tu búsqueda.</p>
       )}
 
-      {/* Lista de filas horizontales — thumbnail cuadrado a la izquierda,
-          nombre/precio/stepper a la derecha, para que quepan más opciones
-          visibles sin tanto scroll. Imagen propia de la opción si existe, si
+      {/* Cuadrícula 2 columnas — imagen propia de la opción si existe, si
           no la del producto padre (nunca queda vacía). */}
-      <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-2.5">
         {opcionesVisibles.map((g) => {
           const fotoUrl = g.foto_url ?? producto?.foto_url ?? null
           const activa = g.cantidad > 0
           return (
             <div
               key={g.id}
-              className={`flex items-center gap-3 rounded-xl border-[1.5px] p-2 transition-colors ${
+              className={`overflow-hidden rounded-xl border-[1.5px] transition-colors ${
                 !g.disponible
                   ? 'pointer-events-none border-[#E5E5EA] bg-white opacity-40'
                   : activa
@@ -344,24 +360,24 @@ export function SheetCapturaPida({
                     : 'border-[#E5E5EA] bg-white'
               }`}
             >
-              <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-s2">
+              <div className="relative h-[88px] w-full bg-s2">
                 {fotoUrl ? (
                   <img src={fotoUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xl">
+                  <div className="flex h-full w-full items-center justify-center text-3xl">
                     {producto?.emoji ?? '🍽️'}
                   </div>
                 )}
                 {activa && (
-                  <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#173F2E] text-white shadow">
-                    <Check size={9} strokeWidth={3} />
+                  <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#173F2E] text-white shadow">
+                    <Check size={13} strokeWidth={3} />
                   </span>
                 )}
               </div>
 
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-bold leading-tight text-text">{g.nombre}</p>
-                <p className="mt-0.5 font-mono text-[12px] text-text-3">
+              <div className="p-2.5">
+                <p className="line-clamp-2 text-[13px] font-bold leading-tight text-text">{g.nombre}</p>
+                <p className="mt-1 font-mono text-[12px] text-text-3">
                   {formatCurrency((producto?.precio ?? 0) + g.precio_extra)} c/u
                 </p>
                 {!g.disponible && (
@@ -369,24 +385,24 @@ export function SheetCapturaPida({
                     Agotado
                   </span>
                 )}
-              </div>
 
-              <div className="flex flex-shrink-0 items-center gap-1.5">
-                <button
-                  onClick={() => ajustar(g.id, -1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-border text-text-2 active:scale-90 active:bg-s2"
-                >
-                  <Minus size={14} strokeWidth={2.4} />
-                </button>
-                <span className={`w-5 text-center font-mono text-[15px] font-bold ${activa ? 'text-[#173F2E]' : 'text-text-4'}`}>
-                  {g.cantidad}
-                </span>
-                <button
-                  onClick={() => ajustar(g.id, 1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-border text-text-2 active:scale-90 active:bg-s2"
-                >
-                  <Plus size={14} strokeWidth={2.4} />
-                </button>
+                <div className="mt-2 flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => ajustar(g.id, -1)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-border text-text-2 active:scale-90 active:bg-s2"
+                  >
+                    <Minus size={14} strokeWidth={2.4} />
+                  </button>
+                  <span className={`w-6 text-center font-mono text-[15px] font-bold ${activa ? 'text-[#173F2E]' : 'text-text-4'}`}>
+                    {g.cantidad}
+                  </span>
+                  <button
+                    onClick={() => ajustar(g.id, 1)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-border text-text-2 active:scale-90 active:bg-s2"
+                  >
+                    <Plus size={14} strokeWidth={2.4} />
+                  </button>
+                </div>
               </div>
             </div>
           )

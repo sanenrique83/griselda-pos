@@ -38,6 +38,9 @@ type OpcionLocal = {
   // Imagen propia opcional — NULL cae en la foto/emoji del producto padre
   // donde se muestre (ver SheetCapturaPida.tsx / SheetModificadores.tsx).
   foto_url: string | null
+  // Categoría opcional para las chips de Modo captura rápida (ver
+  // SheetCapturaPida.tsx) — NULL = solo aparece en "Todas".
+  etiqueta_captura_rapida: string | null
 }
 
 type GrupoLocal = {
@@ -148,6 +151,10 @@ export function SeccionProductos({
   const [foImgPreview, setFoImgPreview] = useState<string | null>(null)
   const [foExistingFotoUrl, setFoExistingFotoUrl] = useState<string | null>(null)
   const foImgInputRef = useRef<HTMLInputElement>(null)
+  // Categoría para Modo captura rápida — sugerencias vía <datalist> con las
+  // etiquetas ya usadas en el mismo grupo, para evitar variantes de tecleo
+  // ("Guisado" vs "Guisados").
+  const [foEtiquetaCapturaRapida, setFoEtiquetaCapturaRapida] = useState('')
 
   // ── Abrir / cerrar sheet ───────────────────────────────────────────────────
 
@@ -537,6 +544,7 @@ export function SeccionProductos({
     setFoImgFile(null)
     setFoImgPreview(null)
     setFoExistingFotoUrl(null)
+    setFoEtiquetaCapturaRapida('')
     setGrupoError(null)
   }
 
@@ -551,6 +559,7 @@ export function SeccionProductos({
     setFoImgFile(null)
     setFoImgPreview(opcion.foto_url)
     setFoExistingFotoUrl(opcion.foto_url)
+    setFoEtiquetaCapturaRapida(opcion.etiqueta_captura_rapida ?? '')
     setGrupoError(null)
   }
 
@@ -585,12 +594,14 @@ export function SeccionProductos({
           if ('error' in uploaded) { setGrupoError(uploaded.error); return }
           fotoUrl = uploaded.url
         }
+        const etiqueta = foEtiquetaCapturaRapida.trim() || null
         const result = await actualizarOpcion(id, {
           nombre,
           precio_extra,
           horario_desde: horarioDesde,
           horario_hasta: horarioHasta,
           foto_url: fotoUrl,
+          etiqueta_captura_rapida: etiqueta,
         })
         if (result?.error) { setGrupoError(result.error); return }
         setGrupos((prev) =>
@@ -600,7 +611,7 @@ export function SeccionProductos({
                   ...g,
                   opciones: g.opciones.map((o) =>
                     o.id === id
-                      ? { ...o, nombre, precio_extra, horario_desde: horarioDesde, horario_hasta: horarioHasta, foto_url: fotoUrl }
+                      ? { ...o, nombre, precio_extra, horario_desde: horarioDesde, horario_hasta: horarioHasta, foto_url: fotoUrl, etiqueta_captura_rapida: etiqueta }
                       : o,
                   ),
                 }
@@ -615,6 +626,7 @@ export function SeccionProductos({
         setFoImgFile(null)
         setFoImgPreview(null)
         setFoExistingFotoUrl(null)
+        setFoEtiquetaCapturaRapida('')
         setOpFormId(null)
         setOpEditandoId(null)
       })
@@ -640,6 +652,7 @@ export function SeccionProductos({
         if ('error' in uploaded) { setGrupoError(uploaded.error); return }
         fotoUrl = uploaded.url
       }
+      const etiqueta = foEtiquetaCapturaRapida.trim() || null
       const result = await crearOpcion({
         grupoId,
         nombre: foNombre.trim(),
@@ -648,6 +661,7 @@ export function SeccionProductos({
         horario_desde: horarioDesde,
         horario_hasta: horarioHasta,
         foto_url: fotoUrl,
+        etiqueta_captura_rapida: etiqueta,
       })
       if ('error' in result) { setGrupoError(result.error); return }
       setGrupos((prev) =>
@@ -666,6 +680,7 @@ export function SeccionProductos({
                     horario_desde: horarioDesde,
                     horario_hasta: horarioHasta,
                     foto_url: fotoUrl,
+                    etiqueta_captura_rapida: etiqueta,
                   },
                 ],
               }
@@ -680,6 +695,7 @@ export function SeccionProductos({
       setFoImgFile(null)
       setFoImgPreview(null)
       setFoExistingFotoUrl(null)
+      setFoEtiquetaCapturaRapida('')
       setOpFormId(null)
     })
   }
@@ -1276,6 +1292,31 @@ export function SeccionProductos({
                             className="w-full rounded-lg border-[1.5px] border-border bg-white py-2 pl-8 pr-3 font-mono text-[13px] outline-none focus:border-blue-500"
                           />
                         </div>
+                        {/* Categoría para Modo captura rápida (opcional) — datalist
+                            con las etiquetas ya usadas en este mismo grupo, para
+                            evitar variantes de tecleo ("Guisado" vs "Guisados"). */}
+                        <div>
+                          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                            Categoría en captura rápida (opcional)
+                          </label>
+                          <input
+                            type="text"
+                            list={`etiquetas-captura-rapida-${grupo.id}`}
+                            value={foEtiquetaCapturaRapida}
+                            onChange={(e) => setFoEtiquetaCapturaRapida(e.target.value)}
+                            placeholder="Ej. Clásicos, Guisados, Vegetarianos"
+                            className="w-full rounded-lg border-[1.5px] border-border bg-white px-3 py-2 text-[13px] outline-none focus:border-blue-500"
+                          />
+                          <datalist id={`etiquetas-captura-rapida-${grupo.id}`}>
+                            {[...new Set(
+                              grupo.opciones
+                                .map((o) => o.etiqueta_captura_rapida)
+                                .filter((e): e is string => !!e),
+                            )].map((etiqueta) => (
+                              <option key={etiqueta} value={etiqueta} />
+                            ))}
+                          </datalist>
+                        </div>
                         {/* Disponibilidad automática por horario (F9-04) */}
                         <div>
                           <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-3">
@@ -1313,6 +1354,7 @@ export function SeccionProductos({
                               setFoImgFile(null)
                               setFoImgPreview(null)
                               setFoExistingFotoUrl(null)
+                              setFoEtiquetaCapturaRapida('')
                             }}
                             className="rounded-lg bg-s2 px-3 py-2 text-[13px] font-semibold text-text-3 active:opacity-80"
                           >

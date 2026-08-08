@@ -26,6 +26,11 @@ export type OpcionMod = {
   // Imagen propia opcional — NULL cae en la foto/emoji del producto padre
   // donde se muestre (ver SheetModificadores.tsx, estilo 'cajas').
   foto_url: string | null
+  // Categoría opcional para las chips de Modo captura rápida (ver
+  // GuisadoMod/SheetCapturaPida.tsx) — se lee aquí también porque el editor
+  // de Catálogo (SeccionProductos.tsx) carga las opciones vía
+  // cargarModificadores(), no cargarGuisados().
+  etiqueta_captura_rapida: string | null
 }
 
 export type GrupoMod = {
@@ -59,6 +64,9 @@ export type GuisadoMod = {
   // Imagen propia opcional — NULL cae en la foto/emoji del producto padre
   // (ver SheetCapturaPida.tsx).
   foto_url: string | null
+  // Categoría opcional para las chips de Modo captura rápida — NULL = solo
+  // en "Todas". Ya no se arman las chips a partir de grupos separados.
+  etiqueta_captura_rapida: string | null
 }
 
 export type GrupoRapido = {
@@ -121,7 +129,7 @@ export async function cargarModificadores(
   const { data, error } = await supabase
     .from('grupos_modificadores')
     .select(
-      'id, nombre, requerido, minimo, maximo, orden, mostrar_en_rapido, conector, prefijo_seleccion_unica, estilo_visual, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, orden, horario_desde, horario_hasta, foto_url, insumos!insumo_id(disponible)), grupo_modificador_padres!grupo_id(opcion_id)',
+      'id, nombre, requerido, minimo, maximo, orden, mostrar_en_rapido, conector, prefijo_seleccion_unica, estilo_visual, opciones_modificador!grupo_id(id, nombre, precio_extra, activa, insumo_id, orden, horario_desde, horario_hasta, foto_url, etiqueta_captura_rapida, insumos!insumo_id(disponible)), grupo_modificador_padres!grupo_id(opcion_id)',
     )
     .eq('producto_id', productoId)
     .eq('activo', true)
@@ -164,6 +172,7 @@ export async function cargarModificadores(
         horario_desde: o.horario_desde ?? null,
         horario_hasta: o.horario_hasta ?? null,
         foto_url: o.foto_url ?? null,
+        etiqueta_captura_rapida: o.etiqueta_captura_rapida ?? null,
       })),
   }))
 
@@ -215,7 +224,7 @@ export async function cargarGuisados(
   // porque este action es exclusivo de POS, nunca del editor de Catálogo)
   const { data: opcionesData, error: opcionesErr } = await supabase
     .from('opciones_modificador')
-    .select('id, grupo_id, nombre, precio_extra, activa, horario_desde, horario_hasta, foto_url, insumos!insumo_id(disponible)')
+    .select('id, grupo_id, nombre, precio_extra, activa, horario_desde, horario_hasta, foto_url, etiqueta_captura_rapida, insumos!insumo_id(disponible)')
     .in('grupo_id', grupoIds)
     .is('activa', true)
     .order(ordenOpciones.column, { ascending: ordenOpciones.ascending })
@@ -243,6 +252,7 @@ export async function cargarGuisados(
         precio_extra: o.precio_extra,
         disponible: true,
         foto_url: o.foto_url ?? null,
+        etiqueta_captura_rapida: o.etiqueta_captura_rapida ?? null,
       })),
   }))
 

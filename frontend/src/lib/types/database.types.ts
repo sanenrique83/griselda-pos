@@ -255,6 +255,10 @@ export interface OpcionModificador {
   // Imagen propia opcional — NULL cae en la foto/emoji del producto padre
   // (ver SheetCapturaPida.tsx / SheetModificadores.tsx, estilo 'cajas').
   foto_url: string | null
+  // Categoría opcional para las chips de Modo captura rápida (ej.
+  // "Clásicos", "Guisados") — NULL = solo aparece en "Todas" (ver
+  // SheetCapturaPida.tsx). Independiente del grupo_id.
+  etiqueta_captura_rapida: string | null
 }
 
 export interface Turno {
