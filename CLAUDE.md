@@ -23,6 +23,7 @@ Actualiza `docs/ESTADO_PROYECTO.md` reflejando lo que se hizo (mover de ⚪ a �
 - El proyecto está vinculado al Supabase CLI. El usuario aplica las migraciones él mismo con `supabase db push` **después de revisar el código** — nunca las apliques ni las des por aplicadas sin que él lo confirme.
 - Antes de asumir que una columna/tabla "no existe" porque no aparece en las migraciones versionadas, considera que puede existir en la base real sin haber pasado por una migración (ya ha pasado varias veces — ej. `productos.orden`, `categorias.modo_captura`, las columnas `ticket_*`). Si tienes acceso, confírmalo contra la base real antes de reportarlo como ausente.
 - Usa `ADD COLUMN IF NOT EXISTS` como hábito, no solo cuando se sospeche un conflicto.
+- **Nunca edites un archivo de migración que ya fue aplicado** — el CLI de Supabase no vuelve a correr un archivo ya marcado como aplicado, así que un cambio agregado ahí después nunca llega a la base por ese camino (ya pasó: se agregó `opciones_modificador.foto_url` a una migración que ya estaba aplicada y la columna nunca se propagó; hubo que aplicarla por fuera y crear una migración nueva para dejar el historial consistente). Si hay duda de si una migración ya se aplicó, confirma con `supabase migration list` (o el equivalente) antes de tocarla. Siempre crea un archivo nuevo para el cambio, aunque sea chico, para que `supabase db push` lo detecte y lo corra.
 
 ## Dónde viven las cosas — no asumas
 

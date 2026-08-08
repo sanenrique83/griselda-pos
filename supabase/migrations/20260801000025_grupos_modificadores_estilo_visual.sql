@@ -8,12 +8,3 @@
 ALTER TABLE grupos_modificadores
   ADD COLUMN IF NOT EXISTS estilo_visual TEXT NOT NULL DEFAULT 'cajas'
   CHECK (estilo_visual IN ('cajas', 'lista', 'chips'));
-
--- Imagen opcional por opción de modificador (ej. una foto por guisado en
--- Modo captura rápida / estilo 'cajas') — nullable a propósito: una opción
--- sin imagen propia cae en la foto/emoji del producto padre en vez de
--- quedar vacía (ver SheetCapturaPida.tsx / SheetModificadores.tsx). Mismo
--- mecanismo de subida que productos.foto_url (subirImagenProducto(), bucket
--- "productos") — no se duplica lógica de upload.
-ALTER TABLE opciones_modificador
-  ADD COLUMN IF NOT EXISTS foto_url TEXT;
