@@ -11,3 +11,4 @@ desktop.ini
 
 # Archivos de sistema
 .DS_Store
+raspberry-pi/__pycache__/
