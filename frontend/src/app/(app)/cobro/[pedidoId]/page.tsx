@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { CobroShell } from '@/components/cobro/CobroShell'
 import type { ItemCliente, TicketConfig } from '@/lib/print'
 import { agruparPorGrupo, construirFraseModificadores, type OpcionConGrupo } from '@/lib/descripcionNatural'
+import { primerNombreValido } from '@/lib/nombreUsuario'
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -30,7 +31,7 @@ export default async function CobroPage({
   // ── Pedido ──────────────────────────────────────────────────────────────────
   const { data: pedido } = await supabase
     .from('pedidos')
-    .select('id, tipo, estado, turno_id, mesa_id, mesas(numero, nombre)')
+    .select('id, tipo, estado, turno_id, mesa_id, mesero_id, num_comensales, cliente_nombre, mesas(numero, nombre)')
     .eq('id', pedidoId)
     .single()
 
@@ -73,6 +74,15 @@ export default async function CobroPage({
       ? supabase.from('perfiles').select('rol').eq('id', user.id).single()
       : Promise.resolve({ data: null }),
   ])
+
+  // Mesero del PEDIDO (no necesariamente quien está cobrando, ej. admin
+  // cobrando la mesa de otro mesero) — para el bloque de encabezado del
+  // ticket de cliente, resuelto con el mismo primerNombreValido() que usa
+  // el resto de la app.
+  const { data: perfilMesero } = (pedido as any).mesero_id
+    ? await supabase.from('perfiles').select('nombre').eq('id', (pedido as any).mesero_id).single()
+    : { data: null }
+  const meseroNombreTicket = primerNombreValido((perfilMesero as any)?.nombre)
 
   // ── Transformar subpedidos ──────────────────────────────────────────────────
   const formatoModificadores = (config as any)?.formato_modificadores_ticket ?? 'agrupado'
@@ -181,6 +191,11 @@ export default async function CobroPage({
       descuentoMaxPct={descuentoMaxPct}
       ticketConfig={ticketConfig}
       impresionActiva={(config as any)?.impresion_activa ?? false}
+      mesero={meseroNombreTicket}
+      orden={String(pedidoId)}
+      tipoMesa={pedido.tipo as 'mesa' | 'llevar' | 'mostrador'}
+      numComensales={(pedido as any).num_comensales ?? null}
+      clienteNombre={(pedido as any).cliente_nombre ?? null}
     />
   )
 }

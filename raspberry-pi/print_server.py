@@ -100,7 +100,43 @@ def _fmt_fecha_cocina() -> str:
     return f'{dia}/{mes}/{anio}, {hora12}:{minuto} {ampm}'
 
 
-def _encabezado_cliente(config: dict, mesa: str, subtitulo: str = '') -> bytes:
+# Mapeo pedidos.tipo -> etiqueta de "SERVICIO:" en el ticket de cliente.
+# Definido aparte de _encabezado_cocina (que tiene su propio mapeo inline,
+# sin 'mostrador' distinto) porque esa funcion es del ticket de cocina y no
+# se toca en este cambio.
+_TIPO_SERVICIO_LABEL = {
+    'mesa': 'SALON',
+    'llevar': 'PARA LLEVAR',
+    'mostrador': 'MOSTRADOR',
+}
+
+
+def _linea_encabezado_servicio(tipo_mesa: str, mesa: str, num_comensales, cliente_nombre: str) -> str:
+    """Primera linea del bloque de servicio del ticket de cliente: mesa (o
+    cliente/comensales para llevar/mostrador) + comensales. Maneja de forma
+    segura los datos opcionales (num_comensales/cliente_nombre pueden venir
+    None o no existir) \u2014 nunca imprime "None"/"null"; si no hay nada real
+    que mostrar, devuelve '' y el llamador simplemente omite la linea."""
+    try:
+        comensales_txt = f'{int(num_comensales)} COMENSALES' if num_comensales else ''
+    except (TypeError, ValueError):
+        comensales_txt = ''
+
+    if tipo_mesa == 'llevar':
+        nombre = (cliente_nombre or '').strip()
+        base = f'CLIENTE: {nombre.upper()}' if nombre else ''
+    elif tipo_mesa == 'mostrador':
+        # Sin mesa ni cliente para mostrador \u2014 solo comensales si aplica.
+        base = ''
+    else:  # 'mesa' \u2014 reutiliza el mismo dato de mesa que ya usa el ticket.
+        base = mesa.strip().upper() if mesa else ''
+
+    if base and comensales_txt:
+        return f'{base} \u00b7 {comensales_txt}'
+    return base or comensales_txt
+
+
+def _encabezado_cliente(config: dict, mesa: str, subtitulo: str = '', servicio: dict = None) -> bytes:
     # OJO: `subtitulo` (parametro) es la etiqueta de escenario ("** PRE-CUENTA **",
     # "COMENSAL: X") \u2014 algo distinto de `config['subtitulo']` (el subtitulo
     # del NEGOCIO, ej. "Fonda & Artesanias", su propia linea debajo del
@@ -112,6 +148,7 @@ def _encabezado_cliente(config: dict, mesa: str, subtitulo: str = '') -> bytes:
     rfc       = config.get('rfc', '').strip()
     linea1    = config.get('linea1', '').strip()
     linea2    = config.get('linea2', '').strip()
+    servicio  = servicio or {}
 
     b = b''
     b += CMD_RESET + CMD_ALIGN_CENTER
@@ -125,7 +162,21 @@ def _encabezado_cliente(config: dict, mesa: str, subtitulo: str = '') -> bytes:
     for campo in [direccion, telefono, rfc, linea1, linea2]:
         if campo:
             b += _encode(campo) + CMD_LF
-    b += _encode(f'{mesa}  \u2014  {_fmt_fecha()}') + CMD_LF
+
+    # Bloque de servicio: MESA/CLIENTE + COMENSALES, MESERO + ORDEN,
+    # SERVICIO, fecha \u2014 reemplaza la antigua linea unica "{mesa} \u2014 {fecha}".
+    tipo_mesa = servicio.get('tipo_mesa') or 'mesa'
+    linea_top = _linea_encabezado_servicio(
+        tipo_mesa, mesa, servicio.get('num_comensales'), servicio.get('cliente_nombre', ''),
+    )
+    if linea_top:
+        b += _encode(linea_top) + CMD_LF
+    mesero_txt = (servicio.get('mesero') or '').strip().upper() or 'SIN REGISTRAR'
+    orden_val  = str(servicio.get('orden') or '').strip()
+    b += _fila(f'MESERO: {mesero_txt}', f'ORDEN #{orden_val}' if orden_val else 'ORDEN #\u2014')
+    b += _encode(f'SERVICIO: {_TIPO_SERVICIO_LABEL.get(tipo_mesa, tipo_mesa.upper())}') + CMD_LF
+    b += _encode(_fmt_fecha().replace(' ', ' \u00b7 ', 1)) + CMD_LF
+
     if subtitulo:
         b += CMD_LF + CMD_BOLD_ON + _encode(subtitulo) + CMD_BOLD_OFF + CMD_LF
     b += _encode('=' * COL) + CMD_LF
@@ -140,7 +191,7 @@ def _pie_cliente(config: dict, con_corte: bool = True) -> bytes:
     b = b''
     b += CMD_ALIGN_CENTER
     b += _encode('=' * COL) + CMD_LF
-    b += CMD_LF * 4
+    b += CMD_LF * 1
     b += CMD_BOLD_ON + _encode(pie) + CMD_BOLD_OFF + CMD_LF
     if pie2:
         b += _encode(pie2) + CMD_LF
@@ -157,6 +208,16 @@ def _item_cliente(nombre: str, cantidad: int, precio_unit: float, modificadores:
     monto_str = f'${precio_unit * cantidad:.2f}'
     espacios  = COL - len(linea) - len(monto_str)
     b = _encode(linea + ' ' * max(1, espacios) + monto_str) + CMD_LF
+    # Orden de impresion: 1) cantidad+nombre+importe (arriba) 2) modificadores
+    # 3) precio unitario "c/u" — antes el c/u salia primero; solo se movio el
+    # orden, mismo calculo/formato de siempre.
+    prefijo  = '  + '
+    sangria  = ' ' * len(prefijo)
+    for grupo in _agrupar_modificadores(modificadores or [], modificadores_por_linea):
+        lineas = _envolver_texto(grupo, COL, sangria_continuacion=sangria)
+        b += _encode(prefijo + lineas[0]) + CMD_LF
+        for continuacion in lineas[1:]:
+            b += _encode(sangria + continuacion) + CMD_LF
     # Precio unitario solo si hay mas de 1 — evita la linea redundante
     # "$X.XX c/u" cuando ya es obvio por la linea principal. Se arma aqui
     # (no en el frontend) porque `nombre`/`modificadores` ya vienen resueltos
@@ -166,13 +227,6 @@ def _item_cliente(nombre: str, cantidad: int, precio_unit: float, modificadores:
     # _build_cliente que listan items.
     if cantidad > 1:
         b += _encode(f'  ${precio_unit:.2f} c/u') + CMD_LF
-    prefijo  = '  + '
-    sangria  = ' ' * len(prefijo)
-    for grupo in _agrupar_modificadores(modificadores or [], modificadores_por_linea):
-        lineas = _envolver_texto(grupo, COL, sangria_continuacion=sangria)
-        b += _encode(prefijo + lineas[0]) + CMD_LF
-        for continuacion in lineas[1:]:
-            b += _encode(sangria + continuacion) + CMD_LF
     return b
 
 
@@ -328,11 +382,23 @@ def _build_cliente(payload: dict) -> bytes:
     cambio    = payload.get('cambio')
     config    = payload.get('config', {})
 
+    # Datos de servicio (bloque de encabezado — ver _linea_encabezado_servicio
+    # y _encabezado_cliente) — ya vienen resueltos desde el frontend (mesero
+    # vía primerNombreValido) o None/'' si el pedido no los tiene; se pasan
+    # tal cual, sin inventar valores por default aqui.
+    servicio = {
+        'mesero': payload.get('mesero', ''),
+        'orden': payload.get('orden', ''),
+        'tipo_mesa': payload.get('tipoMesa', 'mesa'),
+        'num_comensales': payload.get('numComensales'),
+        'cliente_nombre': payload.get('clienteNombre', ''),
+    }
+
     b = b''
 
     # ── PRE-CUENTA ────────────────────────────────────────────────────────────
     if escenario == 'precuenta':
-        b += _encabezado_cliente(config, mesa, '** PRE-CUENTA **')
+        b += _encabezado_cliente(config, mesa, '** PRE-CUENTA **', servicio)
         b += _encabezado_columnas_items()
         for item in items:
             b += _item_cliente(
@@ -351,7 +417,7 @@ def _build_cliente(payload: dict) -> bytes:
 
     # ── GLOBAL ────────────────────────────────────────────────────────────────
     if escenario == 'global':
-        b += _encabezado_cliente(config, mesa)
+        b += _encabezado_cliente(config, mesa, servicio=servicio)
         b += _encabezado_columnas_items()
         for item in items:
             b += _item_cliente(
@@ -364,7 +430,6 @@ def _build_cliente(payload: dict) -> bytes:
         if descuento > 0:
             b += _fila('Descuento', f'-${descuento:.2f}')
         b += _fila('TOTAL', f'${total:.2f}', bold=True, doble=True)
-        b += _fila('Metodo', metodo.capitalize())
         if recibido is not None:
             b += _fila('Recibido', f'${float(recibido):.2f}')
         if cambio is not None:
@@ -386,7 +451,7 @@ def _build_cliente(payload: dict) -> bytes:
             com_cambio   = com.get('cambio')
             subtitulo    = f'COMENSAL: {com_nombre}' if com_nombre else ''
 
-            b += _encabezado_cliente(config, mesa, subtitulo)
+            b += _encabezado_cliente(config, mesa, subtitulo, servicio)
             b += _encabezado_columnas_items()
             for item in com_items:
                 b += _item_cliente(
@@ -400,8 +465,6 @@ def _build_cliente(payload: dict) -> bytes:
                 pct = round(propina / subtotal * 100) if subtotal > 0 else 0
                 b += _fila(f'Propina sugerida ({pct}%)', f'${propina:.2f}')
             b += _fila('TOTAL', f'${com_total:.2f}', bold=True, doble=True)
-            if com_metodo:
-                b += _fila('Metodo', com_metodo.capitalize())
             if com_recibido is not None:
                 b += _fila('Recibido', f'${float(com_recibido):.2f}')
             if com_cambio is not None:
@@ -412,7 +475,7 @@ def _build_cliente(payload: dict) -> bytes:
     # ── VARIOS ────────────────────────────────────────────────────────────────
     if escenario == 'varios':
         nombres = payload.get('comensalesSeleccionados', [])
-        b += _encabezado_cliente(config, mesa)
+        b += _encabezado_cliente(config, mesa, servicio=servicio)
         if nombres:
             b += _encode(' + '.join(nombres)) + CMD_LF
         b += _encabezado_columnas_items()
@@ -428,7 +491,6 @@ def _build_cliente(payload: dict) -> bytes:
             pct = round(propina / subtotal * 100) if subtotal > 0 else 0
             b += _fila(f'Propina sugerida ({pct}%)', f'${propina:.2f}')
         b += _fila('TOTAL', f'${total:.2f}', bold=True, doble=True)
-        b += _fila('Metodo', metodo.capitalize())
         if recibido is not None:
             b += _fila('Recibido', f'${float(recibido):.2f}')
         if cambio is not None:
@@ -442,14 +504,13 @@ def _build_cliente(payload: dict) -> bytes:
         total_partes = int(payload.get('totalPartes', 1))
         por_parte    = round(total / total_partes, 2) if total_partes > 0 else total
 
-        b += _encabezado_cliente(config, mesa)
+        b += _encabezado_cliente(config, mesa, servicio=servicio)
         b += CMD_ALIGN_CENTER + CMD_BOLD_ON + _encode('PAGO DIVIDIDO') + CMD_LF
         b += CMD_BOLD_OFF + _encode(f'Parte {parte_actual} de {total_partes}') + CMD_LF
         b += CMD_ALIGN_LEFT + _encode('-' * COL) + CMD_LF
         b += _fila('Subtotal total', f'${round(por_parte * total_partes, 2):.2f}')
         b += _fila('Por parte', f'${por_parte:.2f}')
         b += _fila('TOTAL', f'${total:.2f}', bold=True, doble=True)
-        b += _fila('Metodo', metodo.capitalize())
         if recibido is not None:
             b += _fila('Recibido', f'${float(recibido):.2f}')
         if cambio is not None:

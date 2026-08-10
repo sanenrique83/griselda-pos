@@ -131,15 +131,15 @@ export type PrintPayload =
       mesero: string
       items: ItemCancelacion[]
     }
-  | {
+  | ({
       tipo: 'cliente'
       escenario: 'individual'
       mesa: string
       config: TicketConfig
       /** Un elemento por subpedido. El servidor imprime un ticket con corte por cada uno. */
       comensales: IndividualComensal[]
-    }
-  | {
+    } & DatosServicioTicket)
+  | ({
       tipo: 'cliente'
       escenario: 'global' | 'varios' | 'dividir' | 'precuenta'
       mesa: string
@@ -155,7 +155,24 @@ export type PrintPayload =
       comensalesSeleccionados?: string[] // varios
       parteActual?: number               // dividir
       totalPartes?: number               // dividir
-    }
+    } & DatosServicioTicket)
+
+/**
+ * Datos de servicio del pedido para el bloque de encabezado del ticket de
+ * cliente (MESA/CLIENTE + comensales, MESERO + ORDEN, SERVICIO, fecha — ver
+ * `_encabezado_cliente()` / `_linea_encabezado_servicio()` en
+ * print_server.py). `mesero` ya viene resuelto vía `primerNombreValido()`
+ * en el llamador — el print server no vuelve a calcularlo.
+ */
+export type DatosServicioTicket = {
+  mesero: string
+  /** pedidos.id como string, tal cual espera el print server (igual que en tipo:'cocina'). */
+  orden: string
+  tipoMesa: 'mesa' | 'llevar' | 'mostrador'
+  numComensales: number | null
+  /** Solo relevante para tipoMesa='llevar' — ver print_server.py. */
+  clienteNombre: string | null
+}
 
 const _printBase =
   process.env.NEXT_PUBLIC_PRINT_SERVER_URL ?? 'http://192.168.1.31:5000'

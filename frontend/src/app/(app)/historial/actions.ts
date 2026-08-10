@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { imprimirTicket, consolidarItemsCliente, type ItemCliente, type TicketConfig } from '@/lib/print'
 import { agruparPorGrupo, construirFraseModificadores, type OpcionConGrupo } from '@/lib/descripcionNatural'
+import { primerNombreValido } from '@/lib/nombreUsuario'
 
 const METODO_LABEL: Record<string, string> = {
   efectivo: 'Efectivo',
@@ -41,7 +42,7 @@ export async function reimprimirTicketCliente(
       cobro_subpedidos(
         subpedido_id,
         subpedidos(
-          pedidos( tipo, mesas(numero, nombre) )
+          pedidos( id, tipo, mesero_id, num_comensales, cliente_nombre, mesas(numero, nombre) )
         )
       )
     `)
@@ -62,6 +63,13 @@ export async function reimprimirTicketCliente(
   } else if (pedido?.tipo === 'mostrador') {
     mesaLabel = 'Mostrador'
   }
+
+  // Mesero del pedido (reimpresión — puede no ser quien reimprime), mismo
+  // patrón primerNombreValido() que el resto de la app.
+  const { data: perfilMesero } = pedido?.mesero_id
+    ? await supabase.from('perfiles').select('nombre').eq('id', pedido.mesero_id).single()
+    : { data: null }
+  const meseroNombreTicket = primerNombreValido((perfilMesero as any)?.nombre)
 
   const { data: config } = await supabase
     .from('config_sistema')
@@ -155,6 +163,11 @@ export async function reimprimirTicketCliente(
       tipo: 'cliente',
       escenario: 'global',
       mesa: mesaLabel,
+      mesero: meseroNombreTicket,
+      orden: pedido?.id != null ? String(pedido.id) : '',
+      tipoMesa: (pedido?.tipo as 'mesa' | 'llevar' | 'mostrador') ?? 'mesa',
+      numComensales: pedido?.num_comensales ?? null,
+      clienteNombre: pedido?.cliente_nombre ?? null,
       items: printItems,
       subtotal,
       propina,

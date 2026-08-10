@@ -35,6 +35,14 @@ interface CobroShellProps {
   descuentoMaxPct?: number
   ticketConfig: TicketConfig
   impresionActiva?: boolean
+  // Datos de servicio para el bloque de encabezado del ticket de cliente
+  // (ver DatosServicioTicket en lib/print.ts) — mesero ya resuelto vía
+  // primerNombreValido() en la page, no se recalcula aquí.
+  mesero: string
+  orden: string
+  tipoMesa: 'mesa' | 'llevar' | 'mostrador'
+  numComensales: number | null
+  clienteNombre: string | null
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -101,6 +109,11 @@ export function CobroShell({
   descuentoMaxPct = 0,
   ticketConfig,
   impresionActiva = false,
+  mesero,
+  orden,
+  tipoMesa,
+  numComensales,
+  clienteNombre,
 }: CobroShellProps) {
   const itemsTicket = subpedidos.flatMap((sp) => sp.items)
   const router = useRouter()
@@ -334,6 +347,11 @@ export function CobroShell({
             tipo: 'cliente',
             escenario: 'individual',
             mesa: mesaLabel,
+            mesero,
+            orden,
+            tipoMesa,
+            numComensales,
+            clienteNombre,
             config: ticketConfig,
             comensales: [
               {
@@ -361,6 +379,11 @@ export function CobroShell({
             tipo: 'cliente',
             escenario: printEscenario,
             mesa: mesaLabel,
+            mesero,
+            orden,
+            tipoMesa,
+            numComensales,
+            clienteNombre,
             items: printItems,
             subtotal: totalConDescuento,
             descuento: montoDescuento > 0 ? montoDescuento : undefined,
@@ -664,6 +687,11 @@ export function CobroShell({
                   tipo: 'cliente',
                   escenario: 'individual',
                   mesa: mesaLabel,
+                  mesero,
+                  orden,
+                  tipoMesa,
+                  numComensales,
+                  clienteNombre,
                   config: ticketConfig,
                   comensales: subpedidos.map((sp) => ({
                     comensalNombre: sp.nombre ?? `Comensal ${sp.comensal_numero}`,
@@ -691,6 +719,11 @@ export function CobroShell({
                   tipo: 'cliente',
                   escenario: 'precuenta',
                   mesa: mesaLabel,
+                  mesero,
+                  orden,
+                  tipoMesa,
+                  numComensales,
+                  clienteNombre,
                   items: precuentaItems,
                   subtotal: totalConDescuento,
                   propina: propinaPreCuenta,
