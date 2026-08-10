@@ -346,6 +346,12 @@ Verde bosque (`#173F2E`, hover `#0F2E21`) decidido como color de marca — **nun
 - Verificado offline (sin impresora física, importando el módulo con un stub de `flask`) con el ejemplo exacto que dio Rober (Mesa 1, 2 comensales, Roberto, orden 187, salón, Café/Menudo/Agua fresca) — el resultado línea por línea coincide con el formato pedido.
 - **Pendiente de Rober**: revisar el resumen/ejemplo, aplicar `20260801000028` con `supabase db push` (declarada en la ronda anterior, aplica también aquí porque las páginas de cobro/historial ya seleccionaban `ticket_subtitulo`, sin relación con este cambio pero mismo bloqueo), y el `scp` + `systemctl restart griselda-print` manual de siempre. Nada de esto se hizo todavía.
 
+**Corrección 3 — Ticket de cliente**: quitó la línea "Método: Efectivo" de `_build_cliente()` (`global`, `individual`, `varios`, `dividir` — `precuenta` nunca la tuvo) por instrucción directa de Rober; no era parte del pedido original, se había colado. Verificado con `Metodo` ausente en los 5 escenarios.
+
+**Corrección 4 — Ancho real de papel (80mm) + separador roto**:
+- `COL` pasó de `32` (58mm) a `42` (80mm en fuente normal) — es una constante compartida por los 3 tipos de ticket (`cliente`, `cocina`, `corte_z`), así que el ajuste corrige el ancho real en los tres automáticamente, sin tocar lógica de ninguno (`_encabezado_cocina`/`_seccion_comensal`/`_build_cocina` siguen intactos, solo leen la misma constante). Verificado con un stripper preciso de comandos ESC/POS (no regex aproximado) que ninguna línea de ningún ticket excede los 42 caracteres y que todos los importes/totales siguen alineados a la derecha en la nueva columna.
+- El separador "·" (U+00B7) se imprimía como "π" en el papel físico real — la impresora térmica no soporta ese carácter en su tabla de códigos. Se reemplazó por un guion simple `-` en los 2 lugares donde se usaba: `_linea_encabezado_servicio()` (mesa/cliente + comensales) y el reemplazo de espacio en `_fmt_fecha()` (fecha + hora). El em-dash `—` que se usa aparte como fallback de "ORDEN #—" no se tocó — no fue parte de lo reportado.
+
 **Pendiente de Bloque F**: migrar el resto de pantallas (Cobro, Pedidos, Historial, Dashboard, Más, etc.) a Boton/Sheet/Tarjeta + verde bosque, una por una.
 
 ---

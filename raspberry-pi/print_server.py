@@ -59,7 +59,7 @@ CMD_FONT_MEDIO   = ESC + b'!\x18'  # solo doble ancho — modificadores (mas gru
 CMD_FONT_NORMAL  = ESC + b'!\x00'
 CMD_CUT          = GS  + b'V\x41\x03'
 CMD_LF           = b'\n'
-COL              = 32
+COL              = 42  # ancho real de papel 80mm en fuente normal (58mm = 32)
 
 
 def _encode(text: str) -> bytes:
@@ -132,7 +132,9 @@ def _linea_encabezado_servicio(tipo_mesa: str, mesa: str, num_comensales, client
         base = mesa.strip().upper() if mesa else ''
 
     if base and comensales_txt:
-        return f'{base} \u00b7 {comensales_txt}'
+        # Guion simple, no "\u00b7" (U+00B7) \u2014 la impresora t\u00e9rmica no lo soporta
+        # y lo imprime como "\u03c0" en el papel fisico (confirmado en ticket real).
+        return f'{base} - {comensales_txt}'
     return base or comensales_txt
 
 
@@ -175,7 +177,8 @@ def _encabezado_cliente(config: dict, mesa: str, subtitulo: str = '', servicio: 
     orden_val  = str(servicio.get('orden') or '').strip()
     b += _fila(f'MESERO: {mesero_txt}', f'ORDEN #{orden_val}' if orden_val else 'ORDEN #\u2014')
     b += _encode(f'SERVICIO: {_TIPO_SERVICIO_LABEL.get(tipo_mesa, tipo_mesa.upper())}') + CMD_LF
-    b += _encode(_fmt_fecha().replace(' ', ' \u00b7 ', 1)) + CMD_LF
+    # Guion simple, no "\u00b7" \u2014 mismo motivo que en _linea_encabezado_servicio.
+    b += _encode(_fmt_fecha().replace(' ', ' - ', 1)) + CMD_LF
 
     if subtitulo:
         b += CMD_LF + CMD_BOLD_ON + _encode(subtitulo) + CMD_BOLD_OFF + CMD_LF
