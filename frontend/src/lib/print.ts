@@ -56,6 +56,9 @@ export type IndividualComensal = {
 
 export type TicketConfig = {
   nombre: string
+  // Subtítulo opcional, en fuente normal, como su propia línea debajo del
+  // nombre (que se imprime en doble ancho) — ej. giro del negocio.
+  subtitulo: string
   direccion: string
   telefono: string
   rfc: string

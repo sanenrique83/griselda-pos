@@ -95,7 +95,7 @@ export default async function CorteZPage({
       .from('config_sistema')
       .select(`
         impresion_activa,
-        ticket_nombre, ticket_direccion, ticket_telefono, ticket_rfc,
+        ticket_nombre, ticket_subtitulo, ticket_direccion, ticket_telefono, ticket_rfc,
         ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea,
         formato_modificadores_ticket
       `)
@@ -105,6 +105,7 @@ export default async function CorteZPage({
 
   const ticketConfig: TicketConfig = {
     nombre: (config as any)?.ticket_nombre ?? 'La Menuderia',
+    subtitulo: (config as any)?.ticket_subtitulo ?? '',
     direccion: (config as any)?.ticket_direccion ?? '',
     telefono: (config as any)?.ticket_telefono ?? '',
     rfc: (config as any)?.ticket_rfc ?? '',

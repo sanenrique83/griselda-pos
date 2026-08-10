@@ -7,6 +7,12 @@ import type { TicketConfig } from '@/lib/print'
 
 const CAMPOS: { key: keyof TicketConfig; label: string; placeholder: string; hint?: string }[] = [
   { key: 'nombre', label: 'Nombre del negocio', placeholder: 'La Menuderia' },
+  {
+    key: 'subtitulo',
+    label: 'Subtítulo',
+    placeholder: 'Ej: Fonda & Artesanías',
+    hint: 'Aparece debajo del nombre, en tamaño normal',
+  },
   { key: 'direccion', label: 'Dirección', placeholder: 'Calle y número, ciudad' },
   { key: 'telefono', label: 'Teléfono', placeholder: 'Ej: 55 1234-5678' },
   { key: 'rfc', label: 'RFC', placeholder: 'Opcional' },

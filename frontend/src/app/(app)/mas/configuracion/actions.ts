@@ -11,6 +11,7 @@ export async function guardarConfigTicket(
     .from('config_sistema')
     .update({
       ticket_nombre: data.nombre.trim() || 'La Menuderia',
+      ticket_subtitulo: data.subtitulo.trim(),
       ticket_direccion: data.direccion.trim(),
       ticket_telefono: data.telefono.trim(),
       ticket_rfc: data.rfc.trim(),

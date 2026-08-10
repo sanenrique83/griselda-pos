@@ -9,6 +9,7 @@ from flask import Flask, request, jsonify, make_response
 from datetime import datetime
 import socket
 import os
+import textwrap
 
 app = Flask(__name__)
 
@@ -65,6 +66,22 @@ def _encode(text: str) -> bytes:
     return text.encode('latin-1', errors='replace')
 
 
+def _envolver_texto(texto: str, ancho: int, sangria_continuacion: str = '') -> list:
+    """Envuelve `texto` a maximo `ancho` caracteres por linea sin cortar
+    palabras a la mitad (la impresora no hace su propio ajuste de linea —
+    antes esto producia palabras cortadas a mitad de la palabra en el papel
+    fisico, tanto en el nombre del negocio como en las lineas de
+    modificadores). Reserva el ancho de `sangria_continuacion` en TODAS las
+    lineas devueltas (incluida la primera), para que el llamador pueda
+    anteponer su propio prefijo de igual longitud a la primera linea y
+    `sangria_continuacion` a las demas, quedando ambas alineadas en la
+    misma columna."""
+    if not texto:
+        return ['']
+    ancho_util = max(1, ancho - len(sangria_continuacion))
+    return textwrap.wrap(texto, width=ancho_util) or ['']
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _fmt_fecha() -> str:
@@ -84,7 +101,12 @@ def _fmt_fecha_cocina() -> str:
 
 
 def _encabezado_cliente(config: dict, mesa: str, subtitulo: str = '') -> bytes:
-    nombre    = config.get('nombre', 'La Menuderia')
+    # OJO: `subtitulo` (parametro) es la etiqueta de escenario ("** PRE-CUENTA **",
+    # "COMENSAL: X") \u2014 algo distinto de `config['subtitulo']` (el subtitulo
+    # del NEGOCIO, ej. "Fonda & Artesanias", su propia linea debajo del
+    # nombre). Nombres iguales, conceptos distintos; no confundir.
+    nombre           = config.get('nombre', 'La Menuderia')
+    subtitulo_negocio = config.get('subtitulo', '').strip()
     direccion = config.get('direccion', '').strip()
     telefono  = config.get('telefono', '').strip()
     rfc       = config.get('rfc', '').strip()
@@ -95,8 +117,11 @@ def _encabezado_cliente(config: dict, mesa: str, subtitulo: str = '') -> bytes:
     b += CMD_RESET + CMD_ALIGN_CENTER
     b += _encode('=' * COL) + CMD_LF
     b += CMD_BOLD_ON + CMD_FONT_DOUBLE
-    b += _encode(nombre) + CMD_LF
+    for linea in _envolver_texto(nombre, COL // 2):
+        b += _encode(linea) + CMD_LF
     b += CMD_FONT_NORMAL + CMD_BOLD_OFF
+    if subtitulo_negocio:
+        b += _encode(subtitulo_negocio) + CMD_LF
     for campo in [direccion, telefono, rfc, linea1, linea2]:
         if campo:
             b += _encode(campo) + CMD_LF
@@ -141,8 +166,13 @@ def _item_cliente(nombre: str, cantidad: int, precio_unit: float, modificadores:
     # _build_cliente que listan items.
     if cantidad > 1:
         b += _encode(f'  ${precio_unit:.2f} c/u') + CMD_LF
+    prefijo  = '  + '
+    sangria  = ' ' * len(prefijo)
     for grupo in _agrupar_modificadores(modificadores or [], modificadores_por_linea):
-        b += _encode(f'  + {grupo}') + CMD_LF
+        lineas = _envolver_texto(grupo, COL, sangria_continuacion=sangria)
+        b += _encode(prefijo + lineas[0]) + CMD_LF
+        for continuacion in lineas[1:]:
+            b += _encode(sangria + continuacion) + CMD_LF
     return b
 
 
@@ -155,6 +185,18 @@ def _agrupar_modificadores(modificadores: list, por_linea: int) -> list:
         ' + '.join(modificadores[i:i + por_linea])
         for i in range(0, len(modificadores), por_linea)
     ]
+
+
+def _encabezado_columnas_items() -> bytes:
+    """Encabezado 'CANT.  PRODUCTO          IMPORTE' antes de la lista de
+    items del ticket de cliente, alineado con el layout de _item_cliente
+    (cantidad+nombre a la izquierda, importe pegado al margen derecho)."""
+    encabezado = 'CANT.  PRODUCTO'
+    importe    = 'IMPORTE'
+    espacios   = COL - len(encabezado) - len(importe)
+    b = CMD_BOLD_ON + _encode(encabezado + ' ' * max(1, espacios) + importe) + CMD_BOLD_OFF + CMD_LF
+    b += _encode('-' * COL) + CMD_LF
+    return b
 
 
 def _fila(label: str, valor: str, bold: bool = False, doble: bool = False) -> bytes:
@@ -291,6 +333,7 @@ def _build_cliente(payload: dict) -> bytes:
     # ── PRE-CUENTA ────────────────────────────────────────────────────────────
     if escenario == 'precuenta':
         b += _encabezado_cliente(config, mesa, '** PRE-CUENTA **')
+        b += _encabezado_columnas_items()
         for item in items:
             b += _item_cliente(
                 item.get('nombre', ''), item.get('cantidad', 1),
@@ -309,6 +352,7 @@ def _build_cliente(payload: dict) -> bytes:
     # ── GLOBAL ────────────────────────────────────────────────────────────────
     if escenario == 'global':
         b += _encabezado_cliente(config, mesa)
+        b += _encabezado_columnas_items()
         for item in items:
             b += _item_cliente(
                 item.get('nombre', ''), item.get('cantidad', 1),
@@ -343,6 +387,7 @@ def _build_cliente(payload: dict) -> bytes:
             subtitulo    = f'COMENSAL: {com_nombre}' if com_nombre else ''
 
             b += _encabezado_cliente(config, mesa, subtitulo)
+            b += _encabezado_columnas_items()
             for item in com_items:
                 b += _item_cliente(
                     item.get('nombre', ''), item.get('cantidad', 1),
@@ -370,7 +415,7 @@ def _build_cliente(payload: dict) -> bytes:
         b += _encabezado_cliente(config, mesa)
         if nombres:
             b += _encode(' + '.join(nombres)) + CMD_LF
-        b += _encode('-' * COL) + CMD_LF
+        b += _encabezado_columnas_items()
         for item in items:
             b += _item_cliente(
                 item.get('nombre', ''), item.get('cantidad', 1),

@@ -20,13 +20,14 @@ export default async function ConfiguracionPage() {
   const { data: config } = await supabase
     .from('config_sistema')
     .select(
-      'ticket_nombre, ticket_direccion, ticket_telefono, ticket_rfc, ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea, formato_modificadores_ticket',
+      'ticket_nombre, ticket_subtitulo, ticket_direccion, ticket_telefono, ticket_rfc, ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea, formato_modificadores_ticket',
     )
     .eq('id', 1)
     .single()
 
   const ticketConfig: TicketConfig = {
     nombre: (config as any)?.ticket_nombre ?? 'La Menuderia',
+    subtitulo: (config as any)?.ticket_subtitulo ?? '',
     direccion: (config as any)?.ticket_direccion ?? '',
     telefono: (config as any)?.ticket_telefono ?? '',
     rfc: (config as any)?.ticket_rfc ?? '',

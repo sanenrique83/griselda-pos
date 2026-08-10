@@ -63,7 +63,7 @@ export default async function CobroPage({
         propina_sugerida_pct, moneda, impresion_activa,
         transferencia_banco, transferencia_clabe, transferencia_titular,
         descuentos_mesero, descuento_max_pct,
-        ticket_nombre, ticket_direccion, ticket_telefono, ticket_rfc,
+        ticket_nombre, ticket_subtitulo, ticket_direccion, ticket_telefono, ticket_rfc,
         ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea,
         formato_modificadores_ticket
       `)
@@ -151,6 +151,7 @@ export default async function CobroPage({
 
   const ticketConfig: TicketConfig = {
     nombre: (config as any)?.ticket_nombre ?? 'La Menuderia',
+    subtitulo: (config as any)?.ticket_subtitulo ?? '',
     direccion: (config as any)?.ticket_direccion ?? '',
     telefono: (config as any)?.ticket_telefono ?? '',
     rfc: (config as any)?.ticket_rfc ?? '',

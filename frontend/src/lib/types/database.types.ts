@@ -92,6 +92,8 @@ export interface ConfigSistema {
   // existían en la base antes de tener migración propia, ver
   // 20260801000005_config_sistema_ticket_columnas_existentes.sql.
   ticket_nombre: string | null
+  // Subtítulo opcional debajo del nombre, en fuente normal (ver TicketConfigShell).
+  ticket_subtitulo: string | null
   ticket_direccion: string | null
   ticket_telefono: string | null
   ticket_rfc: string | null
