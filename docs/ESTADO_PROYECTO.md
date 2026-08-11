@@ -406,7 +406,17 @@ Verde bosque (`#173F2E`, hover `#0F2E21`) decidido como color de marca — **nun
 - **Las ~10 secciones reales fuera del mockup, se quedan todas**: Cancelaciones, Descuentos, Tiempo de servicio, Turnos recientes, Rendimiento de recetas, Insumos bajo stock, Porciones bajas, Margen de productos, Temporada alta, Propina por método — restilizadas con el mismo lenguaje visual (verde bosque consolidado), ordenadas debajo de las secciones que sí coinciden con el mockup. El mockup nunca fue "todo lo que debe existir", mismo criterio que Comanda/Cobro/Pedidos.
 - Las 4 tarjetas KPI (`MetricCard`) ganaron ícono circular (Wallet/ShoppingBag/DollarSign/Armchair) sobre fondo blanco, en vez de tarjeta llena de color — más fiel al mockup.
 
-**Pendiente de Bloque F**: migrar el resto de pantallas (Más, etc.) a Boton/Sheet/Tarjeta + verde bosque, una por una.
+**Más (`/mas`) — décima pantalla rediseñada, completa** (contra `docs/mockups/09-mas.PNG`). Vive inline en `page.tsx` (222 líneas, sin Shell propio) — igual que Dashboard, se confirmó antes de asumir.
+- **Grep de colores**: 6 → 0 (avatar, badge "Administrador", tarjeta "Cambiar de usuario", indicador de turno activo — todos consolidados a verde bosque).
+- **"Cambiar de usuario"**: confirmado, ya enlazaba a `/cambiar-usuario` (mecanismo real de PIN, sin cerrar sesión) — se mantuvo igual, solo restilizado.
+- **Los 6 accesos rápidos**: los 6 ya existían de verdad — Turno (`/mas/turno`), Dashboard (`/dashboard`), Inventario (`/mas/inventario`), Impresoras (`/mas/config`), **Usuarios (`/mas/usuarios`, Bloque B confirmado ya construido)**, Menú del día (`/mas/menu-del-dia`). Antes vivían mezclados en una sola lista plana de Administración junto con los otros 6; se promovieron a tarjetas grandes como en el mockup.
+- **Las 3 columnas de Administración**: los 6 ítems restantes de esa misma lista plana ya existían — Operación (Ticket→`/mas/configuracion`, Catálogo→`/mas/catalogo`, Mapa de mesas→`/mas/mapa-mesas`), Caja (Corte Z→`/mas/corte-z`, Cancelaciones→`/mas/cancelaciones`), Seguridad (Permisos→`/mas/permisos`). 6 accesos rápidos + 6 de administración = los 12 ítems que ya traía la lista plana original, sin ninguno huérfano ni inventado.
+- **Asistencia/Recetario**: confirmados, `/mas/asistencia` y `/mas/recetario` ya existían en la sección "General" — sin cambios de enlace.
+- **Pie de "Sistema"**: se quitaron "Sincronizado"/"Servidor"/"Licencia PRO" por completo (lenguaje de SaaS/licenciamiento ya descartado hasta la conversación de vender esto a otros negocios). Se dejó solo "Versión", con el dato real de `package.json` (`"version": "0.1.0"`, importado directo vía `resolveJsonModule` — ya habilitado en `tsconfig.json`).
+- **Extra real agregado**: el estado del turno activo ahora se muestra en la tarjeta de perfil para **cualquier rol**, no solo admin (antes esa query solo corría `if (isAdmin)`) — es información de solo lectura, coherente con lo que ya se ve en otras pantallas. El acceso rápido "Turno" (que sí abre `/mas/turno`, gestión real) se queda admin-only como siempre — `/mas/turno` ya redirige a cualquier no-admin de vuelta a `/mas`, se confirmó antes de tocar el permiso.
+- Se migró de header armado a mano a `HeaderA` (turno real, sin campana con alertas — mismo criterio que Pedidos/Historial: no hay ningún sistema de alertas propio de esta pantalla que justifique un badge).
+
+**Bloque F — todas las pantallas rediseñadas**: Mesas, Menú, Sheet de personalización, Comanda, Cobro, Pedidos, Historial, Dashboard y Más ya pasaron por el rediseño visual (Boton/Sheet/Tarjeta + verde bosque consolidado). No queda ninguna pantalla pendiente de esta ronda — próximos ajustes serán correcciones puntuales, no rediseños nuevos.
 
 ---
 
