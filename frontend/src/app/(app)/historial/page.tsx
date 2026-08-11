@@ -15,11 +15,22 @@ export type ReciboData = {
   createdAt: string
   mesaLabel: string
   meseroNombre: string
+  clienteNombre: string | null
   total: number
   efectivoRecibido: number | null
   cambio: number | null
   pagos: PagoResumen[]
   pedidoId: number | null
+  // Comensales cobrados en este recibo específico (cuántos subpedidos trae
+  // este movimiento — un cobro individual solo trae 1, uno general trae
+  // todos) y productos (suma de cantidad, sin cancelados) de esos mismos
+  // subpedidos. Antes no se cargaba ninguno de los dos.
+  numComensales: number
+  numProductos: number
+  // % de propina reconstruido desde movimientos_caja.propina/monto (el
+  // monto SÍ se guarda ahí; el % no, así que se recalcula) — null si no
+  // hubo propina en este cobro.
+  propinaPct: number | null
 }
 
 export type TurnoItem = {
@@ -35,15 +46,16 @@ async function cargarRecibos(supabase: Awaited<ReturnType<typeof import('@/lib/s
   const { data: movimientos } = await supabase
     .from('movimientos_caja')
     .select(
-      `id, monto, efectivo_recibido, cambio, created_at,
+      `id, monto, propina, efectivo_recibido, cambio, created_at,
        pagos(metodo_pago, monto),
        cobro_subpedidos(
          subpedidos(
            pedido_id,
            pedidos(
-             tipo, mesa_id, mesero_id,
+             tipo, mesa_id, mesero_id, cliente_nombre,
              mesas(numero, nombre)
-           )
+           ),
+           pedido_productos(cantidad, estado)
          )
        )`,
     )
@@ -87,12 +99,24 @@ async function cargarRecibos(supabase: Awaited<ReturnType<typeof import('@/lib/s
       monto: p.monto,
     }))
 
+    const cobroSubs: any[] = m.cobro_subpedidos ?? []
+    const numComensales = cobroSubs.length
+    const numProductos = cobroSubs.reduce((s: number, cs: any) => {
+      const prods = (cs.subpedidos?.pedido_productos ?? []) as { cantidad: number; estado: string }[]
+      return s + prods.filter((pp) => pp.estado !== 'cancelado').reduce((s2, pp) => s2 + pp.cantidad, 0)
+    }, 0)
+    const propinaPct = m.propina > 0 && m.monto > 0 ? Math.round((m.propina / m.monto) * 100) : null
+
     return {
       id: m.id,
       createdAt: m.created_at,
       mesaLabel,
       meseroNombre: primerNombreValido(pedido?.mesero_id ? nombrePorUsuario.get(pedido.mesero_id) : undefined),
+      clienteNombre: pedido?.cliente_nombre ?? null,
       total: m.monto,
+      numComensales,
+      numProductos,
+      propinaPct,
       efectivoRecibido: m.efectivo_recibido,
       cambio: m.cambio,
       pagos,
@@ -155,6 +179,7 @@ export default async function HistorialPage({
         sinTurno
         turnos={turnos}
         turnoSeleccionadoId={null}
+        turnoActivoId={turnoActivo?.id ?? null}
         isAdmin={isAdmin}
         esTurnoActivo={false}
       />
@@ -169,6 +194,7 @@ export default async function HistorialPage({
       sinTurno={false}
       turnos={turnos}
       turnoSeleccionadoId={turnoIdFinal}
+      turnoActivoId={turnoActivo?.id ?? null}
       isAdmin={isAdmin}
       esTurnoActivo={turnoIdFinal === (turnoActivo?.id ?? null)}
     />
