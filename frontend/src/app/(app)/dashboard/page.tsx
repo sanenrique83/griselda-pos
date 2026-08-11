@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Perfil } from '@/lib/types/database.types'
+import { Wallet, ShoppingBag, DollarSign, Armchair } from 'lucide-react'
 import { DashboardCharts } from '@/components/dashboard/DashboardCharts'
-import { calcularAlertaVentasBajas, type FilaAlertaVentasBajas } from '@/lib/alertaVentasBajas'
 import { primerNombreValido } from '@/lib/nombreUsuario'
 import type {
   VentaHora,
@@ -194,6 +194,7 @@ export default async function DashboardPage() {
             value={String(mesasActivas ?? 0)}
             unit="mesas"
             color="violet"
+            icon={Armchair}
           />
           <InsumosBajoStockCard insumos={insumosBajoStock} />
           <PorcionesBajasCard porciones={porcionesBajas} />
@@ -209,14 +210,18 @@ export default async function DashboardPage() {
   // Queries del turno activo
   // ─────────────────────────────────────────────────────────────────────────
 
+  // Nota: la alerta de ventas bajas (antes mostrada aquí también) se retiró
+  // de Dashboard — ya vive centralizada en la campana de notificaciones de
+  // /mesas (mismo calcularAlertaVentasBajas()/RPC), donde se diseñó a
+  // propósito para evitar la misma alerta duplicada en dos pantallas sin
+  // que nadie lo hubiera decidido. Dashboard es para revisar métricas con
+  // calma, no para alertas operativas.
   const [
     movimientosRes,
     pedidosCerradosRes,
     pedidosActivosRes,
     pedidoIdsRes,
     turnosRecientesRes,
-    configAlertaVentasRes,
-    alertaVentasBajasRes,
   ] = await Promise.all([
       supabase
         .from('movimientos_caja')
@@ -244,15 +249,6 @@ export default async function DashboardPage() {
         .eq('estado', 'cerrado')
         .order('cerrado_en', { ascending: false })
         .limit(10),
-      // Alerta de ventas bajas en tiempo real (F9-06) — config + comparativo,
-      // ambos en paralelo con todo lo demás; se descartan abajo si
-      // alerta_ventas_bajas_activa está apagada.
-      supabase
-        .from('config_sistema')
-        .select('alerta_ventas_bajas_activa, alerta_ventas_bajas_umbral_pct')
-        .eq('id', 1)
-        .single(),
-      supabase.rpc('dashboard_alerta_ventas_bajas'),
     ])
 
   const movimientos = movimientosRes.data ?? []
@@ -261,16 +257,6 @@ export default async function DashboardPage() {
   const pedidosData = pedidoIdsRes.data ?? []
   const pedidoIds = pedidosData.map((p: any) => p.id)
   const turnosRecientesRaw = turnosRecientesRes.data ?? []
-
-  // ── Alerta de ventas bajas en tiempo real (F9-06) ──────────────────────────
-  // dashboard_alerta_ventas_bajas() ya compara "hasta esta hora" — solo falta
-  // aplicar el umbral configurable (calcularAlertaVentasBajas, compartida con
-  // /mesas). Sin datos históricos suficientes no se muestra nada, igual que
-  // TemporadaAltaCard/ComparativoSemanaCard cuando falta historial.
-  const alertaVentasBajas = calcularAlertaVentasBajas(
-    configAlertaVentasRes.data,
-    (alertaVentasBajasRes.data as FilaAlertaVentasBajas[] | null)?.[0],
-  )
 
   // Sub-pedidos del turno — compartido por top productos, cancelaciones y descuentos.
   let subIds: number[] = []
@@ -572,6 +558,17 @@ export default async function DashboardPage() {
     return { dia: label, promedio: r?.promedio ?? 0, turnos: r?.turnos ?? 0 }
   })
 
+  // Mayor/menor día — sobre los mismos datos ya cargados arriba (RPC
+  // dashboard_ventas_promedio_dia_semana), solo entre días con turnos
+  // contados (turnos=0 no es "el más bajo", es "sin dato").
+  const diasConDato = ventasPorDiaSemana.filter((v) => v.turnos > 0)
+  const diaMayor = diasConDato.length > 0
+    ? diasConDato.reduce((a, b) => (b.promedio > a.promedio ? b : a)).dia
+    : null
+  const diaMenor = diasConDato.length > 0
+    ? diasConDato.reduce((a, b) => (b.promedio < a.promedio ? b : a)).dia
+    : null
+
   // ── (3) Ticket promedio: mesa vs. llevar vs. mostrador (cerrados del turno) ──
   let sumMesa = 0, countMesaCerrados = 0
   let sumLlevar = 0, countLlevarCerrados = 0
@@ -696,20 +693,25 @@ export default async function DashboardPage() {
   }
 
   // ── Datos para charts ─────────────────────────────────────────────────────
+  // Paletas de dona/multi-serie: cada categoría necesita un color distinto
+  // entre sí para poder leerse (a diferencia de un botón o badge, aquí el
+  // color ES el dato) — pero ninguno reutiliza azul/esmeralda/verde suelto:
+  // verde bosque de marca + ámbar + violeta, mismo criterio que ya se aplicó
+  // en la limpieza de color de Cobro/Historial, extendido a gráficas.
   const metodosPago: MetodoPagoData[] = [
-    { nombre: '💵 Efectivo', monto: porMetodo.efectivo, color: '#10b981' },
-    { nombre: '💳 Tarjeta', monto: porMetodo.tarjeta, color: '#3b82f6' },
+    { nombre: '💵 Efectivo', monto: porMetodo.efectivo, color: '#173F2E' },
+    { nombre: '💳 Tarjeta', monto: porMetodo.tarjeta, color: '#f59e0b' },
     { nombre: '📱 Transf.', monto: porMetodo.transferencia, color: '#7c3aed' },
   ]
 
   const propinaPorMetodo: MetodoPagoData[] = [
-    { nombre: '💵 Efectivo', monto: propinaAcumulada.efectivo, color: '#10b981' },
-    { nombre: '💳 Tarjeta', monto: propinaAcumulada.tarjeta, color: '#3b82f6' },
+    { nombre: '💵 Efectivo', monto: propinaAcumulada.efectivo, color: '#173F2E' },
+    { nombre: '💳 Tarjeta', monto: propinaAcumulada.tarjeta, color: '#f59e0b' },
     { nombre: '📱 Transf.', monto: propinaAcumulada.transferencia, color: '#7c3aed' },
   ]
 
   const tiposPedido: TipoPedidoData[] = [
-    { nombre: 'Mesa', count: mesaCount, color: '#3b82f6' },
+    { nombre: 'Mesa', count: mesaCount, color: '#173F2E' },
     { nombre: 'Para llevar', count: llevarCount, color: '#f59e0b' },
     { nombre: 'Mostrador', count: mostradorCount, color: '#8b5cf6' },
   ]
@@ -756,22 +758,6 @@ export default async function DashboardPage() {
 
       <div className="px-4 py-4 space-y-4">
 
-        {alertaVentasBajas && (
-          <div className="flex items-start gap-2.5 rounded-xl bg-red-50 border border-red-100 px-3.5 py-3">
-            <span className="text-[18px]">📉</span>
-            <div>
-              <p className="text-xs font-semibold text-red-700">
-                Ventas {Math.abs(alertaVentasBajas.desviacionPct).toFixed(0)}% por debajo de lo normal
-                para esta hora
-              </p>
-              <p className="mt-0.5 text-[11px] text-red-600">
-                ${fmtMoney(alertaVentasBajas.totalActual)} cobrado vs. ${fmtMoney(alertaVentasBajas.promedioHistorico)}{' '}
-                en promedio a esta hora, mismo día de la semana.
-              </p>
-            </div>
-          </div>
-        )}
-
         {pedidosAbiertos > 0 && (
           <div className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-3.5 py-2.5">
             <span className="text-[18px]">⏳</span>
@@ -787,25 +773,29 @@ export default async function DashboardPage() {
           <MetricCard
             label="Total cobrado"
             value={`$${fmtMoney(totalCobrado)}`}
-            color="green"
+            color="forest"
+            icon={Wallet}
             big
           />
           <MetricCard
             label="Pedidos cerrados"
             value={String(pedidosCerrados)}
             unit={pedidosCerrados !== 1 ? 'pedidos' : 'pedido'}
-            color="blue"
+            color="indigo"
+            icon={ShoppingBag}
           />
           <MetricCard
             label="Promedio por pedido"
             value={pedidosCerrados > 0 ? `$${fmtMoney(promedioTicket)}` : '—'}
             color="amber"
+            icon={DollarSign}
           />
           <MetricCard
             label="Mesas activas"
             value={String(mesasActivas ?? 0)}
             unit={mesasActivas !== 1 ? 'mesas' : 'mesa'}
             color="violet"
+            icon={Armchair}
           />
         </div>
 
@@ -829,6 +819,8 @@ export default async function DashboardPage() {
             metodosPago={metodosPago}
             tiposPedido={tiposPedido}
             ventasPorDiaSemana={ventasPorDiaSemana}
+            diaMayor={diaMayor}
+            diaMenor={diaMenor}
             ticketPorTipo={ticketPorTipo}
             tiempoServicio={tiempoServicio}
             cancelaciones={cancelaciones}
@@ -884,37 +876,52 @@ function Header({
           <h1 className="text-[20px] font-bold leading-tight">{titulo}</h1>
           <p className="mt-0.5 text-[13px] text-text-3">{subtitulo}</p>
         </div>
-        <p className="text-[11px] text-text-4 pt-1">↻ {ahora}</p>
+        {/* Hora estática del render (sin ícono de refresh) — no hay
+            auto-refresh real detrás; prometerlo costaría re-consultar toda
+            la página (varias RPCs pesadas) solo por un detalle cosmético
+            del encabezado. Mismo criterio que la manija de arrastre / el
+            ícono de escaneo: no sugerir "en vivo" si no lo es. */}
+        <p className="text-[11px] text-text-4 pt-1">Actualizado: {ahora}</p>
       </div>
     </div>
   )
 }
 
+// 4 tarjetas KPI hermanas — necesitan diferenciarse entre sí a simple vista
+// (no es un estado seleccionado/activo ni positivo/negativo, es "cuál
+// métrica es cuál"), mismo criterio que TINTES_MESA/TINTES_COMENSAL en
+// Historial/Cobro: verde bosque de marca (Total cobrado, la métrica de
+// dinero) + índigo/ámbar/violeta — nunca azul ni un verde/esmeralda aparte.
 function MetricCard({
   label,
   value,
   unit,
   color,
+  icon: Icon,
   big = false,
 }: {
   label: string
   value: string
   unit?: string
-  color: 'green' | 'blue' | 'amber' | 'violet'
+  color: 'forest' | 'indigo' | 'amber' | 'violet'
+  icon: typeof Wallet
   big?: boolean
 }) {
   const colorMap = {
-    green:  { bg: 'bg-green-50',  text: 'text-green-600' },
-    blue:   { bg: 'bg-blue-50',   text: 'text-blue-600' },
+    forest: { bg: 'bg-[#173F2E]/10', text: 'text-[#173F2E]' },
+    indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600' },
     amber:  { bg: 'bg-amber-50',  text: 'text-amber-600' },
     violet: { bg: 'bg-violet-50', text: 'text-violet-600' },
   }
   const c = colorMap[color]
 
   return (
-    <div className={`rounded-2xl ${c.bg} px-4 py-4`}>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">{label}</p>
-      <p className={`mt-1.5 font-mono font-bold leading-tight ${c.text} ${big ? 'text-[22px]' : 'text-[20px]'}`}>
+    <div className="rounded-2xl bg-white shadow-card px-4 py-4">
+      <span className={`flex h-9 w-9 items-center justify-center rounded-full ${c.bg} ${c.text}`}>
+        <Icon size={18} strokeWidth={2} />
+      </span>
+      <p className="mt-2.5 text-[11px] font-semibold uppercase tracking-wide text-text-3">{label}</p>
+      <p className={`mt-1 font-mono font-bold leading-tight ${c.text} ${big ? 'text-[22px]' : 'text-[20px]'}`}>
         {value}
       </p>
       {unit && <p className="mt-0.5 text-[11px] text-text-3">{unit}</p>}
@@ -942,7 +949,7 @@ function ComparativoSemanaCard({ actual, anterior }: { actual: number; anterior:
           const subio = pct >= 0
           return (
             <div className="mt-1 flex items-baseline gap-2">
-              <p className={`font-mono text-[18px] font-bold ${subio ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`font-mono text-[18px] font-bold ${subio ? 'text-[#173F2E]' : 'text-red-600'}`}>
                 {subio ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%
               </p>
               <p className="text-[11px] text-text-3">
@@ -990,20 +997,20 @@ function TemporadaAltaCard({
       </p>
       <p className="mt-1.5 text-[13px] text-text-2">
         Temporada alta:{' '}
-        <span className="font-mono font-semibold text-green-600">${fmtMoney(promedioAlta)}</span>{' '}
+        <span className="font-mono font-semibold text-[#173F2E]">${fmtMoney(promedioAlta)}</span>{' '}
         <span className="text-text-3">
           ({fechasAlta} turno{fechasAlta !== 1 ? 's' : ''})
         </span>
       </p>
       <p className="text-[13px] text-text-2">
         Día normal:{' '}
-        <span className="font-mono font-semibold text-blue-600">${fmtMoney(promedioNormal)}</span>{' '}
+        <span className="font-mono font-semibold text-text-2">${fmtMoney(promedioNormal)}</span>{' '}
         <span className="text-text-3">
           ({fechasNormal} turno{fechasNormal !== 1 ? 's' : ''})
         </span>
       </p>
       {diff !== null && (
-        <p className={`mt-1 text-[13px] font-semibold ${diff >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        <p className={`mt-1 text-[13px] font-semibold ${diff >= 0 ? 'text-[#173F2E]' : 'text-red-600'}`}>
           {diff >= 0 ? '▲' : '▼'} {Math.abs(diff).toFixed(1)}%
         </p>
       )}
@@ -1169,19 +1176,19 @@ function MargenProductosCard({ margenes }: { margenes: MargenProducto[] }) {
                     <span className="text-amber-600">incompleto</span>
                   )}
                 </td>
-                <td className="whitespace-nowrap px-2 py-2 text-right font-mono text-blue-600">
+                <td className="whitespace-nowrap px-2 py-2 text-right font-mono text-text-2">
                   ${fmtMoney(m.precio)}
                 </td>
                 <td
                   className={`whitespace-nowrap px-2 py-2 text-right font-mono font-semibold ${
-                    m.margen === null ? 'text-text-4' : m.margen >= 0 ? 'text-green-600' : 'text-red-600'
+                    m.margen === null ? 'text-text-4' : m.margen >= 0 ? 'text-[#173F2E]' : 'text-red-600'
                   }`}
                 >
                   {m.margen === null ? '—' : `${m.margenVariable ? '~' : ''}$${fmtMoney(m.margen)}`}
                 </td>
                 <td
                   className={`whitespace-nowrap px-4 py-2 text-right font-mono font-semibold ${
-                    m.margenPct === null ? 'text-text-4' : m.margenPct >= 0 ? 'text-green-600' : 'text-red-600'
+                    m.margenPct === null ? 'text-text-4' : m.margenPct >= 0 ? 'text-[#173F2E]' : 'text-red-600'
                   }`}
                 >
                   {m.margenPct === null ? '—' : `${m.margenVariable ? '~' : ''}${m.margenPct.toFixed(1)}%`}

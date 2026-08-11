@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Star, Circle, ChevronRight, ArrowRight, Tag, MapPin } from 'lucide-react'
 import {
   BarChart,
   Bar,
@@ -126,6 +127,9 @@ interface DashboardChartsProps {
   metodosPago: MetodoPagoData[]
   tiposPedido: TipoPedidoData[]
   ventasPorDiaSemana: VentaPorDiaSemana[]
+  /** Día con mayor/menor promedio entre los que sí tienen turnos contados — null si no hay ninguno. */
+  diaMayor: string | null
+  diaMenor: string | null
   ticketPorTipo: TicketPorTipoData
   tiempoServicio: TiempoServicioData
   cancelaciones: CancelacionesData
@@ -167,17 +171,7 @@ function TooltipMoney({ active, payload, label }: any) {
   return (
     <div className="rounded-xl bg-white border border-[#E5E5EA] shadow-lg px-3 py-2">
       <p className="text-xs font-semibold text-text-2">{label}</p>
-      <p className="text-sm font-bold text-green-600">${fmtMoney(payload[0].value)}</p>
-    </div>
-  )
-}
-
-function TooltipProductos({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="rounded-xl bg-white border border-[#E5E5EA] shadow-lg px-3 py-2">
-      <p className="text-xs font-semibold text-text-2 truncate max-w-[160px]">{label}</p>
-      <p className="text-sm font-bold text-blue-600">×{payload[0].value} vendidos</p>
+      <p className="text-sm font-bold text-[#173F2E]">${fmtMoney(payload[0].value)}</p>
     </div>
   )
 }
@@ -190,7 +184,7 @@ function TooltipDiaSemana({ active, payload, label }: any) {
       <p className="text-xs font-semibold text-text-2">{label}</p>
       {turnos > 0 ? (
         <>
-          <p className="text-sm font-bold text-indigo-600">${fmtMoney(payload[0].value)}</p>
+          <p className="text-sm font-bold text-[#173F2E]">${fmtMoney(payload[0].value)}</p>
           <p className="text-[10px] text-text-3">promedio de {turnos} turno{turnos !== 1 ? 's' : ''}</p>
         </>
       ) : (
@@ -241,6 +235,8 @@ export function DashboardCharts({
   metodosPago,
   tiposPedido,
   ventasPorDiaSemana,
+  diaMayor,
+  diaMenor,
   ticketPorTipo,
   tiempoServicio,
   cancelaciones,
@@ -289,7 +285,7 @@ export function DashboardCharts({
                   tickFormatter={(v) => `$${fmtMoney(v)}`}
                 />
                 <Tooltip content={<TooltipMoney />} />
-                <Bar dataKey="total" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                <Bar dataKey="total" fill="#173F2E" radius={[4, 4, 0, 0]} maxBarSize={32} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -318,66 +314,37 @@ export function DashboardCharts({
                 <Tooltip content={<TooltipDiaSemana />} />
                 <Bar dataKey="promedio" radius={[4, 4, 0, 0]} maxBarSize={32}>
                   {ventasPorDiaSemana.map((v, i) => (
-                    <Cell key={i} fill={v.turnos > 0 ? '#6366f1' : '#E5E5EA'} />
+                    <Cell key={i} fill={v.turnos > 0 ? '#173F2E' : '#E5E5EA'} />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
+          {(diaMayor || diaMenor) && (
+            <div className="flex items-center gap-4 border-t border-[#F2F2F7] px-4 py-2.5 text-[11px] text-text-3">
+              {diaMayor && (
+                <span className="flex items-center gap-1">
+                  <Star size={11} strokeWidth={2.2} className="text-[#173F2E]" fill="#173F2E" />
+                  Mayor: {diaMayor}
+                </span>
+              )}
+              {diaMenor && (
+                <span className="flex items-center gap-1">
+                  <Circle size={9} strokeWidth={2.2} className="text-red-500" fill="#ef4444" />
+                  Menor: {diaMenor}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* ── (b) Top 10 productos ───────────────────────────────────────────── */}
+      {/* ── (b) Top productos ────────────────────────────────────────────── */}
       {hayProd && (
-        <div className="rounded-2xl bg-white shadow-card overflow-hidden">
-          <SectionHeader title="Top 10 productos" />
-          <div className="px-2 pt-3 pb-1">
-            <ResponsiveContainer width="100%" height={Math.max(topProductos.length * 28 + 16, 80)}>
-              <BarChart
-                data={topProductos.map((p, idx) => ({
-                  idx,
-                  nombre: `${p.emoji ?? '🍽️'} ${p.nombre}`,
-                  vendidos: p.vendidos,
-                  tieneDesglose: p.variantes.length > 0,
-                }))}
-                layout="vertical"
-                margin={{ top: 0, right: 48, left: 4, bottom: 0 }}
-              >
-                <XAxis type="number" hide />
-                <YAxis
-                  type="category"
-                  dataKey="nombre"
-                  width={130}
-                  tick={{ fontSize: 11, fill: '#3C3C43' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip content={<TooltipProductos />} />
-                <Bar
-                  dataKey="vendidos"
-                  fill="#3b82f6"
-                  radius={[0, 4, 4, 0]}
-                  maxBarSize={18}
-                  label={{ position: 'right', fontSize: 11, fill: '#3C3C43', formatter: (v: number) => `×${v}` }}
-                  onClick={(data: any) => {
-                    const p = topProductos[data.idx]
-                    if (p && p.variantes.length > 0) setSeleccionado(p)
-                  }}
-                  style={{ cursor: 'pointer' }}
-                >
-                  {topProductos.map((p, i) => (
-                    <Cell key={i} fill={p.variantes.length > 0 ? '#3b82f6' : '#93c5fd'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          {topProductos.some((p) => p.variantes.length > 0) && (
-            <p className="px-4 pb-3 text-[10px] text-text-3">
-              💡 Toca una barra en azul fuerte para ver el desglose por variante
-            </p>
-          )}
-        </div>
+        <TopProductosCard
+          topProductos={topProductos}
+          onVerDetalle={(p) => setSeleccionado(p)}
+        />
       )}
 
       {/* ── (b.2) Ventas por categoría y por zona de preparación ────────────── */}
@@ -387,7 +354,7 @@ export function DashboardCharts({
             <div className="rounded-2xl bg-white shadow-card overflow-hidden">
               <SectionHeader title="Ventas por categoría" />
               <div className="px-4 py-3.5">
-                <ListaPersonaMonto items={ventasPorCategoria} color="#3b82f6" />
+                <VentasPorCategoriaGrid items={ventasPorCategoria} />
               </div>
             </div>
           )}
@@ -395,7 +362,7 @@ export function DashboardCharts({
             <div className="rounded-2xl bg-white shadow-card overflow-hidden">
               <SectionHeader title="Ventas por zona de preparación" />
               <div className="px-4 py-3.5">
-                <ListaPersonaMonto items={ventasPorZona} color="#10b981" />
+                <VentasPorZonaLista items={ventasPorZona} />
               </div>
             </div>
           )}
@@ -478,7 +445,7 @@ export function DashboardCharts({
                   ))}
                 </div>
                 <div className="mt-2 w-full border-t border-[#F2F2F7] px-3 pt-2 space-y-1">
-                  <TicketPromedioRow label="Ticket mesa" data={ticketPorTipo.mesa} color="#3b82f6" />
+                  <TicketPromedioRow label="Ticket mesa" data={ticketPorTipo.mesa} color="#173F2E" />
                   <TicketPromedioRow label="Ticket llevar" data={ticketPorTipo.llevar} color="#f59e0b" />
                   <TicketPromedioRow label="Ticket mostrador" data={ticketPorTipo.mostrador} color="#8b5cf6" />
                 </div>
@@ -511,7 +478,7 @@ export function DashboardCharts({
         <div className="px-4 py-4">
           {hayTiempoServicio ? (
             <>
-              <p className="font-mono text-[22px] font-bold text-blue-600">
+              <p className="font-mono text-[22px] font-bold text-[#173F2E]">
                 {fmtDuracion(tiempoServicio.promedioMinutos!)}
               </p>
               <p className="mt-0.5 text-[11px] text-text-3">
@@ -611,7 +578,7 @@ export function DashboardCharts({
               const sinConteo = t.diferencia === null
               const sobrante = !sinConteo && (t.diferencia as number) > 0
               const faltante = !sinConteo && (t.diferencia as number) < 0
-              const colorClase = sobrante ? 'text-green-600' : faltante ? 'text-red-600' : 'text-text-3'
+              const colorClase = sobrante ? 'text-[#173F2E]' : faltante ? 'text-red-600' : 'text-text-3'
               const etiqueta = sinConteo
                 ? 'Sin conteo'
                 : sobrante
@@ -713,7 +680,7 @@ export function DashboardCharts({
                       </p>
                     </div>
                     <div className="text-right flex-shrink-0 ml-3">
-                      <p className="font-mono text-sm font-bold text-blue-600">×{v.vendidos}</p>
+                      <p className="font-mono text-sm font-bold text-[#173F2E]">×{v.vendidos}</p>
                       <p className="text-[11px] text-text-3">${fmtMoney(v.total)}</p>
                     </div>
                   </div>
@@ -790,6 +757,142 @@ function MiniStatHex({ label, value, color }: { label: string; value: string; co
     <div className="rounded-xl bg-s2 px-3 py-2.5">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-text-3">{label}</p>
       <p className="mt-1 font-mono text-[16px] font-bold" style={{ color }}>{value}</p>
+    </div>
+  )
+}
+
+// ─── Top productos — lista numerada con barra de progreso ────────────────────
+// Antes era una gráfica de barras horizontal mostrando los 10 siempre; el
+// mockup pide una lista de 5 + "Ver los 10 productos" — la data ya traía
+// los 10 (query .slice(0, 10)), así que el expand es puro estado local
+// sobre lo ya cargado, sin query nueva. Tocar una fila con variantes abre
+// el mismo sheet de desglose que ya existía (antes se activaba tocando la
+// barra); antes era un mecanismo real pero poco visible, ahora es un
+// affordance explícito (chevron).
+
+function TopProductosCard({
+  topProductos,
+  onVerDetalle,
+}: {
+  topProductos: TopProducto[]
+  onVerDetalle: (p: TopProducto) => void
+}) {
+  const [mostrarTodos, setMostrarTodos] = useState(false)
+  const visibles = mostrarTodos ? topProductos : topProductos.slice(0, 5)
+  const maxVendidos = topProductos[0]?.vendidos ?? 1
+
+  return (
+    <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+      <div className="flex items-center justify-between border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+          Top {topProductos.length} productos
+        </p>
+      </div>
+      <div className="divide-y divide-[#F2F2F7]">
+        {visibles.map((p, i) => {
+          const tieneDesglose = p.variantes.length > 0
+          return (
+            <button
+              key={i}
+              onClick={() => tieneDesglose && onVerDetalle(p)}
+              disabled={!tieneDesglose}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left active:bg-s2 disabled:active:bg-transparent"
+            >
+              <span className="w-4 flex-shrink-0 text-[13px] font-bold text-text-3">{i + 1}</span>
+              <span className="flex-shrink-0 text-[16px]">{p.emoji ?? '🍽️'}</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-medium text-text">{p.nombre}</p>
+                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-s2">
+                  <div
+                    className="h-full rounded-full bg-[#173F2E]"
+                    style={{ width: `${Math.max(4, (p.vendidos / maxVendidos) * 100)}%` }}
+                  />
+                </div>
+              </div>
+              <span className="flex-shrink-0 font-mono text-[12px] text-text-3">×{p.vendidos}</span>
+              <span className="w-[64px] flex-shrink-0 text-right font-mono text-[13px] font-bold text-[#173F2E]">
+                ${fmtMoney(p.total)}
+              </span>
+              {tieneDesglose && (
+                <ChevronRight size={14} strokeWidth={2.2} className="flex-shrink-0 text-text-4" />
+              )}
+            </button>
+          )
+        })}
+      </div>
+      {topProductos.length > 5 && (
+        <button
+          onClick={() => setMostrarTodos((v) => !v)}
+          className="flex w-full items-center justify-center gap-1.5 border-t border-[#F2F2F7] py-3 text-[13px] font-semibold text-[#173F2E] active:bg-s2"
+        >
+          {mostrarTodos ? 'Ver menos' : `Ver los ${topProductos.length} productos`}
+          <ArrowRight size={14} strokeWidth={2.4} />
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─── Ventas por categoría — tarjetas con % + barra ────────────────────────────
+// El mockup muestra un ícono propio por categoría, pero `categorias` no tiene
+// columna de ícono/emoji en la base real — se usa un ícono genérico (Tag) en
+// vez de inventar uno por categoría. Los tintes son puramente decorativos
+// para diferenciar tarjetas vecinas (mismo criterio que TINTES_MESA en
+// Historial/Cobro) — nunca azul/esmeralda/verde suelto.
+const TINTES_CATEGORIA = [
+  { bg: 'bg-teal-50', text: 'text-teal-700', bar: 'bg-teal-500' },
+  { bg: 'bg-amber-50', text: 'text-amber-700', bar: 'bg-amber-500' },
+  { bg: 'bg-indigo-50', text: 'text-indigo-700', bar: 'bg-indigo-500' },
+  { bg: 'bg-purple-50', text: 'text-purple-700', bar: 'bg-purple-500' },
+  { bg: 'bg-pink-50', text: 'text-pink-700', bar: 'bg-pink-500' },
+]
+
+function VentasPorCategoriaGrid({ items }: { items: PersonaMonto[] }) {
+  const total = items.reduce((s, i) => s + i.monto, 0)
+  return (
+    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+      {items.map((item, i) => {
+        const tinte = TINTES_CATEGORIA[i % TINTES_CATEGORIA.length]
+        const pct = total > 0 ? Math.round((item.monto / total) * 100) : 0
+        return (
+          <div key={i} className={`rounded-xl ${tinte.bg} p-3`}>
+            <div className="flex items-center gap-1.5">
+              <Tag size={12} strokeWidth={2.2} className={tinte.text} />
+              <p className={`truncate text-[10px] font-semibold uppercase tracking-wide ${tinte.text}`}>
+                {item.nombre}
+              </p>
+            </div>
+            <p className="mt-1.5 font-mono text-[13px] font-bold text-text">${fmtMoney(item.monto)}</p>
+            <p className={`text-[18px] font-bold ${tinte.text}`}>{pct}%</p>
+            <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-white/60">
+              <div className={`h-full rounded-full ${tinte.bar}`} style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Ventas por zona de preparación — lista simple ────────────────────────────
+// El mockup muestra un "N min promedio" por zona que no existe: no hay
+// timestamp de "completado"/"listo" por zona en el modelo actual (solo
+// pendiente/enviado/cancelado) — no se inventa. `count` es la suma de
+// cantidad de producto, no de pedidos — se etiqueta "productos", no
+// "pedidos", para no decir algo que el dato no es.
+function VentasPorZonaLista({ items }: { items: PersonaMonto[] }) {
+  return (
+    <div className="divide-y divide-[#F2F2F7]">
+      {items.map((item, i) => (
+        <div key={i} className="flex items-center gap-3 py-2.5">
+          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-s2 text-text-2">
+            <MapPin size={15} strokeWidth={2.2} />
+          </span>
+          <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-text">{item.nombre}</p>
+          <p className="flex-shrink-0 text-[12px] text-text-3">{item.count} producto{item.count !== 1 ? 's' : ''}</p>
+          <p className="flex-shrink-0 font-mono text-[13px] font-bold text-[#173F2E]">${fmtMoney(item.monto)}</p>
+        </div>
+      ))}
     </div>
   )
 }
