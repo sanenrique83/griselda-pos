@@ -708,43 +708,42 @@ export function CobroShell({
           )}
         </div>
 
-        {/* ── Descuento — % o $ ─────────────────────────────────────────────── */}
+        {/* ── Descuento — % o $, toggle+input+chips en una sola fila ──────────── */}
         {descuentoHabilitado && totalEscenario > 0 && (
           <div className="rounded-2xl bg-white shadow-card overflow-hidden">
-            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#E5E5EA]">
+            <div className="px-4 pt-4 pb-3 border-b border-[#E5E5EA]">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
                 Descuento
               </p>
-              {/* Toggle $/% — cambiar de modo limpia el valor capturado para
-                  no reinterpretar un mismo número como % o como pesos por
-                  accidente. */}
-              <div className="flex rounded-lg bg-s2 p-0.5">
-                {(['$', '%'] as const).map((modo) => (
+            </div>
+            <div className="px-4 py-4 space-y-3">
+              <div className="flex items-center gap-1.5">
+                {/* El $ y la % ya no son un toggle aparte (le quitaba espacio
+                    a la fila) — son los mismos botones prefijo/sufijo del
+                    mockup, ahora tocables: tocar el que no está activo
+                    cambia de modo y limpia el valor (para no reinterpretar
+                    un mismo número como % o como pesos por accidente). */}
+                <div
+                  className={`flex flex-1 min-w-0 items-center rounded-xl border-[1.5px] bg-s2 ${
+                    descuentoInvalido
+                      ? 'border-red-400 focus-within:border-red-500'
+                      : 'border-border focus-within:border-[#173F2E] focus-within:bg-white'
+                  }`}
+                >
                   <button
-                    key={modo}
+                    type="button"
                     onClick={() => {
-                      if (modo !== descuentoModo) {
-                        setDescuentoModo(modo)
+                      if (descuentoModo !== '$') {
+                        setDescuentoModo('$')
                         setDescuentoValor('')
                       }
                     }}
-                    className={`w-8 rounded-md py-1 text-[13px] font-bold transition-colors ${
-                      descuentoModo === modo ? 'bg-white text-[#173F2E] shadow-sm' : 'text-text-3'
+                    className={`flex-shrink-0 px-2.5 py-3 font-mono text-[15px] font-bold ${
+                      descuentoModo === '$' ? 'text-[#173F2E]' : 'text-text-4'
                     }`}
                   >
-                    {modo}
+                    $
                   </button>
-                ))}
-              </div>
-            </div>
-            <div className="px-4 py-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="relative flex-1">
-                  {descuentoModo === '$' && (
-                    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-[22px] font-bold text-text-3">
-                      $
-                    </span>
-                  )}
                   <input
                     ref={descuentoInputRef}
                     type="number"
@@ -754,47 +753,53 @@ export function CobroShell({
                     step={descuentoModo === '%' ? 1 : 0.5}
                     value={descuentoValor}
                     onChange={(e) => setDescuentoValor(e.target.value)}
-                    placeholder="0"
-                    className={`w-full rounded-xl border-[1.5px] bg-s2 py-3 text-center font-mono text-[22px] font-bold outline-none ${
-                      descuentoModo === '$' ? 'pl-9 pr-3.5' : 'px-3.5'
-                    } ${
-                      descuentoInvalido
-                        ? 'border-red-400 focus:border-red-500'
-                        : 'border-border focus:border-[#173F2E] focus:bg-white'
-                    }`}
+                    placeholder="0.00"
+                    className="w-full min-w-0 flex-1 bg-transparent py-3 text-center font-mono text-base font-bold outline-none"
                   />
-                </div>
-                {descuentoModo === '%' && (
-                  <span className="font-mono text-[22px] font-bold text-text-3">%</span>
-                )}
-              </div>
-
-              {/* Chips rápidos — solo tienen sentido en modo %; en modo $ no
-                  hay montos rápidos reales que ofrecer sin inventarlos, así
-                  que se omiten (mismo criterio de no fabricar). */}
-              {descuentoModo === '%' && (
-                <div className="flex flex-wrap gap-2">
-                  {[5, 10, 15].map((pct) => (
-                    <button
-                      key={pct}
-                      onClick={() => setDescuentoValor(String(pct))}
-                      className={`rounded-full border-[1.5px] px-3.5 py-1.5 text-[13px] font-semibold transition-all active:scale-95 ${
-                        numDescuentoValor === pct
-                          ? 'border-[#173F2E] bg-[#173F2E]/5 text-[#173F2E]'
-                          : 'border-border bg-s2 text-text-2'
-                      }`}
-                    >
-                      {pct}%
-                    </button>
-                  ))}
                   <button
-                    onClick={() => descuentoInputRef.current?.focus()}
-                    className="rounded-full border-[1.5px] border-border bg-s2 px-3.5 py-1.5 text-[13px] font-semibold text-text-2 active:scale-95"
+                    type="button"
+                    onClick={() => {
+                      if (descuentoModo !== '%') {
+                        setDescuentoModo('%')
+                        setDescuentoValor('')
+                      }
+                    }}
+                    className={`flex-shrink-0 px-2.5 py-3 font-mono text-[15px] font-bold ${
+                      descuentoModo === '%' ? 'text-[#173F2E]' : 'text-text-4'
+                    }`}
                   >
-                    Otro
+                    %
                   </button>
                 </div>
-              )}
+
+                {/* Chips rápidos — solo tienen sentido en modo %; en modo $
+                    no hay montos rápidos reales que ofrecer sin inventarlos,
+                    así que se omiten (mismo criterio de no fabricar) y el
+                    campo de captura ocupa toda la fila. */}
+                {descuentoModo === '%' && (
+                  <div className="flex flex-shrink-0 gap-1">
+                    {[5, 10, 15].map((pct) => (
+                      <button
+                        key={pct}
+                        onClick={() => setDescuentoValor(String(pct))}
+                        className={`rounded-full border-[1.5px] px-2 py-1.5 text-[11px] font-bold transition-all active:scale-95 ${
+                          numDescuentoValor === pct
+                            ? 'border-[#173F2E] bg-[#173F2E]/5 text-[#173F2E]'
+                            : 'border-border bg-s2 text-text-2'
+                        }`}
+                      >
+                        {pct}%
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => descuentoInputRef.current?.focus()}
+                      className="rounded-full border-[1.5px] border-border bg-s2 px-2 py-1.5 text-[11px] font-bold text-text-2 active:scale-95"
+                    >
+                      Otro
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {descuentoInvalido && (
                 <div className="flex items-center gap-1.5 rounded-xl bg-red-50 px-3 py-2">
@@ -849,14 +854,17 @@ export function CobroShell({
                 </p>
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            {/* Una sola fila — si algún día se configuran tantos valores que
+                no quepan, se resuelve con scroll horizontal, nunca
+                envolviendo a una segunda línea que se sienta cortada. */}
+            <div className="mt-3 flex gap-2 overflow-x-auto">
               {propinasSugeridas.map((pct) => {
                 const activo = propinaSeleccionada === pct
                 return (
                   <button
                     key={pct}
                     onClick={() => setPropinaSeleccionada((v) => (v === pct ? null : pct))}
-                    className={`rounded-full px-3.5 py-1.5 text-[13px] font-bold transition-all active:scale-95 ${
+                    className={`flex-shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-bold transition-all active:scale-95 ${
                       activo ? 'bg-[#173F2E] text-white' : 'bg-white text-text-2 border-[1.5px] border-[#E5E5EA]'
                     }`}
                   >
@@ -933,20 +941,52 @@ export function CobroShell({
                   Cantidad recibida
                 </p>
 
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-[24px] font-bold text-text-3">
-                    $
-                  </span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    step="0.01"
-                    value={efectivoRecibido}
-                    onChange={(e) => setEfectivoRecibido(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-10 pr-4 font-mono text-[24px] font-bold outline-none focus:border-[#173F2E] focus:bg-white"
-                  />
+                {/* Input + Cambio/Falta en una sola fila (como el mockup) —
+                    el recuadro de Cambio tiene ancho fijo angosto y el
+                    input se encoge alrededor con min-w-0, sin perder
+                    legibilidad (mismo tamaño de fuente que ya traía antes
+                    de separarlos en la ronda anterior). */}
+                <div className="flex items-stretch gap-3">
+                  <div className="relative min-w-0 flex-1">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-[22px] font-bold text-text-3">
+                      $
+                    </span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="0.01"
+                      value={efectivoRecibido}
+                      onChange={(e) => setEfectivoRecibido(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full min-w-0 rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-9 pr-3 font-mono text-[22px] font-bold outline-none focus:border-[#173F2E] focus:bg-white"
+                    />
+                  </div>
+
+                  {numRecibido > 0 && (
+                    <div
+                      className={`flex w-[104px] flex-shrink-0 flex-col items-center justify-center rounded-xl px-1.5 py-2 text-center ${
+                        cambioEfectivo >= 0
+                          ? 'bg-[#173F2E]/5 border border-[#173F2E]/15'
+                          : 'bg-red-50 border border-red-100'
+                      }`}
+                    >
+                      <p
+                        className={`text-[11px] font-semibold ${
+                          cambioEfectivo >= 0 ? 'text-[#173F2E]' : 'text-red-600'
+                        }`}
+                      >
+                        {cambioEfectivo >= 0 ? 'Cambio' : 'Falta'}
+                      </p>
+                      <span
+                        className={`whitespace-nowrap font-mono text-sm font-bold leading-tight ${
+                          cambioEfectivo >= 0 ? 'text-[#173F2E]' : 'text-red-600'
+                        }`}
+                      >
+                        {formatCurrency(Math.abs(cambioEfectivo))}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -966,31 +1006,6 @@ export function CobroShell({
                     </button>
                   ))}
                 </div>
-
-                {numRecibido > 0 && (
-                  <div
-                    className={`flex items-center justify-between rounded-xl px-4 py-3 ${
-                      cambioEfectivo >= 0
-                        ? 'bg-[#173F2E]/5 border border-[#173F2E]/15'
-                        : 'bg-red-50 border border-red-100'
-                    }`}
-                  >
-                    <p
-                      className={`text-sm font-semibold ${
-                        cambioEfectivo >= 0 ? 'text-[#173F2E]' : 'text-red-600'
-                      }`}
-                    >
-                      {cambioEfectivo >= 0 ? 'Cambio' : 'Falta'}
-                    </p>
-                    <span
-                      className={`font-mono text-lg font-bold ${
-                        cambioEfectivo >= 0 ? 'text-[#173F2E]' : 'text-red-600'
-                      }`}
-                    >
-                      {formatCurrency(Math.abs(cambioEfectivo))}
-                    </span>
-                  </div>
-                )}
               </div>
             )}
 
