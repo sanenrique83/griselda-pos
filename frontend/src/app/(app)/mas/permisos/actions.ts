@@ -34,14 +34,17 @@ export async function actualizarBanco(patch: {
   if (error) return { error: 'Error al actualizar los datos bancarios.' }
 }
 
-export async function actualizarPropina(
-  pct: number,
+// Reemplaza a actualizarPropina() (un solo porcentaje) — ahora se guardan
+// varios, separados por comas, para mostrarse como chips seleccionables al
+// cobrar (ver CobroShell.tsx). `csv` ya viene validado/limpio del cliente.
+export async function actualizarPropinasSugeridas(
+  csv: string,
 ): Promise<Err | undefined> {
   const supabase = await createClient()
 
   const { error } = await supabase
     .from('config_sistema')
-    .update({ propina_sugerida_pct: pct })
+    .update({ propinas_sugeridas_pct: csv })
     .eq('id', 1)
 
   if (error) return { error: 'Error al actualizar la propina.' }

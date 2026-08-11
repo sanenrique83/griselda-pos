@@ -36,7 +36,9 @@ interface CobroShellProps {
   mesaLabel: string
   subpedidos: SubpedidoCobro[]
   totalPedido: number
-  propinaPct: number
+  // Varios porcentajes seleccionables (chips) — config_sistema.propinas_sugeridas_pct,
+  // con fallback a propina_sugerida_pct resuelto en la page. Vacío = sin propina.
+  propinasSugeridas: number[]
   datosBancarios?: DatosBancarios
   descuentoHabilitado?: boolean
   descuentoMaxPct?: number
@@ -104,7 +106,7 @@ export function CobroShell({
   mesaLabel,
   subpedidos,
   totalPedido,
-  propinaPct,
+  propinasSugeridas,
   datosBancarios,
   descuentoHabilitado = false,
   descuentoMaxPct = 0,
@@ -132,13 +134,15 @@ export function CobroShell({
   // colapsarlo si estorba). ──────────────────────────────────────────────────
   const [mostrarDesglose, setMostrarDesglose] = useState(true)
 
-  // ── Descuento ─────────────────────────────────────────────────────────────
-  const [descuentoPct, setDescuentoPct] = useState('')
+  // ── Descuento — porcentaje o monto fijo ──────────────────────────────────
+  const [descuentoModo, setDescuentoModo] = useState<'%' | '$'>('%')
+  const [descuentoValor, setDescuentoValor] = useState('')
   const descuentoInputRef = useRef<HTMLInputElement>(null)
 
   // ── Método de pago ─────────────────────────────────────────────────────────
   const [metodo, setMetodo] = useState<Metodo>('efectivo')
-  const [conPropina, setConPropina] = useState(false)
+  // Qué % de propina está seleccionado (uno de propinasSugeridas) — null = ninguno.
+  const [propinaSeleccionada, setPropinaSeleccionada] = useState<number | null>(null)
   const [imprimirTicketPago, setImprimirTicketPago] = useState(false)
 
   // Efectivo
@@ -186,15 +190,25 @@ export function CobroShell({
     return subpedidos.filter((sp) => subSeleccionados.has(sp.id))
   })()
 
-  const numDescuentoPct = parseFloat(descuentoPct) || 0
-  const descuentoInvalido =
-    descuentoHabilitado && numDescuentoPct > 0 && numDescuentoPct > descuentoMaxPct
+  const numDescuentoValor = parseFloat(descuentoValor) || 0
+  // Tope máximo configurado (descuentoMaxPct) siempre vive en %. En modo $
+  // se propone el equivalente en pesos sobre el total actual — mismo límite
+  // de negocio, expresado en la unidad que se está capturando — en vez de
+  // desactivar la validación o inventar un segundo tope en pesos aparte.
+  const montoMaxDescuento = round2(totalEscenario * descuentoMaxPct / 100)
+  const descuentoInvalido = descuentoHabilitado && numDescuentoValor > 0 && (
+    descuentoModo === '%'
+      ? numDescuentoValor > descuentoMaxPct
+      : numDescuentoValor > montoMaxDescuento
+  )
   const montoDescuento = descuentoHabilitado && !descuentoInvalido
-    ? round2(totalEscenario * numDescuentoPct / 100)
+    ? descuentoModo === '%'
+      ? round2(totalEscenario * numDescuentoValor / 100)
+      : round2(Math.min(numDescuentoValor, totalEscenario))
     : 0
   const totalConDescuento = round2(totalEscenario - montoDescuento)
 
-  const propinaAmt = conPropina ? roundPropina(totalConDescuento * propinaPct / 100) : 0
+  const propinaAmt = propinaSeleccionada ? roundPropina(totalConDescuento * propinaSeleccionada / 100) : 0
   const total = round2(totalConDescuento + propinaAmt)
 
   // Efectivo
@@ -268,8 +282,9 @@ export function CobroShell({
     setMixtoEfectivo('')
     setMixtoTarjeta('')
     setMixtoTransfer('')
-    setConPropina(false)
-    setDescuentoPct('')
+    setPropinaSeleccionada(null)
+    setDescuentoValor('')
+    setDescuentoModo('%')
     setError(null)
   }
 
@@ -326,7 +341,8 @@ export function CobroShell({
         pagos,
         efectivoRecibido: efectivoRec,
         cambio,
-        descuentoPct: numDescuentoPct > 0 ? numDescuentoPct : undefined,
+        descuentoValor: numDescuentoValor > 0 ? numDescuentoValor : undefined,
+        descuentoTipo: descuentoModo === '%' ? 'porcentaje' : 'monto_fijo',
         descuentoMonto: montoDescuento > 0 ? montoDescuento : undefined,
       })
 
@@ -465,8 +481,8 @@ export function CobroShell({
           : itemsTicket,
       )
 
-      const propinaPreCuenta = conPropina && propinaPct > 0
-        ? roundPropina(totalConDescuento * propinaPct / 100)
+      const propinaPreCuenta = propinaSeleccionada
+        ? roundPropina(totalConDescuento * propinaSeleccionada / 100)
         : 0
       ok = await imprimirTicket({
         tipo: 'cliente',
@@ -692,68 +708,102 @@ export function CobroShell({
           )}
         </div>
 
-        {/* ── Descuento ──────────────────────────────────────────────────── */}
+        {/* ── Descuento — % o $ ─────────────────────────────────────────────── */}
         {descuentoHabilitado && totalEscenario > 0 && (
           <div className="rounded-2xl bg-white shadow-card overflow-hidden">
-            <div className="px-4 pt-4 pb-3 border-b border-[#E5E5EA]">
+            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#E5E5EA]">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
                 Descuento
               </p>
+              {/* Toggle $/% — cambiar de modo limpia el valor capturado para
+                  no reinterpretar un mismo número como % o como pesos por
+                  accidente. */}
+              <div className="flex rounded-lg bg-s2 p-0.5">
+                {(['$', '%'] as const).map((modo) => (
+                  <button
+                    key={modo}
+                    onClick={() => {
+                      if (modo !== descuentoModo) {
+                        setDescuentoModo(modo)
+                        setDescuentoValor('')
+                      }
+                    }}
+                    className={`w-8 rounded-md py-1 text-[13px] font-bold transition-colors ${
+                      descuentoModo === modo ? 'bg-white text-[#173F2E] shadow-sm' : 'text-text-3'
+                    }`}
+                  >
+                    {modo}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="px-4 py-4 space-y-3">
               <div className="flex items-center gap-3">
                 <div className="relative flex-1">
+                  {descuentoModo === '$' && (
+                    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-[22px] font-bold text-text-3">
+                      $
+                    </span>
+                  )}
                   <input
                     ref={descuentoInputRef}
                     type="number"
                     inputMode="decimal"
                     min={0}
-                    max={100}
-                    step={1}
-                    value={descuentoPct}
-                    onChange={(e) => setDescuentoPct(e.target.value)}
+                    max={descuentoModo === '%' ? 100 : undefined}
+                    step={descuentoModo === '%' ? 1 : 0.5}
+                    value={descuentoValor}
+                    onChange={(e) => setDescuentoValor(e.target.value)}
                     placeholder="0"
-                    className={`w-full rounded-xl border-[1.5px] bg-s2 px-3.5 py-3 text-center font-mono text-[22px] font-bold outline-none ${
+                    className={`w-full rounded-xl border-[1.5px] bg-s2 py-3 text-center font-mono text-[22px] font-bold outline-none ${
+                      descuentoModo === '$' ? 'pl-9 pr-3.5' : 'px-3.5'
+                    } ${
                       descuentoInvalido
                         ? 'border-red-400 focus:border-red-500'
                         : 'border-border focus:border-[#173F2E] focus:bg-white'
                     }`}
                   />
                 </div>
-                <span className="font-mono text-[22px] font-bold text-text-3">%</span>
+                {descuentoModo === '%' && (
+                  <span className="font-mono text-[22px] font-bold text-text-3">%</span>
+                )}
               </div>
 
-              {/* Chips rápidos — valores fijos razonables, no hay un
-                  "modo monto fijo" real (el mockup sugiere $/% pero la
-                  lógica solo soporta porcentaje) — ver resumen. */}
-              <div className="flex flex-wrap gap-2">
-                {[5, 10, 15].map((pct) => (
+              {/* Chips rápidos — solo tienen sentido en modo %; en modo $ no
+                  hay montos rápidos reales que ofrecer sin inventarlos, así
+                  que se omiten (mismo criterio de no fabricar). */}
+              {descuentoModo === '%' && (
+                <div className="flex flex-wrap gap-2">
+                  {[5, 10, 15].map((pct) => (
+                    <button
+                      key={pct}
+                      onClick={() => setDescuentoValor(String(pct))}
+                      className={`rounded-full border-[1.5px] px-3.5 py-1.5 text-[13px] font-semibold transition-all active:scale-95 ${
+                        numDescuentoValor === pct
+                          ? 'border-[#173F2E] bg-[#173F2E]/5 text-[#173F2E]'
+                          : 'border-border bg-s2 text-text-2'
+                      }`}
+                    >
+                      {pct}%
+                    </button>
+                  ))}
                   <button
-                    key={pct}
-                    onClick={() => setDescuentoPct(String(pct))}
-                    className={`rounded-full border-[1.5px] px-3.5 py-1.5 text-[13px] font-semibold transition-all active:scale-95 ${
-                      numDescuentoPct === pct
-                        ? 'border-[#173F2E] bg-[#173F2E]/5 text-[#173F2E]'
-                        : 'border-border bg-s2 text-text-2'
-                    }`}
+                    onClick={() => descuentoInputRef.current?.focus()}
+                    className="rounded-full border-[1.5px] border-border bg-s2 px-3.5 py-1.5 text-[13px] font-semibold text-text-2 active:scale-95"
                   >
-                    {pct}%
+                    Otro
                   </button>
-                ))}
-                <button
-                  onClick={() => descuentoInputRef.current?.focus()}
-                  className="rounded-full border-[1.5px] border-border bg-s2 px-3.5 py-1.5 text-[13px] font-semibold text-text-2 active:scale-95"
-                >
-                  Otro
-                </button>
-              </div>
+                </div>
+              )}
 
               {descuentoInvalido && (
                 <div className="flex items-center gap-1.5 rounded-xl bg-red-50 px-3 py-2">
-                  <span className="text-xs font-bold text-red-600">Máx {descuentoMaxPct}%</span>
+                  <span className="text-xs font-bold text-red-600">
+                    Máx {descuentoModo === '%' ? `${descuentoMaxPct}%` : formatCurrency(montoMaxDescuento)}
+                  </span>
                 </div>
               )}
-              {numDescuentoPct > 0 && !descuentoInvalido && (
+              {numDescuentoValor > 0 && !descuentoInvalido && (
                 <div className="flex items-center justify-between rounded-xl bg-[#173F2E]/5 px-4 py-2.5">
                   <p className="text-xs text-[#173F2E]">Descuento aplicado</p>
                   <span className="font-mono text-sm font-bold text-[#173F2E]">
@@ -772,40 +822,50 @@ export function CobroShell({
           </Boton>
         )}
 
-        {/* ── Propina sugerida ───────────────────────────────────────────── */}
-        {/* El mockup muestra 5 chips de porcentaje (10/12/15/18/20%)
-            seleccionables, pero solo existe UN porcentaje configurado
-            (config_sistema.propina_sugerida_pct, /mas/permisos) — no hay
-            varios niveles reales entre los que elegir. Se muestra ese único
-            valor como una píldora dentro de la misma tarjeta-toggle que ya
-            existía (tocar la tarjeta activa/desactiva la propina), en vez
-            de fabricar 4 opciones más que no llevarían a ningún lado. */}
-        {propinaPct > 0 && totalConDescuento > 0 && (
-          <button
-            onClick={() => setConPropina((v) => !v)}
-            className={`w-full flex items-center gap-3 rounded-2xl border-[1.5px] px-4 py-3.5 transition-colors ${
-              conPropina
+        {/* ── Propina sugerida — varios % seleccionables ───────────────────── */}
+        {/* Ahora config_sistema.propinas_sugeridas_pct trae varios valores
+            reales (editable en /mas/permisos) — el mesero elige uno como
+            chip, ya no es un único valor fijo con un simple toggle on/off. */}
+        {propinasSugeridas.length > 0 && totalConDescuento > 0 && (
+          <div
+            className={`w-full rounded-2xl border-[1.5px] px-4 py-3.5 transition-colors ${
+              propinaSeleccionada
                 ? 'border-[#173F2E]/40 bg-[#173F2E]/5'
                 : 'border-amber-200 bg-amber-50/60'
             }`}
           >
-            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${conPropina ? 'bg-[#173F2E]/10 text-[#173F2E]' : 'bg-amber-100 text-amber-700'}`}>
-              <PiggyBank size={18} strokeWidth={2} />
-            </span>
-            <div className="flex-1 text-left">
-              <p className={`text-sm font-semibold ${conPropina ? 'text-[#173F2E]' : 'text-text-1'}`}>
-                Propina sugerida
-              </p>
-              <p className={`text-xs mt-0.5 ${conPropina ? 'text-[#173F2E]' : 'text-text-3'}`}>
-                {conPropina
-                  ? `+${formatCurrency(propinaAmt)} → Total: ${formatCurrency(total)}`
-                  : 'Toca para aplicarla'}
-              </p>
+            <div className="flex items-center gap-3">
+              <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${propinaSeleccionada ? 'bg-[#173F2E]/10 text-[#173F2E]' : 'bg-amber-100 text-amber-700'}`}>
+                <PiggyBank size={18} strokeWidth={2} />
+              </span>
+              <div className="flex-1 text-left">
+                <p className={`text-sm font-semibold ${propinaSeleccionada ? 'text-[#173F2E]' : 'text-text-1'}`}>
+                  Propina sugerida
+                </p>
+                <p className={`text-xs mt-0.5 ${propinaSeleccionada ? 'text-[#173F2E]' : 'text-text-3'}`}>
+                  {propinaSeleccionada
+                    ? `+${formatCurrency(propinaAmt)} → Total: ${formatCurrency(total)}`
+                    : 'Elige un porcentaje'}
+                </p>
+              </div>
             </div>
-            <span className="flex-shrink-0 rounded-full bg-[#173F2E] px-3 py-1.5 text-[13px] font-bold text-white">
-              {propinaPct}%
-            </span>
-          </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {propinasSugeridas.map((pct) => {
+                const activo = propinaSeleccionada === pct
+                return (
+                  <button
+                    key={pct}
+                    onClick={() => setPropinaSeleccionada((v) => (v === pct ? null : pct))}
+                    className={`rounded-full px-3.5 py-1.5 text-[13px] font-bold transition-all active:scale-95 ${
+                      activo ? 'bg-[#173F2E] text-white' : 'bg-white text-text-2 border-[1.5px] border-[#E5E5EA]'
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         )}
 
         {/* ── Botón imprimir cuenta (etapa ANTES de cobrar — precuenta) ────── */}
@@ -824,11 +884,13 @@ export function CobroShell({
                 Método de pago
               </p>
             </div>
-            {/* 2×2 en vez de las 4 columnas del mockup — con "Transferencia"
-                (la etiqueta más larga) 4-en-línea se apretaba demasiado en
-                pantallas angostas (iPhone SE); 2×2 ya es el patrón probado
-                que traía esta pantalla. */}
-            <div className="grid grid-cols-2 gap-2.5 p-3">
+            {/* Fila única compacta (en vez del 2×2 previo) — "Transferencia"
+                se queda con su etiqueta completa; a text-[10px] con
+                leading-tight y text-center, si algún día no alcanza el
+                ancho cabe en 2 líneas dentro del mismo pill en vez de
+                desbordarse o obligar a abreviar. No probado en un iPhone SE
+                físico, solo con este cálculo de ancho. */}
+            <div className="flex gap-2 p-3">
               {METODOS.map((m) => {
                 const activo = metodo === m.id
                 return (
@@ -838,19 +900,19 @@ export function CobroShell({
                       setMetodo(m.id)
                       setReferencia('')
                     }}
-                    className={`relative flex flex-col items-center gap-1.5 rounded-xl border-[1.5px] py-3.5 px-3 transition-all active:scale-[.97] ${
+                    className={`relative flex flex-1 flex-col items-center gap-1 rounded-xl border-[1.5px] py-2.5 px-1 transition-all active:scale-[.97] ${
                       activo
                         ? 'border-[#173F2E] bg-[#173F2E]/5'
                         : 'border-[#E5E5EA] bg-white'
                     }`}
                   >
-                    <m.Icon size={22} strokeWidth={1.8} className={activo ? 'text-[#173F2E]' : 'text-text-3'} />
-                    <span className={`text-[13px] font-semibold ${activo ? 'text-[#173F2E]' : 'text-text-2'}`}>
+                    <m.Icon size={18} strokeWidth={1.8} className={activo ? 'text-[#173F2E]' : 'text-text-3'} />
+                    <span className={`text-center text-[10px] font-semibold leading-tight ${activo ? 'text-[#173F2E]' : 'text-text-2'}`}>
                       {m.label}
                     </span>
                     {activo && (
-                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#173F2E] text-white">
-                        <Check size={10} strokeWidth={3.2} />
+                      <span className="absolute right-1 top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#173F2E] text-white">
+                        <Check size={8} strokeWidth={3.2} />
                       </span>
                     )}
                   </button>
@@ -871,47 +933,20 @@ export function CobroShell({
                   Cantidad recibida
                 </p>
 
-                <div className="flex items-stretch gap-3">
-                  <div className="relative flex-1">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-[24px] font-bold text-text-3">
-                      $
-                    </span>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      step="0.01"
-                      value={efectivoRecibido}
-                      onChange={(e) => setEfectivoRecibido(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-10 pr-4 font-mono text-[24px] font-bold outline-none focus:border-[#173F2E] focus:bg-white"
-                    />
-                  </div>
-
-                  {numRecibido > 0 && (
-                    <div
-                      className={`flex w-[112px] flex-shrink-0 flex-col items-center justify-center rounded-xl px-2 py-2 text-center ${
-                        cambioEfectivo >= 0
-                          ? 'bg-[#173F2E]/5 border border-[#173F2E]/15'
-                          : 'bg-red-50 border border-red-100'
-                      }`}
-                    >
-                      <p
-                        className={`text-[11px] font-semibold ${
-                          cambioEfectivo >= 0 ? 'text-[#173F2E]' : 'text-red-600'
-                        }`}
-                      >
-                        {cambioEfectivo >= 0 ? 'Cambio' : 'Falta'}
-                      </p>
-                      <span
-                        className={`font-mono text-[16px] font-bold leading-tight ${
-                          cambioEfectivo >= 0 ? 'text-[#173F2E]' : 'text-red-600'
-                        }`}
-                      >
-                        {formatCurrency(Math.abs(cambioEfectivo))}
-                      </span>
-                    </div>
-                  )}
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-[24px] font-bold text-text-3">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    value={efectivoRecibido}
+                    onChange={(e) => setEfectivoRecibido(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-10 pr-4 font-mono text-[24px] font-bold outline-none focus:border-[#173F2E] focus:bg-white"
+                  />
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -931,6 +966,31 @@ export function CobroShell({
                     </button>
                   ))}
                 </div>
+
+                {numRecibido > 0 && (
+                  <div
+                    className={`flex items-center justify-between rounded-xl px-4 py-3 ${
+                      cambioEfectivo >= 0
+                        ? 'bg-[#173F2E]/5 border border-[#173F2E]/15'
+                        : 'bg-red-50 border border-red-100'
+                    }`}
+                  >
+                    <p
+                      className={`text-sm font-semibold ${
+                        cambioEfectivo >= 0 ? 'text-[#173F2E]' : 'text-red-600'
+                      }`}
+                    >
+                      {cambioEfectivo >= 0 ? 'Cambio' : 'Falta'}
+                    </p>
+                    <span
+                      className={`font-mono text-lg font-bold ${
+                        cambioEfectivo >= 0 ? 'text-[#173F2E]' : 'text-red-600'
+                      }`}
+                    >
+                      {formatCurrency(Math.abs(cambioEfectivo))}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1170,7 +1230,7 @@ export function CobroShell({
         <div className="flex-shrink-0 border-t border-[#E5E5EA] bg-white px-4 pb-[calc(env(safe-area-inset-bottom,0px)+14px)] pt-3.5">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[13px] text-text-3">
-              {conPropina ? `Con propina (${propinaPct}%)` : 'Total a cobrar'}
+              {propinaSeleccionada ? `Con propina (${propinaSeleccionada}%)` : 'Total a cobrar'}
             </p>
             <span className="font-mono text-[22px] font-bold text-[#173F2E]">
               {formatCurrency(total)}
@@ -1189,13 +1249,13 @@ export function CobroShell({
               Imprimir ticket automáticamente
             </span>
             <span
-              className={`relative h-6 w-[42px] flex-shrink-0 rounded-full transition-colors ${
+              className={`relative h-6 w-11 flex-shrink-0 overflow-hidden rounded-full transition-colors ${
                 imprimirTicketPago ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
               }`}
             >
               <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                  imprimirTicketPago ? 'translate-x-[19px]' : 'translate-x-0.5'
+                className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  imprimirTicketPago ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
             </span>

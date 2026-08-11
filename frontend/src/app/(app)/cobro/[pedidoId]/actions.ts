@@ -161,7 +161,12 @@ export async function cobrarPedido(data: {
   pagos: PagoInput[]     // montos físicos por método (incluyen propina)
   efectivoRecibido: number | null
   cambio: number | null
-  descuentoPct?: number
+  // El valor tal cual lo capturó el mesero — el % o el monto fijo en pesos,
+  // según descuentoTipo (tipo_descuento ya soporta 'monto_fijo' desde el
+  // schema inicial, columna `valor` documentada como "el porcentaje o monto
+  // ingresado" — no hizo falta ninguna migración para esto).
+  descuentoValor?: number
+  descuentoTipo?: 'porcentaje' | 'monto_fijo'
   descuentoMonto?: number
 }): Promise<{ error: string } | { ok: true; redirectTo: string }> {
   const supabase = await createClient()
@@ -180,12 +185,12 @@ export async function cobrarPedido(data: {
   await supabase.from('pedidos').update({ precuenta_impresa_en: null }).eq('id', data.pedidoId)
 
   // ── 0. Registrar descuento si aplica ──────────────────────────────────────
-  if (data.descuentoPct && data.descuentoPct > 0 && data.descuentoMonto && user) {
+  if (data.descuentoValor && data.descuentoValor > 0 && data.descuentoMonto && user) {
     await supabase.from('descuentos').insert({
       pedido_id: data.pedidoId,
       usuario_id: user.id,
-      tipo: 'porcentaje',
-      valor: data.descuentoPct,
+      tipo: data.descuentoTipo ?? 'porcentaje',
+      valor: data.descuentoValor,
       monto_calculado: data.descuentoMonto,
       motivo: 'Descuento en cobro',
     })

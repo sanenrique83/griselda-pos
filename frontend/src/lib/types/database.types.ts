@@ -56,6 +56,11 @@ export interface ConfigSistema {
   descuento_max_pct: number
   corteria_requiere_nota: boolean
   propina_sugerida_pct: number
+  // Varios porcentajes seleccionables al cobrar, texto separado por comas
+  // (ej. '10,12,15,18,20') — null cae de vuelta a propina_sugerida_pct como
+  // único chip (ver CobroShell.tsx). No reemplaza la columna anterior en la
+  // base, solo en la UI de /mas/permisos.
+  propinas_sugeridas_pct: string | null
   impresion_activa: boolean
   transferencia_banco: string | null
   transferencia_clabe: string | null

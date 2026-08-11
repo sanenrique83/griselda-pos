@@ -5,7 +5,7 @@ import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
 import {
   actualizarPermiso,
   actualizarBanco,
-  actualizarPropina,
+  actualizarPropinasSugeridas,
   actualizarTimeoutInactividad,
   actualizarOrdenProductos,
   actualizarOrdenModificadores,
@@ -130,8 +130,13 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
   const [savingBanco, setSavingBanco] = useState(false)
   const [bancoBanner, setBancoBanner] = useState<string | null>(null)
 
-  // Propina
-  const [propinaPct, setPropinaPct] = useState(config.propina_sugerida_pct.toString())
+  // Propinas sugeridas (varios %, chips al cobrar) — si nunca se configuró
+  // el nuevo campo, se parte del único porcentaje anterior (continuidad,
+  // ver migración 20260801000029) en vez de arrancar vacío.
+  const [propinasPct, setPropinasPct] = useState(
+    config.propinas_sugeridas_pct ??
+      (config.propina_sugerida_pct > 0 ? String(config.propina_sugerida_pct) : ''),
+  )
   const [savingPropina, setSavingPropina] = useState(false)
   const [propinaBanner, setPropinaBanner] = useState<string | null>(null)
 
@@ -228,18 +233,24 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
   }
 
   async function handleGuardarPropina() {
-    const pct = parseFloat(propinaPct)
-    if (isNaN(pct) || pct < 0 || pct > 100) {
-      setPropinaBanner('Ingresa un porcentaje entre 0 y 100.')
+    const partes = propinasPct.split(',').map((p) => p.trim()).filter((p) => p !== '')
+    const numeros = partes.map((p) => parseFloat(p))
+    if (numeros.some((n) => isNaN(n) || n <= 0 || n > 100)) {
+      setPropinaBanner('Ingresa porcentajes entre 1 y 100, separados por comas (ej. 10,15,20) — o déjalo vacío.')
       return
     }
+    // Limpia duplicados y ordena ascendente — mismo orden en que aparecerán
+    // los chips al cobrar. Vacío = sin propinas sugeridas (chip no aparece).
+    const limpios = [...new Set(numeros)].sort((a, b) => a - b)
+    const csv = limpios.join(',')
     setSavingPropina(true)
     setPropinaBanner(null)
-    const result = await actualizarPropina(pct)
+    const result = await actualizarPropinasSugeridas(csv)
     setSavingPropina(false)
     if (result?.error) {
       setPropinaBanner(result.error)
     } else {
+      setPropinasPct(csv)
       setPropinaBanner('Guardado ✓')
       setTimeout(() => setPropinaBanner(null), 3000)
     }
@@ -545,41 +556,36 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
           </div>
         </div>
 
-        {/* ── Propina sugerida ─────────────────────────────────────────────── */}
+        {/* ── Propinas sugeridas ───────────────────────────────────────────── */}
         <div className="rounded-2xl bg-white shadow-card overflow-hidden">
           <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
-              Propina sugerida
+              Propinas sugeridas
             </p>
           </div>
           <div className="px-4 py-4 space-y-3">
-            <div className="flex items-center gap-3">
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={100}
-                step={1}
-                value={propinaPct}
-                onChange={(e) => setPropinaPct(e.target.value)}
-                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-blue-500"
-              />
-              <p className="text-sm text-text-2">% sobre el total del pedido</p>
-            </div>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={propinasPct}
+              onChange={(e) => setPropinasPct(e.target.value)}
+              placeholder="10,12,15,18,20"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 font-mono text-sm outline-none focus:border-[#173F2E]"
+            />
             <p className="text-xs text-text-3">
-              Aparece como opción al cobrar. Usa 0 para desactivar.
+              Porcentajes separados por comas — el mesero elige uno como chip al cobrar. Déjalo vacío para no ofrecer propina.
             </p>
             {propinaBanner && (
-              <p className={`text-xs font-semibold ${propinaBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-xs font-semibold ${propinaBanner.includes('✓') ? 'text-[#173F2E]' : 'text-red-600'}`}>
                 {propinaBanner}
               </p>
             )}
             <button
               onClick={handleGuardarPropina}
               disabled={savingPropina}
-              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+              className="w-full rounded-xl bg-[#173F2E] py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.28)] active:scale-[.98] disabled:opacity-40"
             >
-              {savingPropina ? 'Guardando…' : 'Guardar propina'}
+              {savingPropina ? 'Guardando…' : 'Guardar propinas'}
             </button>
           </div>
         </div>

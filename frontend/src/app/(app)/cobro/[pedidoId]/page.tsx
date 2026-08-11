@@ -61,7 +61,7 @@ export default async function CobroPage({
     supabase
       .from('config_sistema')
       .select(`
-        propina_sugerida_pct, moneda, impresion_activa,
+        propina_sugerida_pct, propinas_sugeridas_pct, moneda, impresion_activa,
         transferencia_banco, transferencia_clabe, transferencia_titular,
         descuentos_mesero, descuento_max_pct,
         ticket_nombre, ticket_subtitulo, ticket_direccion, ticket_telefono, ticket_rfc,
@@ -159,6 +159,21 @@ export default async function CobroPage({
     esAdmin || ((config as any)?.descuentos_mesero === true)
   const descuentoMaxPct = esAdmin ? 100 : ((config as any)?.descuento_max_pct ?? 0)
 
+  // Propinas sugeridas (chips) — propinas_sugeridas_pct (CSV) es la fuente
+  // nueva; si nunca se configuró (NULL, distinto de '' que sí es "el admin
+  // lo dejó vacío a propósito") cae de vuelta al único porcentaje anterior
+  // para no perder configuración previa (ver migración 20260801000029).
+  const csvPropinas = (config as any)?.propinas_sugeridas_pct as string | null | undefined
+  const propinasSugeridas: number[] = (
+    csvPropinas !== null && csvPropinas !== undefined
+      ? csvPropinas.split(',')
+      : (config as any)?.propina_sugerida_pct > 0
+        ? [String((config as any).propina_sugerida_pct)]
+        : []
+  )
+    .map((p: string) => parseFloat(p.trim()))
+    .filter((n: number) => !isNaN(n) && n > 0)
+
   const ticketConfig: TicketConfig = {
     nombre: (config as any)?.ticket_nombre ?? 'La Menuderia',
     subtitulo: (config as any)?.ticket_subtitulo ?? '',
@@ -181,7 +196,7 @@ export default async function CobroPage({
       mesaLabel={mesaLabel}
       subpedidos={subpedidos}
       totalPedido={totalPedido}
-      propinaPct={config?.propina_sugerida_pct ?? 0}
+      propinasSugeridas={propinasSugeridas}
       datosBancarios={{
         banco: (config as any)?.transferencia_banco ?? null,
         clabe: (config as any)?.transferencia_clabe ?? null,
