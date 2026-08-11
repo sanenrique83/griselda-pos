@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Search, ChevronDown, ChevronRight, Check, Download, Armchair,
-  Banknote, CreditCard, Smartphone, CirclePlus, Users, Package, Printer, RotateCcw, X,
+  Banknote, CreditCard, Smartphone, CirclePlus, Users, Package, Printer, RotateCcw, X, ArrowUpDown,
 } from 'lucide-react'
 import type { ReciboData, PagoResumen, TurnoItem } from '@/app/(app)/historial/page'
 import { reimprimirTicketCliente, reabrirPedido } from '@/app/(app)/historial/actions'
@@ -31,6 +31,9 @@ function fmtFechaCorta(iso: string) {
   })
 }
 
+type FiltroEstado = 'todas' | 'cobro' | 'cancelada'
+type Orden = 'recientes' | 'antiguas' | 'monto'
+
 const METODO_INFO: Record<PagoResumen['metodo'], { label: string; Icon: typeof Banknote }> = {
   efectivo: { label: 'Efectivo', Icon: Banknote },
   tarjeta: { label: 'Tarjeta', Icon: CreditCard },
@@ -52,11 +55,12 @@ const TINTES_MESA = [
 // ─── CSV Export ───────────────────────────────────────────────────────────────
 
 function exportarCSV(recibos: ReciboData[], turnoId: number | null) {
-  const header = 'ID,Hora,Mesa,Mesero,Comensales,Productos,Total,Efectivo recibido,Cambio,Métodos'
+  const header = 'ID,Estado,Hora,Mesa,Mesero,Comensales,Productos,Total,Efectivo recibido,Cambio,Métodos'
   const rows = recibos.map((r) => {
     const metodos = r.pagos.map((p) => `${p.metodo}:$${p.monto.toFixed(2)}`).join(' | ')
     return [
       r.id,
+      r.estado === 'cancelada' ? 'Cancelada' : 'Cerrada',
       new Date(r.createdAt).toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }),
       `"${r.mesaLabel}"`,
       `"${r.meseroNombre}"`,
@@ -101,20 +105,37 @@ export function HistorialShell({
   const [seleccionado, setSeleccionado] = useState<ReciboData | null>(null)
   const [selectorOpen, setSelectorOpen] = useState(false)
   const [busqueda, setBusqueda] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('todas')
+  const [orden, setOrden] = useState<Orden>('recientes')
 
   const turnoActual = turnos.find((t) => t.id === turnoSeleccionadoId)
   const turnoLabel = turnoActual
     ? `Turno #${turnoActual.id} · ${fmtFechaCorta(turnoActual.abierto_en)} ${fmtHora(turnoActual.abierto_en)}`
     : esTurnoActivo ? 'Turno activo' : 'Historial de cobros'
 
+  const cerradasCount = recibos.filter((r) => r.estado === 'cobro').length
+  const canceladasCount = recibos.filter((r) => r.estado === 'cancelada').length
+
   const recibosFiltrados = useMemo(() => {
+    let lista = recibos
+    if (filtroEstado !== 'todas') lista = lista.filter((r) => r.estado === filtroEstado)
     const q = busqueda.trim().toLowerCase()
-    if (!q) return recibos
-    return recibos.filter((r) => {
-      const campos = [r.mesaLabel, String(r.id), r.meseroNombre, r.clienteNombre ?? '']
-      return campos.some((c) => c.toLowerCase().includes(q))
-    })
-  }, [recibos, busqueda])
+    if (q) {
+      lista = lista.filter((r) => {
+        const campos = [r.mesaLabel, String(r.id), r.meseroNombre, r.clienteNombre ?? '']
+        return campos.some((c) => c.toLowerCase().includes(q))
+      })
+    }
+    const ordenada = [...lista]
+    if (orden === 'recientes') {
+      ordenada.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    } else if (orden === 'antiguas') {
+      ordenada.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    } else {
+      ordenada.sort((a, b) => b.total - a.total)
+    }
+    return ordenada
+  }, [recibos, filtroEstado, busqueda, orden])
 
   const totalVentas = recibosFiltrados.reduce((s, r) => s + r.total, 0)
 
@@ -174,6 +195,42 @@ export function HistorialShell({
         </div>
       )}
 
+      {/* Chips de filtro por estado (regla #1 CLAUDE.md: píldora de solo
+          texto, sin ícono) + selector simple de orden. */}
+      {!sinTurno && recibos.length > 0 && (
+        <div className="flex items-center gap-2 border-b border-[#E5E5EA] bg-white px-4 pb-3">
+          <div className="flex flex-1 items-center gap-2 overflow-x-auto scrollbar-none">
+            {([
+              ['todas', `Todas (${recibos.length})`],
+              ['cobro', `Cerrada (${cerradasCount})`],
+              ['cancelada', `Cancelada (${canceladasCount})`],
+            ] as [FiltroEstado, string][]).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setFiltroEstado(id)}
+                className={`flex-shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+                  filtroEstado === id ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="relative flex-shrink-0">
+            <select
+              value={orden}
+              onChange={(e) => setOrden(e.target.value as Orden)}
+              className="appearance-none rounded-xl border-[1.5px] border-border bg-s2 py-1.5 pl-8 pr-3 text-[13px] font-semibold text-text-2 outline-none"
+            >
+              <option value="recientes">Más recientes</option>
+              <option value="antiguas">Más antiguas</option>
+              <option value="monto">Mayor monto</option>
+            </select>
+            <ArrowUpDown size={13} strokeWidth={2.4} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-3" />
+          </div>
+        </div>
+      )}
+
       <div className="px-4 py-4">
         {sinTurno ? (
           <SinTurnoState />
@@ -191,7 +248,7 @@ export function HistorialShell({
             </div>
 
             {recibosFiltrados.length === 0 ? (
-              <p className="py-10 text-center text-sm text-text-3">Sin resultados para tu búsqueda.</p>
+              <p className="py-10 text-center text-sm text-text-3">Sin registros que coincidan con el filtro o la búsqueda.</p>
             ) : (
               <div className="space-y-2.5">
                 {recibosFiltrados.map((r, idx) => (
@@ -316,7 +373,7 @@ function ReciboCard({
             "esto es lo activo/importante" (mismo criterio recién aplicado
             en Cobro). Neutro para método, ámbar informativo para propina
             (mismo tono ya usado en la tarjeta de propina de Cobro). */}
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        <div className={`flex flex-wrap items-center gap-1.5 ${r.pagos.length > 0 || r.propinaPct !== null ? 'mt-1.5' : ''}`}>
           {r.pagos.length > 1 ? (
             <span className="flex items-center gap-1 rounded-full bg-s2 px-2 py-0.5 text-[11px] font-semibold text-text-2">
               <CirclePlus size={11} strokeWidth={2.2} />
@@ -342,11 +399,23 @@ function ReciboCard({
       </div>
 
       <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
-        <span className="flex items-center gap-1 rounded-full bg-[#173F2E]/10 px-2 py-0.5 text-[11px] font-semibold text-[#173F2E]">
-          <Check size={11} strokeWidth={3} />
-          Cerrada
-        </span>
-        <span className="font-mono text-[15px] font-bold text-[#173F2E]">
+        {/* Píldora con ícono, distinta del semáforo de mesa (que es color
+            sólido de tarjeta, no una píldora) — regla ya documentada.
+            Cancelada usa rojo: mismo criterio de la limpieza de color en
+            Cobro (rojo reservado para negativo/falta; una cuenta cancelada
+            es exactamente eso, nada cobrado). */}
+        {r.estado === 'cancelada' ? (
+          <span className="flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-600">
+            <X size={11} strokeWidth={3} />
+            Cancelada
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 rounded-full bg-[#173F2E]/10 px-2 py-0.5 text-[11px] font-semibold text-[#173F2E]">
+            <Check size={11} strokeWidth={3} />
+            Cerrada
+          </span>
+        )}
+        <span className={`font-mono text-[15px] font-bold ${r.estado === 'cancelada' ? 'text-red-600' : 'text-[#173F2E]'}`}>
           {formatCurrency(r.total)}
         </span>
       </div>
@@ -441,49 +510,55 @@ function ReciboSheet({
             </p>
           </div>
 
-          <div className="rounded-xl bg-s2 px-4 py-3 flex items-center justify-between">
-            <p className="text-sm font-semibold">Total cobrado</p>
-            <span className="font-mono text-[20px] font-bold text-[#173F2E]">
+          <div className={`rounded-xl px-4 py-3 flex items-center justify-between ${r.estado === 'cancelada' ? 'bg-red-50' : 'bg-s2'}`}>
+            <p className="text-sm font-semibold">{r.estado === 'cancelada' ? 'Cuenta cancelada' : 'Total cobrado'}</p>
+            <span className={`font-mono text-[20px] font-bold ${r.estado === 'cancelada' ? 'text-red-600' : 'text-[#173F2E]'}`}>
               {formatCurrency(r.total)}
             </span>
           </div>
 
-          <div className="rounded-xl bg-white border border-[#E5E5EA] divide-y divide-[#F2F2F7] overflow-hidden">
-            {r.pagos.map((p, i) => (
-              <div key={i} className="flex items-center justify-between px-4 py-3">
-                <p className="flex items-center gap-2 text-sm">
-                  {(() => { const Icon = METODO_INFO[p.metodo].Icon; return <Icon size={15} strokeWidth={2.2} className="text-text-3" /> })()}
-                  {METODO_INFO[p.metodo].label}
-                </p>
-                <span className="font-mono text-sm font-semibold">{formatCurrency(p.monto)}</span>
+          {/* Sin desglose de pagos ni botón de reimpresión en cancelada —
+              no hubo ningún cobro, no hay ticket de pago que reenviar. */}
+          {r.estado === 'cobro' && (
+            <>
+              <div className="rounded-xl bg-white border border-[#E5E5EA] divide-y divide-[#F2F2F7] overflow-hidden">
+                {r.pagos.map((p, i) => (
+                  <div key={i} className="flex items-center justify-between px-4 py-3">
+                    <p className="flex items-center gap-2 text-sm">
+                      {(() => { const Icon = METODO_INFO[p.metodo].Icon; return <Icon size={15} strokeWidth={2.2} className="text-text-3" /> })()}
+                      {METODO_INFO[p.metodo].label}
+                    </p>
+                    <span className="font-mono text-sm font-semibold">{formatCurrency(p.monto)}</span>
+                  </div>
+                ))}
+                {r.efectivoRecibido !== null && r.cambio !== null && r.cambio > 0 && (
+                  <>
+                    <div className="flex items-center justify-between px-4 py-3 bg-s2">
+                      <p className="text-xs text-text-3">Recibido en efectivo</p>
+                      <span className="font-mono text-xs text-text-3">
+                        {formatCurrency(r.efectivoRecibido)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-3 bg-s2">
+                      <p className="text-xs text-text-3">Cambio entregado</p>
+                      <span className="font-mono text-xs text-text-3">{formatCurrency(r.cambio)}</span>
+                    </div>
+                  </>
+                )}
               </div>
-            ))}
-            {r.efectivoRecibido !== null && r.cambio !== null && r.cambio > 0 && (
-              <>
-                <div className="flex items-center justify-between px-4 py-3 bg-s2">
-                  <p className="text-xs text-text-3">Recibido en efectivo</p>
-                  <span className="font-mono text-xs text-text-3">
-                    {formatCurrency(r.efectivoRecibido)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between px-4 py-3 bg-s2">
-                  <p className="text-xs text-text-3">Cambio entregado</p>
-                  <span className="font-mono text-xs text-text-3">{formatCurrency(r.cambio)}</span>
-                </div>
-              </>
-            )}
-          </div>
 
-          {printError && (
-            <p className="text-center text-xs font-semibold text-red-600">
-              No se pudo conectar con la impresora.
-            </p>
+              {printError && (
+                <p className="text-center text-xs font-semibold text-red-600">
+                  No se pudo conectar con la impresora.
+                </p>
+              )}
+
+              <Boton variant="secundario" onClick={handleReimprimir} disabled={imprimiendo}>
+                <Printer size={16} strokeWidth={2.2} />
+                {imprimiendo ? 'Enviando…' : 'Enviar a impresora'}
+              </Boton>
+            </>
           )}
-
-          <Boton variant="secundario" onClick={handleReimprimir} disabled={imprimiendo}>
-            <Printer size={16} strokeWidth={2.2} />
-            {imprimiendo ? 'Enviando…' : 'Enviar a impresora'}
-          </Boton>
 
           {puedeReabrir && r.pedidoId && (
             <>

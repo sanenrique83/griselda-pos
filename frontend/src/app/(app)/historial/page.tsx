@@ -11,7 +11,10 @@ export type PagoResumen = {
 }
 
 export type ReciboData = {
-  id: number           // movimiento_id
+  id: number           // movimiento_id (cobro) o pedido_id (cancelada — no hay movimiento)
+  // 'cobro' = tiene movimientos_caja tipo='cobro' real (badge "Cerrada").
+  // 'cancelada' = pedido cerrado sin ningún cobro asociado (badge "Cancelada").
+  estado: 'cobro' | 'cancelada'
   createdAt: string
   mesaLabel: string
   meseroNombre: string
@@ -42,7 +45,22 @@ export type TurnoItem = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function cargarRecibos(supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server').createClient>>, turnoId: number): Promise<ReciboData[]> {
+type SupabaseClientType = Awaited<ReturnType<typeof import('@/lib/supabase/server').createClient>>
+
+function resolverMesaLabel(pedido: any): string {
+  if (!pedido) return 'Para llevar'
+  if (pedido.tipo === 'mesa' && pedido.mesas) {
+    const mesa = pedido.mesas as { numero: number; nombre: string | null }
+    return `Mesa ${mesa.nombre ?? mesa.numero}`
+  }
+  if (pedido.tipo === 'mostrador') return 'Mostrador'
+  return 'Para llevar'
+}
+
+async function cargarRecibosCobrados(
+  supabase: SupabaseClientType,
+  turnoId: number,
+): Promise<{ recibos: ReciboData[]; pedidoIdsConCobro: Set<number>; meseroIds: Set<string> }> {
   const { data: movimientos } = await supabase
     .from('movimientos_caja')
     .select(
@@ -64,35 +82,15 @@ async function cargarRecibos(supabase: Awaited<ReturnType<typeof import('@/lib/s
     .order('created_at', { ascending: false })
 
   const rows = movimientos ?? []
+  const pedidoIdsConCobro = new Set<number>()
+  const meseroIds = new Set<string>()
 
-  // Nombre del mesero dueño del pedido de cada recibo (F5-00: antes esta
-  // pantalla no mostraba ningún nombre de usuario).
-  const meseroIds = Array.from(
-    new Set(
-      rows
-        .map((m: any) => m.cobro_subpedidos?.[0]?.subpedidos?.pedidos?.mesero_id as string | undefined)
-        .filter((id: string | undefined): id is string => !!id),
-    ),
-  )
-  const { data: perfilesData } =
-    meseroIds.length > 0
-      ? await supabase.from('perfiles').select('id, nombre').in('id', meseroIds)
-      : { data: [] as { id: string; nombre: string }[] }
-  const nombrePorUsuario = new Map((perfilesData ?? []).map((p) => [p.id, p.nombre]))
-
-  return rows.map((m: any) => {
+  const recibos: ReciboData[] = rows.map((m: any) => {
     const primerSubpedido = (m.cobro_subpedidos ?? [])[0]
     const pedido = primerSubpedido?.subpedidos?.pedidos
-
-    let mesaLabel = 'Para llevar'
-    if (pedido) {
-      if (pedido.tipo === 'mesa' && pedido.mesas) {
-        const mesa = pedido.mesas as { numero: number; nombre: string | null }
-        mesaLabel = `Mesa ${mesa.nombre ?? mesa.numero}`
-      } else if (pedido.tipo === 'mostrador') {
-        mesaLabel = 'Mostrador'
-      }
-    }
+    const pedidoId = primerSubpedido?.subpedidos?.pedido_id ?? null
+    if (pedidoId) pedidoIdsConCobro.add(pedidoId)
+    if (pedido?.mesero_id) meseroIds.add(pedido.mesero_id)
 
     const pagos: PagoResumen[] = (m.pagos ?? []).map((p: any) => ({
       metodo: p.metodo_pago as PagoResumen['metodo'],
@@ -109,9 +107,10 @@ async function cargarRecibos(supabase: Awaited<ReturnType<typeof import('@/lib/s
 
     return {
       id: m.id,
+      estado: 'cobro',
       createdAt: m.created_at,
-      mesaLabel,
-      meseroNombre: primerNombreValido(pedido?.mesero_id ? nombrePorUsuario.get(pedido.mesero_id) : undefined),
+      mesaLabel: resolverMesaLabel(pedido),
+      meseroNombre: '', // se resuelve después de juntar todos los meseroIds (cobros + cancelados)
       clienteNombre: pedido?.cliente_nombre ?? null,
       total: m.monto,
       numComensales,
@@ -120,9 +119,95 @@ async function cargarRecibos(supabase: Awaited<ReturnType<typeof import('@/lib/s
       efectivoRecibido: m.efectivo_recibido,
       cambio: m.cambio,
       pagos,
-      pedidoId: primerSubpedido?.subpedidos?.pedido_id ?? null,
-    }
+      pedidoId,
+      _meseroId: pedido?.mesero_id ?? null,
+    } as any
   })
+
+  return { recibos, pedidoIdsConCobro, meseroIds }
+}
+
+// ─── Cuentas canceladas ─────────────────────────────────────────────────────
+// Un pedido "cancelado" (badge "Cancelada") no es un estado propio de
+// `pedidos.estado` (solo existe 'abierto'/'cerrado') — se deriva: cerrado +
+// SIN ningún cobro asociado + con al menos un subpedido/producto real.
+// El filtro "con subpedidos" es necesario para no confundir esto con un
+// pedido que se cerró por fusión (unirMesas() mueve sus subpedidos al
+// destino y lo deja vacío, no cancelado) — verificado contra la base real:
+// hay pedidos 'cerrado' con 0 subpedidos que son fusiones, no cancelaciones.
+// No se agregan pedidos 'abierto' — esos ya viven en /pedidos.
+async function cargarCancelados(
+  supabase: SupabaseClientType,
+  turnoId: number,
+  pedidoIdsConCobro: Set<number>,
+): Promise<{ recibos: ReciboData[]; meseroIds: Set<string> }> {
+  const { data: pedidosCerrados } = await supabase
+    .from('pedidos')
+    .select(
+      `id, tipo, mesa_id, mesero_id, cliente_nombre, cerrado_en, created_at,
+       mesas(numero, nombre),
+       subpedidos(id, pedido_productos(cantidad, estado))`,
+    )
+    .eq('turno_id', turnoId)
+    .eq('estado', 'cerrado')
+
+  const meseroIds = new Set<string>()
+
+  const recibos: ReciboData[] = (pedidosCerrados ?? [])
+    .filter((p: any) => !pedidoIdsConCobro.has(p.id) && (p.subpedidos ?? []).length > 0)
+    .map((p: any) => {
+      if (p.mesero_id) meseroIds.add(p.mesero_id)
+      const subs: any[] = p.subpedidos ?? []
+      const numProductos = subs.reduce(
+        (s: number, sp: any) => s + (sp.pedido_productos ?? []).reduce((s2: number, pp: any) => s2 + pp.cantidad, 0),
+        0,
+      )
+
+      return {
+        id: p.id,
+        estado: 'cancelada',
+        createdAt: p.cerrado_en ?? p.created_at,
+        mesaLabel: resolverMesaLabel(p),
+        meseroNombre: '',
+        clienteNombre: p.cliente_nombre ?? null,
+        total: 0,
+        numComensales: subs.length,
+        numProductos,
+        propinaPct: null,
+        efectivoRecibido: null,
+        cambio: null,
+        pagos: [],
+        pedidoId: p.id,
+        _meseroId: p.mesero_id ?? null,
+      } as any
+    })
+
+  return { recibos, meseroIds }
+}
+
+async function cargarRecibos(supabase: SupabaseClientType, turnoId: number): Promise<ReciboData[]> {
+  const { recibos: cobrados, pedidoIdsConCobro, meseroIds: meseroIdsCobro } =
+    await cargarRecibosCobrados(supabase, turnoId)
+  const { recibos: cancelados, meseroIds: meseroIdsCancel } =
+    await cargarCancelados(supabase, turnoId, pedidoIdsConCobro)
+
+  const todosMeseroIds = Array.from(new Set([...meseroIdsCobro, ...meseroIdsCancel]))
+  const { data: perfilesData } =
+    todosMeseroIds.length > 0
+      ? await supabase.from('perfiles').select('id, nombre').in('id', todosMeseroIds)
+      : { data: [] as { id: string; nombre: string }[] }
+  const nombrePorUsuario = new Map((perfilesData ?? []).map((p) => [p.id, p.nombre]))
+
+  const todos = [...cobrados, ...cancelados].map((r: any) => {
+    const { _meseroId, ...rest } = r
+    return {
+      ...rest,
+      meseroNombre: primerNombreValido(_meseroId ? nombrePorUsuario.get(_meseroId) : undefined),
+    } as ReciboData
+  })
+
+  todos.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  return todos
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
