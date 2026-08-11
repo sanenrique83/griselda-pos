@@ -75,9 +75,9 @@ const ESCENARIOS: { id: Escenario; label: string; desc: string; Icon: typeof Use
 // no tienen significado operativo (a diferencia del semáforo de mesa en
 // lib/colorMesa.ts, que nunca se reutiliza para esto).
 const TINTES_COMENSAL = [
-  'bg-green-100 text-green-800',
+  'bg-teal-100 text-teal-800',
   'bg-amber-100 text-amber-800',
-  'bg-blue-100 text-blue-800',
+  'bg-indigo-100 text-indigo-800',
   'bg-purple-100 text-purple-800',
   'bg-pink-100 text-pink-800',
 ]
@@ -597,7 +597,7 @@ export function CobroShell({
                       disabled={!mostrarCheck}
                       className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
                         mostrarCheck
-                          ? seleccionado ? 'bg-blue-50' : 'active:bg-s2'
+                          ? seleccionado ? 'bg-[#173F2E]/5' : 'active:bg-s2'
                           : ''
                       }`}
                     >
@@ -612,7 +612,7 @@ export function CobroShell({
                           {numProductos} producto{numProductos !== 1 ? 's' : ''}
                         </p>
                       </div>
-                      <span className={`font-mono text-[14px] font-bold ${mostrarCheck && seleccionado ? 'text-blue-700' : 'text-[#173F2E]'}`}>
+                      <span className="font-mono text-[14px] font-bold text-[#173F2E]">
                         {formatCurrency(sp.total)}
                       </span>
                       {/* El ícono de persona también es el indicador de
@@ -622,7 +622,7 @@ export function CobroShell({
                       <span
                         className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${
                           mostrarCheck && seleccionado
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-[#173F2E] text-white'
                             : 'bg-s2 text-text-3'
                         }`}
                       >
@@ -647,7 +647,7 @@ export function CobroShell({
                       max={20}
                       value={nPartes}
                       onChange={(e) => setNPartes(e.target.value)}
-                      className="w-20 rounded-xl border-[1.5px] border-border bg-s2 px-3 py-2 text-center font-mono text-sm font-bold outline-none focus:border-blue-500"
+                      className="w-20 rounded-xl border-[1.5px] border-border bg-s2 px-3 py-2 text-center font-mono text-sm font-bold outline-none focus:border-[#173F2E]"
                     />
                     <span className="text-sm text-text-3">personas</span>
                   </div>
@@ -660,16 +660,16 @@ export function CobroShell({
                       max={parseInt(nPartes) || 1}
                       value={partesAPagar}
                       onChange={(e) => setPartesAPagar(e.target.value)}
-                      className="w-20 rounded-xl border-[1.5px] border-border bg-s2 px-3 py-2 text-center font-mono text-sm font-bold outline-none focus:border-blue-500"
+                      className="w-20 rounded-xl border-[1.5px] border-border bg-s2 px-3 py-2 text-center font-mono text-sm font-bold outline-none focus:border-[#173F2E]"
                     />
                     <span className="text-sm text-text-3">
                       de {nPartes}
                     </span>
                   </div>
                   {parseInt(nPartes) >= 2 && (
-                    <div className="rounded-xl bg-blue-50 px-4 py-2.5 flex items-center justify-between">
-                      <p className="text-xs text-blue-600">Precio por parte</p>
-                      <span className="font-mono text-sm font-bold text-blue-700">
+                    <div className="rounded-xl bg-[#173F2E]/5 px-4 py-2.5 flex items-center justify-between">
+                      <p className="text-xs text-[#173F2E]">Precio por parte</p>
+                      <span className="font-mono text-sm font-bold text-[#173F2E]">
                         {formatCurrency(round2(totalPedido / (parseInt(nPartes) || 1)))}
                       </span>
                     </div>
@@ -716,7 +716,7 @@ export function CobroShell({
                     className={`w-full rounded-xl border-[1.5px] bg-s2 px-3.5 py-3 text-center font-mono text-[22px] font-bold outline-none ${
                       descuentoInvalido
                         ? 'border-red-400 focus:border-red-500'
-                        : 'border-border focus:border-blue-500 focus:bg-white'
+                        : 'border-border focus:border-[#173F2E] focus:bg-white'
                     }`}
                   />
                 </div>
@@ -733,7 +733,7 @@ export function CobroShell({
                     onClick={() => setDescuentoPct(String(pct))}
                     className={`rounded-full border-[1.5px] px-3.5 py-1.5 text-[13px] font-semibold transition-all active:scale-95 ${
                       numDescuentoPct === pct
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        ? 'border-[#173F2E] bg-[#173F2E]/5 text-[#173F2E]'
                         : 'border-border bg-s2 text-text-2'
                     }`}
                   >
@@ -754,9 +754,9 @@ export function CobroShell({
                 </div>
               )}
               {numDescuentoPct > 0 && !descuentoInvalido && (
-                <div className="flex items-center justify-between rounded-xl bg-blue-50 px-4 py-2.5">
-                  <p className="text-xs text-blue-600">Descuento aplicado</p>
-                  <span className="font-mono text-sm font-bold text-blue-700">
+                <div className="flex items-center justify-between rounded-xl bg-[#173F2E]/5 px-4 py-2.5">
+                  <p className="text-xs text-[#173F2E]">Descuento aplicado</p>
+                  <span className="font-mono text-sm font-bold text-[#173F2E]">
                     −{formatCurrency(montoDescuento)}
                   </span>
                 </div>
@@ -785,28 +785,24 @@ export function CobroShell({
             onClick={() => setConPropina((v) => !v)}
             className={`w-full flex items-center gap-3 rounded-2xl border-[1.5px] px-4 py-3.5 transition-colors ${
               conPropina
-                ? 'border-emerald-400 bg-emerald-50'
+                ? 'border-[#173F2E]/40 bg-[#173F2E]/5'
                 : 'border-amber-200 bg-amber-50/60'
             }`}
           >
-            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${conPropina ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${conPropina ? 'bg-[#173F2E]/10 text-[#173F2E]' : 'bg-amber-100 text-amber-700'}`}>
               <PiggyBank size={18} strokeWidth={2} />
             </span>
             <div className="flex-1 text-left">
-              <p className={`text-sm font-semibold ${conPropina ? 'text-emerald-700' : 'text-text-1'}`}>
+              <p className={`text-sm font-semibold ${conPropina ? 'text-[#173F2E]' : 'text-text-1'}`}>
                 Propina sugerida
               </p>
-              <p className={`text-xs mt-0.5 ${conPropina ? 'text-emerald-600' : 'text-text-3'}`}>
+              <p className={`text-xs mt-0.5 ${conPropina ? 'text-[#173F2E]' : 'text-text-3'}`}>
                 {conPropina
                   ? `+${formatCurrency(propinaAmt)} → Total: ${formatCurrency(total)}`
                   : 'Toca para aplicarla'}
               </p>
             </div>
-            <span
-              className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[13px] font-bold ${
-                conPropina ? 'bg-emerald-600 text-white' : 'bg-[#173F2E] text-white'
-              }`}
-            >
+            <span className="flex-shrink-0 rounded-full bg-[#173F2E] px-3 py-1.5 text-[13px] font-bold text-white">
               {propinaPct}%
             </span>
           </button>
@@ -888,7 +884,7 @@ export function CobroShell({
                       value={efectivoRecibido}
                       onChange={(e) => setEfectivoRecibido(e.target.value)}
                       placeholder="0.00"
-                      className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-10 pr-4 font-mono text-[24px] font-bold outline-none focus:border-emerald-500 focus:bg-white"
+                      className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-10 pr-4 font-mono text-[24px] font-bold outline-none focus:border-[#173F2E] focus:bg-white"
                     />
                   </div>
 
@@ -896,20 +892,20 @@ export function CobroShell({
                     <div
                       className={`flex w-[112px] flex-shrink-0 flex-col items-center justify-center rounded-xl px-2 py-2 text-center ${
                         cambioEfectivo >= 0
-                          ? 'bg-emerald-50 border border-emerald-100'
+                          ? 'bg-[#173F2E]/5 border border-[#173F2E]/15'
                           : 'bg-red-50 border border-red-100'
                       }`}
                     >
                       <p
                         className={`text-[11px] font-semibold ${
-                          cambioEfectivo >= 0 ? 'text-emerald-700' : 'text-red-600'
+                          cambioEfectivo >= 0 ? 'text-[#173F2E]' : 'text-red-600'
                         }`}
                       >
                         {cambioEfectivo >= 0 ? 'Cambio' : 'Falta'}
                       </p>
                       <span
                         className={`font-mono text-[16px] font-bold leading-tight ${
-                          cambioEfectivo >= 0 ? 'text-emerald-600' : 'text-red-600'
+                          cambioEfectivo >= 0 ? 'text-[#173F2E]' : 'text-red-600'
                         }`}
                       >
                         {formatCurrency(Math.abs(cambioEfectivo))}
@@ -925,7 +921,7 @@ export function CobroShell({
                       onClick={() => setEfectivoRecibido(chip.valor.toString())}
                       className={`rounded-full border-[1.5px] px-3.5 py-1.5 text-[13px] font-semibold transition-all active:scale-95 ${
                         numRecibido === chip.valor
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                          ? 'border-[#173F2E] bg-[#173F2E]/5 text-[#173F2E]'
                           : 'border-border bg-s2 text-text-2'
                       }`}
                     >
@@ -941,13 +937,13 @@ export function CobroShell({
             {/* TARJETA */}
             {metodo === 'tarjeta' && (
               <div className="p-4 space-y-4">
-                <div className="flex items-start gap-3 rounded-xl bg-blue-50 px-4 py-3.5">
-                  <CreditCard size={20} strokeWidth={2} className="mt-0.5 flex-shrink-0 text-blue-600" />
+                <div className="flex items-start gap-3 rounded-xl bg-[#173F2E]/5 px-4 py-3.5">
+                  <CreditCard size={20} strokeWidth={2} className="mt-0.5 flex-shrink-0 text-[#173F2E]" />
                   <div>
-                    <p className="text-sm font-semibold text-blue-800">
+                    <p className="text-sm font-semibold text-[#173F2E]">
                       Pago con tarjeta
                     </p>
-                    <p className="mt-0.5 text-xs text-blue-600">
+                    <p className="mt-0.5 text-xs text-[#173F2E]/80">
                       Procesa el cobro en la terminal bancaria.
                       No se genera cambio.
                     </p>
@@ -962,7 +958,7 @@ export function CobroShell({
                     value={referencia}
                     onChange={(e) => setReferencia(e.target.value)}
                     placeholder="Ej: 123456"
-                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
                   />
                 </div>
               </div>
@@ -1007,7 +1003,7 @@ export function CobroShell({
 
                 {/* Fila efectivo */}
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[#173F2E]/10 text-[#173F2E]">
                     <Banknote size={16} strokeWidth={2} />
                   </div>
                   <div className="relative flex-1">
@@ -1022,7 +1018,7 @@ export function CobroShell({
                       value={mixtoEfectivo}
                       onChange={(e) => setMixtoEfectivo(e.target.value)}
                       placeholder="0.00"
-                      className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-2.5 pl-7 pr-3 font-mono text-sm font-medium outline-none focus:border-emerald-500"
+                      className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-2.5 pl-7 pr-3 font-mono text-sm font-medium outline-none focus:border-[#173F2E]"
                     />
                   </div>
                   <span className="w-[72px] text-right text-xs font-medium text-text-3">
@@ -1032,7 +1028,7 @@ export function CobroShell({
 
                 {/* Fila tarjeta */}
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[#173F2E]/10 text-[#173F2E]">
                     <CreditCard size={16} strokeWidth={2} />
                   </div>
                   <div className="relative flex-1">
@@ -1047,7 +1043,7 @@ export function CobroShell({
                       value={mixtoTarjeta}
                       onChange={(e) => setMixtoTarjeta(e.target.value)}
                       placeholder="0.00"
-                      className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-2.5 pl-7 pr-3 font-mono text-sm font-medium outline-none focus:border-blue-500"
+                      className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-2.5 pl-7 pr-3 font-mono text-sm font-medium outline-none focus:border-[#173F2E]"
                     />
                   </div>
                   <span className="w-[72px] text-right text-xs font-medium text-text-3">
@@ -1100,22 +1096,22 @@ export function CobroShell({
                     )}
 
                     {restanteMixto <= 0.009 && cambioMixto > 0.009 && (
-                      <div className="flex items-center justify-between px-4 py-2.5 bg-emerald-50">
-                        <p className="text-[13px] font-semibold text-emerald-700">
+                      <div className="flex items-center justify-between px-4 py-2.5 bg-[#173F2E]/5">
+                        <p className="text-[13px] font-semibold text-[#173F2E]">
                           Cambio (efectivo)
                         </p>
-                        <span className="font-mono text-[13px] font-bold text-emerald-600">
+                        <span className="font-mono text-[13px] font-bold text-[#173F2E]">
                           {formatCurrency(cambioMixto)}
                         </span>
                       </div>
                     )}
 
                     {restanteMixto <= 0.009 && cambioMixto <= 0.009 && (
-                      <div className="flex items-center justify-between px-4 py-2.5 bg-emerald-50">
-                        <p className="text-[13px] font-semibold text-emerald-700">
+                      <div className="flex items-center justify-between px-4 py-2.5 bg-[#173F2E]/5">
+                        <p className="text-[13px] font-semibold text-[#173F2E]">
                           Cubierto ✓
                         </p>
-                        <span className="font-mono text-[13px] font-bold text-emerald-600">
+                        <span className="font-mono text-[13px] font-bold text-[#173F2E]">
                           {formatCurrency(0)}
                         </span>
                       </div>
@@ -1158,33 +1154,6 @@ export function CobroShell({
           </div>
         )}
 
-        {/* Imprimir automáticamente — toggle iOS, mismo estado que antes */}
-        {!mostrarAnular && (
-          <button
-            onClick={() => setImprimirTicketPago((v) => !v)}
-            className="flex w-full items-center gap-3 rounded-2xl bg-white px-4 py-3.5 shadow-card active:opacity-80"
-          >
-            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-s2 text-text-2">
-              <Printer size={17} strokeWidth={2} />
-            </span>
-            <div className="flex-1 text-left">
-              <p className="text-[14px] font-semibold text-text">Imprimir ticket automáticamente</p>
-              <p className="text-[12px] text-text-3">Se imprimirá el ticket al finalizar el cobro</p>
-            </div>
-            <span
-              className={`relative h-7 w-12 flex-shrink-0 rounded-full transition-colors ${
-                imprimirTicketPago ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-                  imprimirTicketPago ? 'translate-x-[22px]' : 'translate-x-0.5'
-                }`}
-              />
-            </span>
-          </button>
-        )}
-
         {/* Error */}
         {error && (
           <div className="flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3.5 text-sm text-red-600 border border-red-100">
@@ -1203,15 +1172,39 @@ export function CobroShell({
             <p className="text-[13px] text-text-3">
               {conPropina ? `Con propina (${propinaPct}%)` : 'Total a cobrar'}
             </p>
-            <span className="font-mono text-[22px] font-bold text-green-600">
+            <span className="font-mono text-[22px] font-bold text-[#173F2E]">
               {formatCurrency(total)}
             </span>
           </div>
 
+          {/* Imprimir automáticamente — toggle iOS, de vuelta al pie fijo
+              pegado al botón "Cobrar" (decisión de una ronda anterior: que
+              nunca se pierda de vista sin hacer scroll). */}
+          <button
+            onClick={() => setImprimirTicketPago((v) => !v)}
+            className="mb-3 flex w-full items-center gap-2.5 rounded-xl bg-s2 px-3.5 py-2.5 active:opacity-70"
+          >
+            <Printer size={16} strokeWidth={2} className="flex-shrink-0 text-text-2" />
+            <span className="flex-1 text-left text-[13px] font-medium text-text-2">
+              Imprimir ticket automáticamente
+            </span>
+            <span
+              className={`relative h-6 w-[42px] flex-shrink-0 rounded-full transition-colors ${
+                imprimirTicketPago ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  imprimirTicketPago ? 'translate-x-[19px]' : 'translate-x-0.5'
+                }`}
+              />
+            </span>
+          </button>
+
           <button
             onClick={handleCobrar}
             disabled={!esValido || isPending}
-            className="flex w-full flex-col items-center gap-0.5 rounded-xl bg-green-600 py-[14px] text-white shadow-[0_4px_14px_rgba(22,163,74,.35)] active:scale-[.98] disabled:opacity-40"
+            className="flex w-full flex-col items-center gap-0.5 rounded-xl bg-[#173F2E] py-[14px] text-white shadow-[0_4px_14px_rgba(23,63,46,.32)] active:scale-[.98] active:bg-[#0F2E21] disabled:opacity-40"
           >
             <span className="flex items-center gap-2 text-base font-bold">
               <Lock size={16} strokeWidth={2.4} />
