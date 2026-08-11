@@ -1,7 +1,11 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import {
+  Banknote, CreditCard, Smartphone, CirclePlus, Users, User, UserRoundPlus, Split,
+  ChevronUp, ChevronDown, Printer, Lock, Check, X, PiggyBank,
+} from 'lucide-react'
 import {
   cobrarPedido,
   anularPedido,
@@ -10,6 +14,9 @@ import {
 } from '@/app/(app)/cobro/[pedidoId]/actions'
 import type { SubpedidoCobro } from '@/app/(app)/cobro/[pedidoId]/page'
 import { imprimirTicket, consolidarItemsCliente, type TicketConfig } from '@/lib/print'
+import { HeaderB } from '@/components/ui/HeaderB'
+import { Boton } from '@/components/ui/Boton'
+import { formatCurrency } from '@/components/ui/tokens'
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────
 
@@ -46,39 +53,33 @@ interface CobroShellProps {
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
+// Iconos lucide-react en vez de emoji — mismo criterio de "Modo captura
+// rápida"/Menú (reemplazar emoji por lucide donde el mockup muestra un
+// ícono real, no una decoración tipográfica).
 
-const METODOS: { id: Metodo; label: string; emoji: string; activeClass: string }[] = [
-  {
-    id: 'efectivo',
-    label: 'Efectivo',
-    emoji: '💵',
-    activeClass: 'bg-emerald-500 text-white shadow-[0_3px_10px_rgba(16,185,129,.35)]',
-  },
-  {
-    id: 'tarjeta',
-    label: 'Tarjeta',
-    emoji: '💳',
-    activeClass: 'bg-blue-600 text-white shadow-[0_3px_10px_rgba(37,99,235,.35)]',
-  },
-  {
-    id: 'transferencia',
-    label: 'Transf.',
-    emoji: '📱',
-    activeClass: 'bg-violet-600 text-white shadow-[0_3px_10px_rgba(124,58,237,.35)]',
-  },
-  {
-    id: 'mixto',
-    label: 'Mixto',
-    emoji: '⊕',
-    activeClass: 'bg-amber-500 text-white shadow-[0_3px_10px_rgba(245,158,11,.35)]',
-  },
+const METODOS: { id: Metodo; label: string; Icon: typeof Banknote }[] = [
+  { id: 'efectivo', label: 'Efectivo', Icon: Banknote },
+  { id: 'tarjeta', label: 'Tarjeta', Icon: CreditCard },
+  { id: 'transferencia', label: 'Transferencia', Icon: Smartphone },
+  { id: 'mixto', label: 'Mixto', Icon: CirclePlus },
 ]
 
-const ESCENARIOS: { id: Escenario; label: string }[] = [
-  { id: 'general', label: 'Cuenta general' },
-  { id: 'individual', label: 'Individual' },
-  { id: 'varios', label: 'Uno paga varios' },
-  { id: 'dividir', label: 'Dividir igual' },
+const ESCENARIOS: { id: Escenario; label: string; desc: string; Icon: typeof Users }[] = [
+  { id: 'general', label: 'Cuenta general', desc: 'Se cobrará un solo pago por toda la mesa.', Icon: Users },
+  { id: 'individual', label: 'Individual', desc: 'Cada comensal paga su consumo.', Icon: User },
+  { id: 'varios', label: 'Uno paga varios', desc: 'Un comensal paga por los demás.', Icon: UserRoundPlus },
+  { id: 'dividir', label: 'Dividir igual', desc: 'El total se divide en partes iguales.', Icon: Split },
+]
+
+// Tintes puramente decorativos para diferenciar comensales a simple vista —
+// no tienen significado operativo (a diferencia del semáforo de mesa en
+// lib/colorMesa.ts, que nunca se reutiliza para esto).
+const TINTES_COMENSAL = [
+  'bg-green-100 text-green-800',
+  'bg-amber-100 text-amber-800',
+  'bg-blue-100 text-blue-800',
+  'bg-purple-100 text-purple-800',
+  'bg-pink-100 text-pink-800',
 ]
 
 // Billetes comunes en México
@@ -126,8 +127,14 @@ export function CobroShell({
   const [nPartes, setNPartes] = useState('2')
   const [partesAPagar, setPartesAPagar] = useState('1')
 
+  // ── Desglose por comensal (tarjeta "Total a cobrar") — abierto por
+  // defecto, puramente visual (no oculta nada nuevo, solo permite
+  // colapsarlo si estorba). ──────────────────────────────────────────────────
+  const [mostrarDesglose, setMostrarDesglose] = useState(true)
+
   // ── Descuento ─────────────────────────────────────────────────────────────
   const [descuentoPct, setDescuentoPct] = useState('')
+  const descuentoInputRef = useRef<HTMLInputElement>(null)
 
   // ── Método de pago ─────────────────────────────────────────────────────────
   const [metodo, setMetodo] = useState<Metodo>('efectivo')
@@ -205,11 +212,12 @@ export function CobroShell({
     ? round2(numMixtoE - porCubrirConEfectivo)
     : 0
 
-  // Quick chips para efectivo
+  // Quick chips para efectivo — denominaciones reales (BILLETES_MX), no las
+  // del mockup ($250/$300, que no existen en la lista real).
   const chipsRapidos = [
     { label: 'Exacto', valor: total },
     ...BILLETES_MX.filter((b) => b > total)
-      .slice(0, 3)
+      .slice(0, 4)
       .map((b) => ({ label: `$${b.toLocaleString('es-MX')}`, valor: b })),
   ]
 
@@ -424,6 +432,68 @@ export function CobroShell({
     })
   }
 
+  async function handleImprimirCuenta() {
+    let ok: boolean
+    if (escenario === 'individual') {
+      // Imprime un ticket separado por cada comensal
+      ok = await imprimirTicket({
+        tipo: 'cliente',
+        escenario: 'individual',
+        mesa: mesaLabel,
+        mesero,
+        orden,
+        tipoMesa,
+        numComensales,
+        clienteNombre,
+        config: ticketConfig,
+        comensales: subpedidos.map((sp) => ({
+          comensalNombre: sp.nombre ?? `Comensal ${sp.comensal_numero}`,
+          items: sp.items,
+          subtotal: sp.total,
+          total: sp.total,
+        })),
+      }, impresionActiva)
+    } else {
+      // Pre-cuenta: si es "Uno paga varios", solo los comensales
+      // seleccionados — no toda la mesa. "Cuenta general" y
+      // "Dividir igual" sí muestran todo, porque ahí aplica a todos.
+      const precuentaItems = consolidarItemsCliente(
+        escenario === 'varios'
+          ? subpedidos
+              .filter((sp) => subSeleccionados.has(sp.id))
+              .flatMap((sp) => sp.items)
+          : itemsTicket,
+      )
+
+      const propinaPreCuenta = conPropina && propinaPct > 0
+        ? roundPropina(totalConDescuento * propinaPct / 100)
+        : 0
+      ok = await imprimirTicket({
+        tipo: 'cliente',
+        escenario: 'precuenta',
+        mesa: mesaLabel,
+        mesero,
+        orden,
+        tipoMesa,
+        numComensales,
+        clienteNombre,
+        items: precuentaItems,
+        subtotal: totalConDescuento,
+        propina: propinaPreCuenta,
+        total: round2(totalConDescuento + propinaPreCuenta),
+        metodo: '',
+        recibido: null,
+        cambio: null,
+        config: ticketConfig,
+      }, impresionActiva)
+
+      if (ok) {
+        await marcarPrecuentaImpresa(pedidoId)
+      }
+    }
+    if (!ok) setPrintError(true)
+  }
+
   // ── UI ─────────────────────────────────────────────────────────────────────
   return (
     <div
@@ -435,24 +505,23 @@ export function CobroShell({
           ⚠️ Sin conexión a impresora
         </div>
       )}
-      {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 bg-white border-b border-[#E5E5EA]">
-        <div className="flex items-center gap-2 px-4 pt-3 pb-3">
-          <button
-            onClick={() => router.push(`/pos/${pedidoId}`)}
-            className="-ml-1 px-1 py-1 text-[15px] font-medium text-blue-600 active:opacity-60"
-          >
-            ‹ Comanda
-          </button>
-          <div className="flex-1 min-w-0 text-center">
-            <p className="text-[15px] font-semibold leading-tight truncate">
-              {mesaLabel}
-            </p>
-            <p className="text-[11px] text-text-3">Cobro</p>
-          </div>
-          <div className="w-[64px]" />
-        </div>
-      </div>
+
+      {/* ── Header B ──────────────────────────────────────────────────────── */}
+      {/* Sin badge de "Terminal conectada" del mockup — no existe ninguna
+          integración real de terminal de pago (ver "Conciliación de
+          terminal bancaria" en ESTADO_PROYECTO.md, listada como pendiente
+          sin spec); mismo criterio que se aplicó a "Servir" en Pedidos. */}
+      <HeaderB
+        backLabel="Comanda"
+        onBack={() => router.push(`/pos/${pedidoId}`)}
+        titulo={mesaLabel}
+        subtitulo={
+          <p className="text-[13px] text-text-3">
+            Cuenta #{orden}
+            {numComensales ? ` · ${numComensales} comensal${numComensales !== 1 ? 'es' : ''}` : ''}
+          </p>
+        }
+      />
 
       {/* ── Cuerpo scrolleable ────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
@@ -464,129 +533,163 @@ export function CobroShell({
               ¿Quién paga?
             </p>
           </div>
-          <div className="p-3 grid grid-cols-2 gap-2">
-            {ESCENARIOS.map((e) => (
-              <button
-                key={e.id}
-                onClick={() => handleCambiarEscenario(e.id)}
-                className={`rounded-xl py-2.5 px-3 text-[13px] font-semibold transition-all active:scale-[.97] ${
-                  escenario === e.id
-                    ? 'bg-blue-600 text-white shadow-[0_2px_8px_rgba(37,99,235,.3)]'
-                    : 'bg-s2 text-text-2'
-                }`}
-              >
-                {e.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Resumen de cuenta ──────────────────────────────────────────── */}
-        <div className="rounded-2xl bg-white shadow-card overflow-hidden">
-          <div className="px-4 pt-4 pb-2 border-b border-[#E5E5EA]">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
-              {escenario === 'general' ? 'Cuenta' : 'Seleccionar comensales'}
-            </p>
-          </div>
-          <div className="divide-y divide-[#F2F2F7]">
-            {subpedidos.map((sp) => {
-              const seleccionado = subSeleccionados.has(sp.id)
-              const mostrarCheck = escenario === 'individual' || escenario === 'varios'
-
+          <div className="p-3 grid grid-cols-2 gap-2.5">
+            {ESCENARIOS.map((e) => {
+              const activo = escenario === e.id
               return (
                 <button
-                  key={sp.id}
-                  onClick={() => mostrarCheck ? toggleSubpedido(sp.id) : undefined}
-                  disabled={!mostrarCheck}
-                  className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
-                    mostrarCheck
-                      ? seleccionado
-                        ? 'bg-blue-50'
-                        : 'active:bg-s2'
-                      : ''
+                  key={e.id}
+                  onClick={() => handleCambiarEscenario(e.id)}
+                  className={`relative rounded-xl p-3.5 text-left transition-all active:scale-[.98] ${
+                    activo ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    {mostrarCheck && (
-                      <div
-                        className={`flex h-5 w-5 flex-shrink-0 items-center justify-center border-2 text-[10px] font-bold text-white transition-all ${
-                          escenario === 'individual' ? 'rounded-full' : 'rounded-[4px]'
-                        } ${
-                          seleccionado
-                            ? 'border-blue-600 bg-blue-600'
-                            : 'border-border'
-                        }`}
-                      >
-                        {seleccionado && '✓'}
-                      </div>
-                    )}
-                    <p className="text-sm text-text-2">
-                      {sp.nombre ?? `Comensal ${sp.comensal_numero}`}
-                    </p>
-                  </div>
-                  <span className={`font-mono text-sm font-medium ${
-                    mostrarCheck && seleccionado ? 'text-blue-700' : ''
-                  }`}>
-                    ${sp.total.toFixed(2)}
-                  </span>
+                  {activo && (
+                    <span className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#173F2E]">
+                      <Check size={12} strokeWidth={3} />
+                    </span>
+                  )}
+                  <e.Icon size={20} strokeWidth={2} className={activo ? 'text-white' : 'text-text-2'} />
+                  <p className="mt-2 text-[14px] font-bold leading-tight">{e.label}</p>
+                  <p className={`mt-0.5 text-[11px] leading-tight ${activo ? 'text-white/75' : 'text-text-3'}`}>
+                    {e.desc}
+                  </p>
                 </button>
               )
             })}
           </div>
+        </div>
 
-          {/* Dividir equal UI */}
-          {escenario === 'dividir' && (
-            <div className="px-4 py-3 border-t border-[#E5E5EA] space-y-3">
-              <div className="flex items-center gap-3">
-                <label className="text-sm text-text-2 flex-1">Dividir entre</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={2}
-                  max={20}
-                  value={nPartes}
-                  onChange={(e) => setNPartes(e.target.value)}
-                  className="w-20 rounded-xl border-[1.5px] border-border bg-s2 px-3 py-2 text-center font-mono text-sm font-bold outline-none focus:border-blue-500"
-                />
-                <span className="text-sm text-text-3">personas</span>
+        {/* ── Total a cobrar (expandible) + desglose por comensal ─────────── */}
+        <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+          <button
+            onClick={() => setMostrarDesglose((v) => !v)}
+            className="flex w-full items-center justify-between px-4 py-4 active:bg-s2"
+          >
+            <p className="text-[15px] font-bold">Total a cobrar</p>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[20px] font-bold text-[#173F2E]">
+                {formatCurrency(totalEscenario)}
+              </span>
+              {mostrarDesglose
+                ? <ChevronUp size={18} strokeWidth={2.4} className="text-text-4" />
+                : <ChevronDown size={18} strokeWidth={2.4} className="text-text-4" />}
+            </div>
+          </button>
+
+          {mostrarDesglose && (
+            <div className="border-t border-[#E5E5EA]">
+              <div className="px-4 pt-3 pb-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                  {escenario === 'general' ? 'Cuenta' : 'Seleccionar comensales'}
+                </p>
               </div>
-              <div className="flex items-center gap-3">
-                <label className="text-sm text-text-2 flex-1">Partes a pagar ahora</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={parseInt(nPartes) || 1}
-                  value={partesAPagar}
-                  onChange={(e) => setPartesAPagar(e.target.value)}
-                  className="w-20 rounded-xl border-[1.5px] border-border bg-s2 px-3 py-2 text-center font-mono text-sm font-bold outline-none focus:border-blue-500"
-                />
-                <span className="text-sm text-text-3">
-                  de {nPartes}
-                </span>
+              <div className="divide-y divide-[#F2F2F7]">
+                {subpedidos.map((sp, idx) => {
+                  const seleccionado = subSeleccionados.has(sp.id)
+                  const mostrarCheck = escenario === 'individual' || escenario === 'varios'
+                  const numProductos = sp.items.reduce((s, i) => s + i.cantidad, 0)
+
+                  return (
+                    <button
+                      key={sp.id}
+                      onClick={() => mostrarCheck ? toggleSubpedido(sp.id) : undefined}
+                      disabled={!mostrarCheck}
+                      className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+                        mostrarCheck
+                          ? seleccionado ? 'bg-blue-50' : 'active:bg-s2'
+                          : ''
+                      }`}
+                    >
+                      <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${TINTES_COMENSAL[idx % TINTES_COMENSAL.length]}`}>
+                        {sp.comensal_numero}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[14px] font-semibold text-text">
+                          {sp.nombre ?? `Comensal ${sp.comensal_numero}`}
+                        </p>
+                        <p className="text-[12px] text-text-3">
+                          {numProductos} producto{numProductos !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                      <span className={`font-mono text-[14px] font-bold ${mostrarCheck && seleccionado ? 'text-blue-700' : 'text-[#173F2E]'}`}>
+                        {formatCurrency(sp.total)}
+                      </span>
+                      {/* El ícono de persona también es el indicador de
+                          selección en individual/varios (evita duplicar un
+                          check aparte) — en general/dividir es solo
+                          decorativo, no hay drill-down por comensal. */}
+                      <span
+                        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${
+                          mostrarCheck && seleccionado
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-s2 text-text-3'
+                        }`}
+                      >
+                        {mostrarCheck && seleccionado
+                          ? <Check size={15} strokeWidth={3} />
+                          : <User size={15} strokeWidth={2.2} />}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
-              {parseInt(nPartes) >= 2 && (
-                <div className="rounded-xl bg-blue-50 px-4 py-2.5 flex items-center justify-between">
-                  <p className="text-xs text-blue-600">Precio por parte</p>
-                  <span className="font-mono text-sm font-bold text-blue-700">
-                    ${round2(totalPedido / (parseInt(nPartes) || 1)).toFixed(2)}
-                  </span>
+
+              {/* Dividir equal UI */}
+              {escenario === 'dividir' && (
+                <div className="px-4 py-3 border-t border-[#E5E5EA] space-y-3">
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm text-text-2 flex-1">Dividir entre</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={2}
+                      max={20}
+                      value={nPartes}
+                      onChange={(e) => setNPartes(e.target.value)}
+                      className="w-20 rounded-xl border-[1.5px] border-border bg-s2 px-3 py-2 text-center font-mono text-sm font-bold outline-none focus:border-blue-500"
+                    />
+                    <span className="text-sm text-text-3">personas</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm text-text-2 flex-1">Partes a pagar ahora</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={parseInt(nPartes) || 1}
+                      value={partesAPagar}
+                      onChange={(e) => setPartesAPagar(e.target.value)}
+                      className="w-20 rounded-xl border-[1.5px] border-border bg-s2 px-3 py-2 text-center font-mono text-sm font-bold outline-none focus:border-blue-500"
+                    />
+                    <span className="text-sm text-text-3">
+                      de {nPartes}
+                    </span>
+                  </div>
+                  {parseInt(nPartes) >= 2 && (
+                    <div className="rounded-xl bg-blue-50 px-4 py-2.5 flex items-center justify-between">
+                      <p className="text-xs text-blue-600">Precio por parte</p>
+                      <span className="font-mono text-sm font-bold text-blue-700">
+                        {formatCurrency(round2(totalPedido / (parseInt(nPartes) || 1)))}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
+
+              {/* Total del escenario */}
+              <div className="flex items-center justify-between bg-s2 px-4 py-3.5">
+                <p className="text-[15px] font-bold">
+                  {escenario === 'individual' || escenario === 'varios'
+                    ? 'Subtotal seleccionado'
+                    : 'Total'}
+                </p>
+                <span className="font-mono text-[18px] font-bold text-[#173F2E]">
+                  {formatCurrency(totalEscenario)}
+                </span>
+              </div>
             </div>
           )}
-
-          {/* Total del escenario */}
-          <div className="flex items-center justify-between bg-s2 px-4 py-3.5">
-            <p className="text-[15px] font-bold">
-              {escenario === 'individual' || escenario === 'varios'
-                ? 'Subtotal seleccionado'
-                : 'Total'}
-            </p>
-            <span className="font-mono text-[22px] font-bold text-green-600">
-              ${totalEscenario.toFixed(2)}
-            </span>
-          </div>
         </div>
 
         {/* ── Descuento ──────────────────────────────────────────────────── */}
@@ -597,10 +700,11 @@ export function CobroShell({
                 Descuento
               </p>
             </div>
-            <div className="px-4 py-4 space-y-2">
+            <div className="px-4 py-4 space-y-3">
               <div className="flex items-center gap-3">
                 <div className="relative flex-1">
                   <input
+                    ref={descuentoInputRef}
                     type="number"
                     inputMode="decimal"
                     min={0}
@@ -618,6 +722,32 @@ export function CobroShell({
                 </div>
                 <span className="font-mono text-[22px] font-bold text-text-3">%</span>
               </div>
+
+              {/* Chips rápidos — valores fijos razonables, no hay un
+                  "modo monto fijo" real (el mockup sugiere $/% pero la
+                  lógica solo soporta porcentaje) — ver resumen. */}
+              <div className="flex flex-wrap gap-2">
+                {[5, 10, 15].map((pct) => (
+                  <button
+                    key={pct}
+                    onClick={() => setDescuentoPct(String(pct))}
+                    className={`rounded-full border-[1.5px] px-3.5 py-1.5 text-[13px] font-semibold transition-all active:scale-95 ${
+                      numDescuentoPct === pct
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-border bg-s2 text-text-2'
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+                <button
+                  onClick={() => descuentoInputRef.current?.focus()}
+                  className="rounded-full border-[1.5px] border-border bg-s2 px-3.5 py-1.5 text-[13px] font-semibold text-text-2 active:scale-95"
+                >
+                  Otro
+                </button>
+              </div>
+
               {descuentoInvalido && (
                 <div className="flex items-center gap-1.5 rounded-xl bg-red-50 px-3 py-2">
                   <span className="text-xs font-bold text-red-600">Máx {descuentoMaxPct}%</span>
@@ -627,7 +757,7 @@ export function CobroShell({
                 <div className="flex items-center justify-between rounded-xl bg-blue-50 px-4 py-2.5">
                   <p className="text-xs text-blue-600">Descuento aplicado</p>
                   <span className="font-mono text-sm font-bold text-blue-700">
-                    −${montoDescuento.toFixed(2)}
+                    −{formatCurrency(montoDescuento)}
                   </span>
                 </div>
               )}
@@ -637,113 +767,57 @@ export function CobroShell({
 
         {/* ── Botón Anular mesa (solo cuando total=0) ────────────────────── */}
         {mostrarAnular && (
-          <button
-            onClick={handleAnular}
-            disabled={isPendingAnular}
-            className="w-full rounded-2xl bg-red-600 py-4 text-base font-bold text-white shadow-[0_4px_14px_rgba(220,38,38,.35)] active:scale-[.98] disabled:opacity-40"
-          >
+          <Boton variant="peligro" onClick={handleAnular} disabled={isPendingAnular}>
             {isPendingAnular ? 'Anulando…' : 'Anular mesa (sin cobro)'}
-          </button>
+          </Boton>
         )}
 
         {/* ── Propina sugerida ───────────────────────────────────────────── */}
+        {/* El mockup muestra 5 chips de porcentaje (10/12/15/18/20%)
+            seleccionables, pero solo existe UN porcentaje configurado
+            (config_sistema.propina_sugerida_pct, /mas/permisos) — no hay
+            varios niveles reales entre los que elegir. Se muestra ese único
+            valor como una píldora dentro de la misma tarjeta-toggle que ya
+            existía (tocar la tarjeta activa/desactiva la propina), en vez
+            de fabricar 4 opciones más que no llevarían a ningún lado. */}
         {propinaPct > 0 && totalConDescuento > 0 && (
           <button
             onClick={() => setConPropina((v) => !v)}
-            className={`w-full flex items-center justify-between rounded-2xl border-[1.5px] px-4 py-3.5 transition-colors ${
+            className={`w-full flex items-center gap-3 rounded-2xl border-[1.5px] px-4 py-3.5 transition-colors ${
               conPropina
                 ? 'border-emerald-400 bg-emerald-50'
-                : 'border-[#D1D1D6] bg-white'
+                : 'border-amber-200 bg-amber-50/60'
             }`}
           >
-            <div className="text-left">
+            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${conPropina ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+              <PiggyBank size={18} strokeWidth={2} />
+            </span>
+            <div className="flex-1 text-left">
               <p className={`text-sm font-semibold ${conPropina ? 'text-emerald-700' : 'text-text-1'}`}>
-                Propina sugerida ({propinaPct}%)
+                Propina sugerida
               </p>
               <p className={`text-xs mt-0.5 ${conPropina ? 'text-emerald-600' : 'text-text-3'}`}>
-                +${propinaAmt.toFixed(2)} → Total: ${total.toFixed(2)}
+                {conPropina
+                  ? `+${formatCurrency(propinaAmt)} → Total: ${formatCurrency(total)}`
+                  : 'Toca para aplicarla'}
               </p>
             </div>
-            <div
-              className={`flex h-[24px] w-[24px] flex-shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold text-white transition-all ${
-                conPropina
-                  ? 'border-emerald-500 bg-emerald-500'
-                  : 'border-border'
+            <span
+              className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[13px] font-bold ${
+                conPropina ? 'bg-emerald-600 text-white' : 'bg-[#173F2E] text-white'
               }`}
             >
-              {conPropina && '✓'}
-            </div>
+              {propinaPct}%
+            </span>
           </button>
         )}
 
         {/* ── Botón imprimir cuenta (etapa ANTES de cobrar — precuenta) ────── */}
         {!mostrarAnular && (
-          <button
-            onClick={async () => {
-              let ok: boolean
-              if (escenario === 'individual') {
-                // Imprime un ticket separado por cada comensal
-                ok = await imprimirTicket({
-                  tipo: 'cliente',
-                  escenario: 'individual',
-                  mesa: mesaLabel,
-                  mesero,
-                  orden,
-                  tipoMesa,
-                  numComensales,
-                  clienteNombre,
-                  config: ticketConfig,
-                  comensales: subpedidos.map((sp) => ({
-                    comensalNombre: sp.nombre ?? `Comensal ${sp.comensal_numero}`,
-                    items: sp.items,
-                    subtotal: sp.total,
-                    total: sp.total,
-                  })),
-                }, impresionActiva)
-              } else {
-                // Pre-cuenta: si es "Uno paga varios", solo los comensales
-                // seleccionados — no toda la mesa. "Cuenta general" y
-                // "Dividir igual" sí muestran todo, porque ahí aplica a todos.
-                const precuentaItems = consolidarItemsCliente(
-                  escenario === 'varios'
-                    ? subpedidos
-                        .filter((sp) => subSeleccionados.has(sp.id))
-                        .flatMap((sp) => sp.items)
-                    : itemsTicket,
-                )
-
-                const propinaPreCuenta = conPropina && propinaPct > 0
-                  ? roundPropina(totalConDescuento * propinaPct / 100)
-                  : 0
-                ok = await imprimirTicket({
-                  tipo: 'cliente',
-                  escenario: 'precuenta',
-                  mesa: mesaLabel,
-                  mesero,
-                  orden,
-                  tipoMesa,
-                  numComensales,
-                  clienteNombre,
-                  items: precuentaItems,
-                  subtotal: totalConDescuento,
-                  propina: propinaPreCuenta,
-                  total: round2(totalConDescuento + propinaPreCuenta),
-                  metodo: '',
-                  recibido: null,
-                  cambio: null,
-                  config: ticketConfig,
-                }, impresionActiva)
-
-                if (ok) {
-                  await marcarPrecuentaImpresa(pedidoId)
-                }
-              }
-              if (!ok) setPrintError(true)
-            }}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl border-[1.5px] border-[#D1D1D6] bg-white py-3.5 text-[15px] font-semibold text-text-2 active:bg-s2 active:scale-[.98]"
-          >
-            🖨️ Imprimir cuenta
-          </button>
+          <Boton variant="secundario" onClick={handleImprimirCuenta}>
+            <Printer size={17} strokeWidth={2.2} />
+            Imprimir cuenta
+          </Boton>
         )}
 
         {/* ── Método de pago ─────────────────────────────────────────────── */}
@@ -754,26 +828,38 @@ export function CobroShell({
                 Método de pago
               </p>
             </div>
+            {/* 2×2 en vez de las 4 columnas del mockup — con "Transferencia"
+                (la etiqueta más larga) 4-en-línea se apretaba demasiado en
+                pantallas angostas (iPhone SE); 2×2 ya es el patrón probado
+                que traía esta pantalla. */}
             <div className="grid grid-cols-2 gap-2.5 p-3">
-              {METODOS.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => {
-                    setMetodo(m.id)
-                    setReferencia('')
-                  }}
-                  className={`flex items-center gap-2.5 rounded-xl py-3.5 px-3.5 text-left transition-all active:scale-[.97] ${
-                    metodo === m.id
-                      ? m.activeClass
-                      : 'bg-s2 text-text-2'
-                  }`}
-                >
-                  <span className="text-[22px] leading-none">{m.emoji}</span>
-                  <span className="text-[14px] font-semibold leading-tight">
-                    {m.label}
-                  </span>
-                </button>
-              ))}
+              {METODOS.map((m) => {
+                const activo = metodo === m.id
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      setMetodo(m.id)
+                      setReferencia('')
+                    }}
+                    className={`relative flex flex-col items-center gap-1.5 rounded-xl border-[1.5px] py-3.5 px-3 transition-all active:scale-[.97] ${
+                      activo
+                        ? 'border-[#173F2E] bg-[#173F2E]/5'
+                        : 'border-[#E5E5EA] bg-white'
+                    }`}
+                  >
+                    <m.Icon size={22} strokeWidth={1.8} className={activo ? 'text-[#173F2E]' : 'text-text-3'} />
+                    <span className={`text-[13px] font-semibold ${activo ? 'text-[#173F2E]' : 'text-text-2'}`}>
+                      {m.label}
+                    </span>
+                    {activo && (
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#173F2E] text-white">
+                        <Check size={10} strokeWidth={3.2} />
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           </div>
         )}
@@ -789,20 +875,47 @@ export function CobroShell({
                   Cantidad recibida
                 </p>
 
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-[24px] font-bold text-text-3">
-                    $
-                  </span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    step="0.01"
-                    value={efectivoRecibido}
-                    onChange={(e) => setEfectivoRecibido(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-10 pr-4 font-mono text-[24px] font-bold outline-none focus:border-emerald-500 focus:bg-white"
-                  />
+                <div className="flex items-stretch gap-3">
+                  <div className="relative flex-1">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-[24px] font-bold text-text-3">
+                      $
+                    </span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="0.01"
+                      value={efectivoRecibido}
+                      onChange={(e) => setEfectivoRecibido(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-10 pr-4 font-mono text-[24px] font-bold outline-none focus:border-emerald-500 focus:bg-white"
+                    />
+                  </div>
+
+                  {numRecibido > 0 && (
+                    <div
+                      className={`flex w-[112px] flex-shrink-0 flex-col items-center justify-center rounded-xl px-2 py-2 text-center ${
+                        cambioEfectivo >= 0
+                          ? 'bg-emerald-50 border border-emerald-100'
+                          : 'bg-red-50 border border-red-100'
+                      }`}
+                    >
+                      <p
+                        className={`text-[11px] font-semibold ${
+                          cambioEfectivo >= 0 ? 'text-emerald-700' : 'text-red-600'
+                        }`}
+                      >
+                        {cambioEfectivo >= 0 ? 'Cambio' : 'Falta'}
+                      </p>
+                      <span
+                        className={`font-mono text-[16px] font-bold leading-tight ${
+                          cambioEfectivo >= 0 ? 'text-emerald-600' : 'text-red-600'
+                        }`}
+                      >
+                        {formatCurrency(Math.abs(cambioEfectivo))}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -817,36 +930,11 @@ export function CobroShell({
                       }`}
                     >
                       {chip.label === 'Exacto'
-                        ? `Exacto $${total.toFixed(2)}`
+                        ? `Exacto (${formatCurrency(total)})`
                         : chip.label}
                     </button>
                   ))}
                 </div>
-
-                {numRecibido > 0 && (
-                  <div
-                    className={`flex items-center justify-between rounded-xl px-4 py-3.5 ${
-                      cambioEfectivo >= 0
-                        ? 'bg-emerald-50 border border-emerald-100'
-                        : 'bg-red-50 border border-red-100'
-                    }`}
-                  >
-                    <p
-                      className={`text-sm font-semibold ${
-                        cambioEfectivo >= 0 ? 'text-emerald-700' : 'text-red-600'
-                      }`}
-                    >
-                      {cambioEfectivo >= 0 ? 'Cambio' : 'Falta'}
-                    </p>
-                    <span
-                      className={`font-mono text-[22px] font-bold ${
-                        cambioEfectivo >= 0 ? 'text-emerald-600' : 'text-red-600'
-                      }`}
-                    >
-                      ${Math.abs(cambioEfectivo).toFixed(2)}
-                    </span>
-                  </div>
-                )}
               </div>
             )}
 
@@ -854,7 +942,7 @@ export function CobroShell({
             {metodo === 'tarjeta' && (
               <div className="p-4 space-y-4">
                 <div className="flex items-start gap-3 rounded-xl bg-blue-50 px-4 py-3.5">
-                  <span className="mt-0.5 text-[20px]">💳</span>
+                  <CreditCard size={20} strokeWidth={2} className="mt-0.5 flex-shrink-0 text-blue-600" />
                   <div>
                     <p className="text-sm font-semibold text-blue-800">
                       Pago con tarjeta
@@ -884,7 +972,7 @@ export function CobroShell({
             {metodo === 'transferencia' && (
               <div className="p-4 space-y-4">
                 <div className="flex items-start gap-3 rounded-xl bg-violet-50 px-4 py-3.5">
-                  <span className="mt-0.5 text-[20px]">📱</span>
+                  <Smartphone size={20} strokeWidth={2} className="mt-0.5 flex-shrink-0 text-violet-600" />
                   <div>
                     <p className="text-sm font-semibold text-violet-800">
                       Pago por transferencia
@@ -919,8 +1007,8 @@ export function CobroShell({
 
                 {/* Fila efectivo */}
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-[18px]">
-                    💵
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                    <Banknote size={16} strokeWidth={2} />
                   </div>
                   <div className="relative flex-1">
                     <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-text-3">
@@ -944,8 +1032,8 @@ export function CobroShell({
 
                 {/* Fila tarjeta */}
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[18px]">
-                    💳
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                    <CreditCard size={16} strokeWidth={2} />
                   </div>
                   <div className="relative flex-1">
                     <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-text-3">
@@ -969,8 +1057,8 @@ export function CobroShell({
 
                 {/* Fila transferencia */}
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-violet-50 text-[18px]">
-                    📱
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+                    <Smartphone size={16} strokeWidth={2} />
                   </div>
                   <div className="relative flex-1">
                     <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-text-3">
@@ -998,7 +1086,7 @@ export function CobroShell({
                     <div className="flex items-center justify-between px-4 py-2.5">
                       <p className="text-[13px] text-text-2">Asignado</p>
                       <span className="font-mono text-[13px] font-semibold">
-                        ${sumaMixto.toFixed(2)}
+                        {formatCurrency(sumaMixto)}
                       </span>
                     </div>
 
@@ -1006,7 +1094,7 @@ export function CobroShell({
                       <div className="flex items-center justify-between px-4 py-2.5 bg-red-50">
                         <p className="text-[13px] font-semibold text-red-600">Falta</p>
                         <span className="font-mono text-[13px] font-bold text-red-600">
-                          ${restanteMixto.toFixed(2)}
+                          {formatCurrency(restanteMixto)}
                         </span>
                       </div>
                     )}
@@ -1017,7 +1105,7 @@ export function CobroShell({
                           Cambio (efectivo)
                         </p>
                         <span className="font-mono text-[13px] font-bold text-emerald-600">
-                          ${cambioMixto.toFixed(2)}
+                          {formatCurrency(cambioMixto)}
                         </span>
                       </div>
                     )}
@@ -1028,7 +1116,7 @@ export function CobroShell({
                           Cubierto ✓
                         </p>
                         <span className="font-mono text-[13px] font-bold text-emerald-600">
-                          $0.00
+                          {formatCurrency(0)}
                         </span>
                       </div>
                     )}
@@ -1070,9 +1158,37 @@ export function CobroShell({
           </div>
         )}
 
+        {/* Imprimir automáticamente — toggle iOS, mismo estado que antes */}
+        {!mostrarAnular && (
+          <button
+            onClick={() => setImprimirTicketPago((v) => !v)}
+            className="flex w-full items-center gap-3 rounded-2xl bg-white px-4 py-3.5 shadow-card active:opacity-80"
+          >
+            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-s2 text-text-2">
+              <Printer size={17} strokeWidth={2} />
+            </span>
+            <div className="flex-1 text-left">
+              <p className="text-[14px] font-semibold text-text">Imprimir ticket automáticamente</p>
+              <p className="text-[12px] text-text-3">Se imprimirá el ticket al finalizar el cobro</p>
+            </div>
+            <span
+              className={`relative h-7 w-12 flex-shrink-0 rounded-full transition-colors ${
+                imprimirTicketPago ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                  imprimirTicketPago ? 'translate-x-[22px]' : 'translate-x-0.5'
+                }`}
+              />
+            </span>
+          </button>
+        )}
+
         {/* Error */}
         {error && (
-          <div className="rounded-2xl bg-red-50 px-4 py-3.5 text-sm text-red-600 border border-red-100">
+          <div className="flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3.5 text-sm text-red-600 border border-red-100">
+            <X size={16} strokeWidth={2.4} className="mt-0.5 flex-shrink-0" />
             {error}
           </div>
         )}
@@ -1088,37 +1204,24 @@ export function CobroShell({
               {conPropina ? `Con propina (${propinaPct}%)` : 'Total a cobrar'}
             </p>
             <span className="font-mono text-[22px] font-bold text-green-600">
-              ${total.toFixed(2)}
+              {formatCurrency(total)}
             </span>
           </div>
-
-          {/* Decisión de la acción de cobrar en sí — pegada al botón,
-              deliberadamente separada de "Imprimir cuenta" (arriba, en el
-              cuerpo scrolleable), que es una etapa previa e independiente. */}
-          <button
-            onClick={() => setImprimirTicketPago((v) => !v)}
-            className="mb-3 flex w-full items-center gap-2.5 rounded-xl bg-s2 px-3.5 py-2.5 active:opacity-70"
-          >
-            <div
-              className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-[5px] border-2 text-[10px] font-bold text-white transition-all ${
-                imprimirTicketPago ? 'border-blue-600 bg-blue-600' : 'border-border'
-              }`}
-            >
-              {imprimirTicketPago && '✓'}
-            </div>
-            <span className="text-[13px] font-medium text-text-2">
-              🖨️ Imprimir ticket de pago al cobrar
-            </span>
-          </button>
 
           <button
             onClick={handleCobrar}
             disabled={!esValido || isPending}
-            className="w-full rounded-xl bg-green-600 py-[18px] text-base font-bold text-white shadow-[0_4px_14px_rgba(22,163,74,.35)] active:scale-[.98] disabled:opacity-40"
+            className="flex w-full flex-col items-center gap-0.5 rounded-xl bg-green-600 py-[14px] text-white shadow-[0_4px_14px_rgba(22,163,74,.35)] active:scale-[.98] disabled:opacity-40"
           >
-            {isPending
-              ? 'Procesando cobro…'
-              : `✓ Cobrar $${total.toFixed(2)}`}
+            <span className="flex items-center gap-2 text-base font-bold">
+              <Lock size={16} strokeWidth={2.4} />
+              {isPending ? 'Procesando cobro…' : `Cobrar ${formatCurrency(total)}`}
+            </span>
+            {!isPending && (
+              <span className="text-[12px] font-medium text-white/75">
+                {METODOS.find((m) => m.id === metodo)?.label}
+              </span>
+            )}
           </button>
         </div>
       )}
