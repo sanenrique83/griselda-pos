@@ -967,13 +967,13 @@ export function CobroShell({
             {/* TRANSFERENCIA */}
             {metodo === 'transferencia' && (
               <div className="p-4 space-y-4">
-                <div className="flex items-start gap-3 rounded-xl bg-violet-50 px-4 py-3.5">
-                  <Smartphone size={20} strokeWidth={2} className="mt-0.5 flex-shrink-0 text-violet-600" />
+                <div className="flex items-start gap-3 rounded-xl bg-[#173F2E]/5 px-4 py-3.5">
+                  <Smartphone size={20} strokeWidth={2} className="mt-0.5 flex-shrink-0 text-[#173F2E]" />
                   <div>
-                    <p className="text-sm font-semibold text-violet-800">
+                    <p className="text-sm font-semibold text-[#173F2E]">
                       Pago por transferencia
                     </p>
-                    <p className="mt-0.5 text-xs text-violet-600">
+                    <p className="mt-0.5 text-xs text-[#173F2E]/80">
                       Verifica que la transferencia haya sido recibida.
                       No se genera cambio.
                     </p>
@@ -988,7 +988,7 @@ export function CobroShell({
                     value={referencia}
                     onChange={(e) => setReferencia(e.target.value)}
                     placeholder="Ej: SPEI 2024-xxxxxx"
-                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-violet-500"
+                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
                   />
                 </div>
               </div>
@@ -1053,7 +1053,7 @@ export function CobroShell({
 
                 {/* Fila transferencia */}
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[#173F2E]/10 text-[#173F2E]">
                     <Smartphone size={16} strokeWidth={2} />
                   </div>
                   <div className="relative flex-1">
@@ -1068,7 +1068,7 @@ export function CobroShell({
                       value={mixtoTransfer}
                       onChange={(e) => setMixtoTransfer(e.target.value)}
                       placeholder="0.00"
-                      className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-2.5 pl-7 pr-3 font-mono text-sm font-medium outline-none focus:border-violet-500"
+                      className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-2.5 pl-7 pr-3 font-mono text-sm font-medium outline-none focus:border-[#173F2E]"
                     />
                   </div>
                   <span className="w-[72px] text-right text-xs font-medium text-text-3">
