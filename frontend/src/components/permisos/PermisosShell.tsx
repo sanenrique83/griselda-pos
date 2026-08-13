@@ -494,6 +494,22 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
           ))}
         </div>
 
+        {/* ── Cobro ─────────────────────────────────────────────────────────── */}
+        <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+          <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+              Cobro
+            </p>
+          </div>
+          <ToggleRow
+            label="Cobrar solo admin"
+            desc="El mesero puede abrir Cobro, ver el total, aplicar descuento e imprimir precuenta — solo el botón final de cobrar queda restringido a admin"
+            value={permisos.cobro_solo_admin}
+            onChange={(v) => handleToggle('cobro_solo_admin', v)}
+            disabled={isPending}
+          />
+        </div>
+
         {/* ── Datos de transferencia ────────────────────────────────────────── */}
         <div className="rounded-2xl bg-white shadow-card overflow-hidden">
           <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">

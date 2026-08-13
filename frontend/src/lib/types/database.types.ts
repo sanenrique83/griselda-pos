@@ -121,6 +121,14 @@ export interface ConfigSistema {
   // es validación de cierre, es un aviso antes de llegar a la hora fin.
   recordatorio_fin_turno_activo: boolean
   recordatorio_fin_turno_minutos: number
+  // Restringe el paso FINAL de cobrar (botón "Cobrar $X" en CobroShell) a
+  // admin — un mesero con este permiso activo puede seguir abriendo
+  // /cobro/[pedidoId], ver el total, aplicar descuento e imprimir
+  // precuenta. Puente hacia un futuro rol "Cajero" real: cuando exista el
+  // sistema de permisos por rol, la fuente de la verificación debe migrar
+  // de esta columna a esa tabla, sin mover el punto donde se verifica (ver
+  // CobroShell.tsx).
+  cobro_solo_admin: boolean
 }
 
 export interface Area {

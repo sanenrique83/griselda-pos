@@ -63,7 +63,7 @@ export default async function CobroPage({
       .select(`
         propina_sugerida_pct, propinas_sugeridas_pct, moneda, impresion_activa,
         transferencia_banco, transferencia_clabe, transferencia_titular,
-        descuentos_mesero, descuento_max_pct,
+        descuentos_mesero, descuento_max_pct, cobro_solo_admin,
         ticket_nombre, ticket_subtitulo, ticket_direccion, ticket_telefono, ticket_rfc,
         ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea,
         formato_modificadores_ticket
@@ -158,6 +158,10 @@ export default async function CobroPage({
   const descuentoHabilitado =
     esAdmin || ((config as any)?.descuentos_mesero === true)
   const descuentoMaxPct = esAdmin ? 100 : ((config as any)?.descuento_max_pct ?? 0)
+  // Permiso "Cobrar solo admin" — solo bloquea el botón final de cobrar
+  // (señal de UI); la verificación que de verdad importa está en
+  // cobrarPedido() (actions.ts), server-side, por si alguien salta esta capa.
+  const puedeCobrar = esAdmin || (config as any)?.cobro_solo_admin !== true
 
   // Propinas sugeridas (chips) — propinas_sugeridas_pct (CSV) es la fuente
   // nueva; si nunca se configuró (NULL, distinto de '' que sí es "el admin
@@ -204,6 +208,7 @@ export default async function CobroPage({
       }}
       descuentoHabilitado={descuentoHabilitado}
       descuentoMaxPct={descuentoMaxPct}
+      puedeCobrar={puedeCobrar}
       ticketConfig={ticketConfig}
       impresionActiva={(config as any)?.impresion_activa ?? false}
       mesero={meseroNombreTicket}

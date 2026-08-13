@@ -42,6 +42,12 @@ interface CobroShellProps {
   datosBancarios?: DatosBancarios
   descuentoHabilitado?: boolean
   descuentoMaxPct?: number
+  // Permiso "Cobrar solo admin" (config_sistema.cobro_solo_admin), resuelto
+  // en la page — default true (comportamiento de hoy: cualquiera con acceso
+  // a esta pantalla puede completar el cobro). En false, el mesero puede
+  // seguir viendo todo (total, descuento, imprimir precuenta) pero el botón
+  // final "Cobrar $X" queda deshabilitado — ver el punto de uso abajo.
+  puedeCobrar?: boolean
   ticketConfig: TicketConfig
   impresionActiva?: boolean
   // Datos de servicio para el bloque de encabezado del ticket de cliente
@@ -110,6 +116,7 @@ export function CobroShell({
   datosBancarios,
   descuentoHabilitado = false,
   descuentoMaxPct = 0,
+  puedeCobrar = true,
   ticketConfig,
   impresionActiva = false,
   mesero,
@@ -1276,9 +1283,20 @@ export function CobroShell({
             </span>
           </button>
 
+          {/* Permiso "Cobrar solo admin" — el mesero llega hasta aquí (ve
+              total, aplica descuento, imprime precuenta) pero el paso FINAL
+              de cobrar queda bloqueado. Esta señal visual es solo UX; la
+              verificación real está en cobrarPedido() (actions.ts),
+              server-side — deshabilitar este botón nunca es, por sí solo,
+              control de acceso. */}
+          {!puedeCobrar && (
+            <p className="mb-2 text-center text-[12px] font-medium text-amber-700">
+              Cobrar está restringido a admin — pide que un admin complete el cobro.
+            </p>
+          )}
           <button
             onClick={handleCobrar}
-            disabled={!esValido || isPending}
+            disabled={!esValido || isPending || !puedeCobrar}
             className="flex w-full flex-col items-center gap-0.5 rounded-xl bg-[#173F2E] py-[14px] text-white shadow-[0_4px_14px_rgba(23,63,46,.32)] active:scale-[.98] active:bg-[#0F2E21] disabled:opacity-40"
           >
             <span className="flex items-center gap-2 text-base font-bold">

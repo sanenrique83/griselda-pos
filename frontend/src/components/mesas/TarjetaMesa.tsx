@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Wallet, Clock3 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Users, Wallet, Clock3, Receipt } from 'lucide-react'
 import type { MesaUI } from '@/app/(app)/mesas/page'
 import { colorSemaforoMesa, type ColorMesa } from '@/lib/colorMesa'
 import { mostrarAvisoPrecuenta } from '@/lib/precuenta'
 import { formatCurrency } from '@/components/ui/tokens'
 import { TiempoMesa } from './TiempoMesa'
 import { AvisoPrecuenta } from './AvisoPrecuenta'
+import { BadgePrecuentaImpresa } from './BadgePrecuentaImpresa'
 
 interface TarjetaMesaProps {
   mesa: MesaUI
@@ -38,6 +40,7 @@ export function TarjetaMesa({
   alertaPrecuentaActiva,
   alertaPrecuentaMinutos,
 }: TarjetaMesaProps) {
+  const router = useRouter()
   const ocupada = mesa.pedido_activo !== null
 
   // Reevalúa el semáforo cada 30s — el color depende del tiempo transcurrido
@@ -62,17 +65,40 @@ export function TarjetaMesa({
     ahora ?? undefined,
   )
   const estilo = ESTILO_TARJETA[color]
+  const precuentaImpresaEn = mesa.pedido_activo?.precuentaImpresaEn ?? null
 
+  // Ya no es un <button> nativo: la tarjeta necesita contener un botón real
+  // aparte ("Cobrar", abajo) — un <button> dentro de otro <button> es HTML
+  // inválido. Un div con role="button" mantiene el comportamiento de tap y
+  // teclado sin ese problema.
   return (
-    <button
-      onClick={onClick}
-      disabled={isPending}
-      className={`relative w-full rounded-xl p-3.5 text-left shadow-card transition-transform active:scale-[.97] disabled:opacity-60 border-[1.5px] ${estilo.border} ${estilo.bg}`}
+    <div
+      onClick={() => !isPending && onClick()}
+      role="button"
+      tabIndex={isPending ? -1 : 0}
+      aria-disabled={isPending}
+      onKeyDown={(e) => {
+        if (isPending) return
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      className={`relative w-full rounded-xl p-3.5 text-left shadow-card transition-transform active:scale-[.97] ${isPending ? 'opacity-60' : 'cursor-pointer'} border-[1.5px] ${estilo.border} ${estilo.bg}`}
     >
       {/* Spinner mientras se crea el pedido */}
       {isPending && (
         <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/70">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#173F2E] border-t-transparent" />
+        </div>
+      )}
+
+      {/* Badge de precuenta impresa — siempre visible, esquina superior
+          derecha, aparte del aviso ámbar de abajo (que solo aparece pasado
+          el umbral configurado). */}
+      {precuentaImpresaEn && (
+        <div className="absolute right-2.5 top-2.5">
+          <BadgePrecuentaImpresa />
         </div>
       )}
 
@@ -133,6 +159,22 @@ export function TarjetaMesa({
           </div>
         </>
       )}
-    </button>
+
+      {/* Atajo directo a Cobrar — quita el paso de pasar por la comanda
+          cuando ya se imprimió precuenta (probablemente ya están listos
+          para pagar). */}
+      {precuentaImpresaEn && mesa.pedido_activo && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            router.push(`/cobro/${mesa.pedido_activo!.id}`)
+          }}
+          className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#173F2E] py-1.5 text-[11px] font-semibold text-white active:scale-[.97]"
+        >
+          <Receipt size={12} strokeWidth={2.4} />
+          Cobrar
+        </button>
+      )}
+    </div>
   )
 }

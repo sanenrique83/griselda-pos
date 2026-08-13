@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Users, Wallet } from 'lucide-react'
+import { Users, Wallet, Receipt } from 'lucide-react'
 import {
   DndContext,
   PointerSensor,
@@ -20,6 +20,7 @@ import { calcularPosicionesSillas } from '@/lib/asientos'
 import { colorSemaforoMesa, ESTILO_COLOR_MESA } from '@/lib/colorMesa'
 import { mostrarAvisoPrecuenta } from '@/lib/precuenta'
 import { AvisoPrecuenta } from './AvisoPrecuenta'
+import { BadgePrecuentaImpresa } from './BadgePrecuentaImpresa'
 import { unirMesas, unirMesaLibreAOcupada } from '@/app/(app)/pos/[pedidoId]/actions'
 import { guardarDisposicion } from '@/app/(app)/mas/mapa-mesas/actions'
 import {
@@ -374,6 +375,7 @@ function MesaArrastrable({
   ahora: number
   mostrarPrecuenta: boolean
 }) {
+  const router = useRouter()
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(mesa.id),
   })
@@ -385,62 +387,92 @@ function MesaArrastrable({
     zIndex: isDragging ? 10 : 1,
   }
 
+  const precuentaImpresaEn = mesa.pedido_activo?.precuentaImpresaEn ?? null
+
+  // Envuelto en un div (en vez de style directo en el <button> arrastrable)
+  // para poder superponer el badge y el atajo de Cobrar como hermanos —
+  // ninguno de los dos participa del drag (no llevan {...listeners}).
   return (
-    <button
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      onClick={onClick}
-      className="absolute touch-none active:scale-[.96] transition-transform"
-      style={style}
-    >
-      {mostrarPrecuenta && mesa.pedido_activo?.precuentaImpresaEn && (
-        <div className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2">
-          <AvisoPrecuenta
-            precuentaImpresaEn={mesa.pedido_activo.precuentaImpresaEn}
-            ahora={ahora}
-            className="border border-amber-200 bg-white shadow-sm"
-          />
+    <div className="absolute" style={style}>
+      <button
+        ref={setNodeRef}
+        {...listeners}
+        {...attributes}
+        onClick={onClick}
+        className="touch-none active:scale-[.96] transition-transform"
+      >
+        {mostrarPrecuenta && mesa.pedido_activo?.precuentaImpresaEn && (
+          <div className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2">
+            <AvisoPrecuenta
+              precuentaImpresaEn={mesa.pedido_activo.precuentaImpresaEn}
+              ahora={ahora}
+              className="border border-amber-200 bg-white shadow-sm"
+            />
+          </div>
+        )}
+        <MesaShape
+          forma={mesa.forma}
+          tamano={mesa.tamano}
+          rotacion={mesa.rotacion}
+          colorEstado={colorEstado}
+          anilloColor={anilloColor}
+          marcadores={marcadores}
+        >
+          <span className="text-[13px] font-bold leading-none">
+            {mesa.nombre ?? mesa.numero}
+          </span>
+          {mesa.fuera_de_servicio && <span className="text-[11px] leading-none">🔧</span>}
+          {mesa.pedido_activo && (
+            <>
+              {mesa.tamano !== 'chico' && (
+                <span className="flex items-center gap-1 text-[9px] leading-none text-text-3">
+                  <Users size={9} strokeWidth={2.4} />
+                  {mesa.pedido_activo.num_comensales}
+                </span>
+              )}
+              <TiempoMesa
+                desde={mesa.pedido_activo.created_at}
+                umbralMinutos={tiempoMesaAlertaMinutos}
+                className="text-[9px] leading-none"
+              />
+              {mesa.tamano !== 'chico' && mesa.pedido_activo.monto > 0 && (
+                <span className="flex items-center gap-1 text-[9px] font-mono font-semibold leading-none text-text-2">
+                  <Wallet size={9} strokeWidth={2.4} />
+                  {formatCurrency(mesa.pedido_activo.monto)}
+                </span>
+              )}
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: ESTILO_COLOR_MESA[colorEstado].dot }}
+              />
+            </>
+          )}
+        </MesaShape>
+      </button>
+
+      {/* Badge de precuenta impresa — siempre visible, esquina, aparte del
+          aviso ámbar centrado de arriba (que solo aparece pasado el
+          umbral). */}
+      {precuentaImpresaEn && (
+        <div className="absolute -right-1 -top-1 z-10">
+          <BadgePrecuentaImpresa className="border border-white" />
         </div>
       )}
-      <MesaShape
-        forma={mesa.forma}
-        tamano={mesa.tamano}
-        rotacion={mesa.rotacion}
-        colorEstado={colorEstado}
-        anilloColor={anilloColor}
-        marcadores={marcadores}
-      >
-        <span className="text-[13px] font-bold leading-none">
-          {mesa.nombre ?? mesa.numero}
-        </span>
-        {mesa.fuera_de_servicio && <span className="text-[11px] leading-none">🔧</span>}
-        {mesa.pedido_activo && (
-          <>
-            {mesa.tamano !== 'chico' && (
-              <span className="flex items-center gap-1 text-[9px] leading-none text-text-3">
-                <Users size={9} strokeWidth={2.4} />
-                {mesa.pedido_activo.num_comensales}
-              </span>
-            )}
-            <TiempoMesa
-              desde={mesa.pedido_activo.created_at}
-              umbralMinutos={tiempoMesaAlertaMinutos}
-              className="text-[9px] leading-none"
-            />
-            {mesa.tamano !== 'chico' && mesa.pedido_activo.monto > 0 && (
-              <span className="flex items-center gap-1 text-[9px] font-mono font-semibold leading-none text-text-2">
-                <Wallet size={9} strokeWidth={2.4} />
-                {formatCurrency(mesa.pedido_activo.monto)}
-              </span>
-            )}
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ backgroundColor: ESTILO_COLOR_MESA[colorEstado].dot }}
-            />
-          </>
-        )}
-      </MesaShape>
-    </button>
+
+      {/* Atajo directo a Cobrar — icono solo, la forma de mesa es
+          demasiado chica para un botón con texto. */}
+      {precuentaImpresaEn && mesa.pedido_activo && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            router.push(`/cobro/${mesa.pedido_activo!.id}`)
+          }}
+          title="Cobrar"
+          className="absolute -bottom-1 -right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[#173F2E] text-white shadow active:scale-90"
+        >
+          <Receipt size={12} strokeWidth={2.4} />
+        </button>
+      )}
+    </div>
   )
 }

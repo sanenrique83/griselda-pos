@@ -173,6 +173,25 @@ export async function cobrarPedido(data: {
 
   const { data: { user } } = await supabase.auth.getUser()
 
+  // ── Permiso "Cobrar solo admin" (config_sistema.cobro_solo_admin) ────────
+  // Verificación REAL, server-side — el botón deshabilitado en
+  // CobroShell.tsx es solo la señal visual, esto es lo que de verdad
+  // bloquea el cobro (un botón disabled nunca es, por sí solo, control de
+  // acceso). Fuente de la verdad HOY: config_sistema.cobro_solo_admin,
+  // booleano simple. Cuando exista un sistema de permisos por rol real (rol
+  // "Cajero"), esta verificación debe leer de esa tabla de permisos en vez
+  // de esta columna — sin mover este PUNTO donde se verifica, solo cambiar
+  // de dónde saca la respuesta.
+  if (user) {
+    const [{ data: perfilCobro }, { data: configCobro }] = await Promise.all([
+      supabase.from('perfiles').select('rol').eq('id', user.id).single(),
+      supabase.from('config_sistema').select('cobro_solo_admin').eq('id', 1).single(),
+    ])
+    if (configCobro?.cobro_solo_admin === true && perfilCobro?.rol !== 'admin') {
+      return { error: 'Cobrar está restringido a admin en este momento.' }
+    }
+  }
+
   // Validar que los pagos cubran el total físico (negocio + propina)
   const totalFisico = data.totalCobrado + data.propina
   const sumaPagos = data.pagos.reduce((s, p) => s + p.monto, 0)
