@@ -844,7 +844,7 @@ export function CobroShell({
                 <PiggyBank size={18} strokeWidth={2} />
               </span>
               <div className="flex-1 text-left">
-                <p className={`text-sm font-semibold ${propinaSeleccionada ? 'text-[#173F2E]' : 'text-text-1'}`}>
+                <p className={`text-sm font-semibold ${propinaSeleccionada ? 'text-[#173F2E]' : 'text-text'}`}>
                   Propina sugerida
                 </p>
                 <p className={`text-xs mt-0.5 ${propinaSeleccionada ? 'text-[#173F2E]' : 'text-text-3'}`}>

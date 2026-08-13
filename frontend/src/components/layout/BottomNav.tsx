@@ -48,13 +48,13 @@ export function BottomNav({ rol, pedidosActivos = 0 }: BottomNavProps) {
               key={tab.href}
               href={tab.href}
               className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium transition-colors ${
-                isActive ? 'text-blue-600' : 'text-text-3'
+                isActive ? 'text-[#173F2E]' : 'text-text-3'
               }`}
             >
               <div className="relative">
                 <Icon size={22} strokeWidth={isActive ? 2.5 : 1.8} />
                 {tab.href === '/pedidos' && pedidosActivos > 0 && (
-                  <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white">
+                  <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#173F2E] px-1 text-[10px] font-bold text-white">
                     {pedidosActivos > 99 ? '99+' : pedidosActivos}
                   </span>
                 )}

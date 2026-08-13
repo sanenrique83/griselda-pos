@@ -155,7 +155,7 @@ export function CorteZShell({
             type="date"
             value={fechaInput}
             onChange={(e) => setFechaInput(e.target.value)}
-            className="flex-1 rounded-xl border border-[#E5E5EA] px-3 py-2.5 text-[14px] font-medium text-text-1"
+            className="flex-1 rounded-xl border border-[#E5E5EA] px-3 py-2.5 text-[14px] font-medium text-text"
           />
           <Boton fullWidth={false} className="flex-shrink-0" onClick={handleGenerar}>
             Generar Corte Z
@@ -323,7 +323,7 @@ function FilaMonto({
     <div className="flex items-center justify-between px-4 py-3">
       <p className="text-[13px] text-text-2">{label}</p>
       <span
-        className={`font-mono text-[13px] font-semibold ${negativo && monto > 0 ? 'text-red-600' : 'text-text-1'}`}
+        className={`font-mono text-[13px] font-semibold ${negativo && monto > 0 ? 'text-red-600' : 'text-text'}`}
       >
         {negativo && monto > 0 ? '-' : ''}${fmtMoney(monto)}
       </span>

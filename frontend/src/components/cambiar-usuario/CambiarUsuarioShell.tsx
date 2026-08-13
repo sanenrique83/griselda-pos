@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
+import { HeaderB } from '@/components/ui/HeaderB'
 import { cambiarUsuario } from '@/app/(app)/cambiar-usuario/actions'
 import type { UsuarioSwitchable } from '@/app/(app)/cambiar-usuario/page'
 
@@ -57,10 +57,7 @@ export function CambiarUsuarioShell({ usuarios }: CambiarUsuarioShellProps) {
 
   return (
     <div className="min-h-full bg-s2">
-      <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <BotonRegresarMas />
-        <h1 className="mt-1 text-[20px] font-bold leading-tight">Cambiar de usuario</h1>
-      </div>
+      <HeaderB backLabel="Más" onBack={() => router.push('/mas')} titulo="Cambiar de usuario" />
 
       <div className="px-4 py-4">
         {!seleccionado ? (
@@ -79,7 +76,7 @@ export function CambiarUsuarioShell({ usuarios }: CambiarUsuarioShellProps) {
                     onClick={() => elegirUsuario(u)}
                     className="flex w-full items-center gap-3 px-4 py-4 text-left active:bg-s2"
                   >
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-[15px] font-bold text-blue-600">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#173F2E]/10 text-[15px] font-bold text-[#173F2E]">
                       {u.nombre.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -94,13 +91,13 @@ export function CambiarUsuarioShell({ usuarios }: CambiarUsuarioShellProps) {
           )
         ) : (
           <div className="flex flex-col items-center pt-6">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-xl font-bold text-blue-600">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#173F2E]/10 text-xl font-bold text-[#173F2E]">
               {seleccionado.nombre.charAt(0).toUpperCase()}
             </div>
             <p className="mt-3 text-[15px] font-semibold">{seleccionado.nombre}</p>
             <button
               onClick={volver}
-              className="mt-1 text-[12px] font-medium text-blue-600 active:opacity-60"
+              className="mt-1 text-[12px] font-medium text-[#173F2E] active:opacity-60"
             >
               No soy yo — cambiar
             </button>
@@ -111,7 +108,7 @@ export function CambiarUsuarioShell({ usuarios }: CambiarUsuarioShellProps) {
                 <div
                   key={i}
                   className={`h-3.5 w-3.5 rounded-full border-2 transition-colors ${
-                    i < pin.length ? 'border-blue-600 bg-blue-600' : 'border-[#D1D1D6] bg-transparent'
+                    i < pin.length ? 'border-[#173F2E] bg-[#173F2E]' : 'border-[#D1D1D6] bg-transparent'
                   }`}
                 />
               ))}
@@ -132,7 +129,7 @@ export function CambiarUsuarioShell({ usuarios }: CambiarUsuarioShellProps) {
                     key={idx}
                     onClick={() => handleTecla(tecla)}
                     disabled={isPending}
-                    className="rounded-2xl bg-white py-4 text-xl font-semibold text-text-1 shadow-card active:scale-[.96] disabled:opacity-40"
+                    className="rounded-2xl bg-white py-4 text-xl font-semibold text-text shadow-card active:scale-[.96] disabled:opacity-40"
                   >
                     {tecla}
                   </button>

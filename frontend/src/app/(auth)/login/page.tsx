@@ -60,7 +60,7 @@ function LoginForm() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-card border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
+              className="w-full rounded-card border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-[#173F2E] focus:ring-2 focus:ring-[#173F2E]/20"
             />
           </div>
 
@@ -74,7 +74,7 @@ function LoginForm() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-card border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
+              className="w-full rounded-card border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-[#173F2E] focus:ring-2 focus:ring-[#173F2E]/20"
             />
           </div>
 
@@ -87,7 +87,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="touch-target w-full rounded-card bg-blue-600 px-4 py-[18px] text-sm font-semibold text-white disabled:opacity-50"
+            className="touch-target w-full rounded-card bg-[#173F2E] px-4 py-[18px] text-sm font-semibold text-white disabled:opacity-50"
           >
             {loading ? 'Entrando…' : 'Entrar'}
           </button>

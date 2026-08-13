@@ -112,7 +112,7 @@ export function CancelacionesShell({
                 type="date"
                 value={desde}
                 onChange={(e) => setDesde(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-[#E5E5EA] px-3 py-2.5 text-[14px] font-medium text-text-1"
+                className="mt-1 w-full rounded-xl border border-[#E5E5EA] px-3 py-2.5 text-[14px] font-medium text-text"
               />
             </label>
             <label className="block">
@@ -123,7 +123,7 @@ export function CancelacionesShell({
                 type="date"
                 value={hasta}
                 onChange={(e) => setHasta(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-[#E5E5EA] px-3 py-2.5 text-[14px] font-medium text-text-1"
+                className="mt-1 w-full rounded-xl border border-[#E5E5EA] px-3 py-2.5 text-[14px] font-medium text-text"
               />
             </label>
           </div>
@@ -135,7 +135,7 @@ export function CancelacionesShell({
             <select
               value={meseroId}
               onChange={(e) => setMeseroId(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#E5E5EA] px-3 py-2.5 text-[14px] font-medium text-text-1"
+              className="mt-1 w-full rounded-xl border border-[#E5E5EA] px-3 py-2.5 text-[14px] font-medium text-text"
             >
               <option value="">Todos</option>
               {meserosOpciones.map((m) => (
@@ -153,7 +153,7 @@ export function CancelacionesShell({
             <select
               value={productoId}
               onChange={(e) => setProductoId(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#E5E5EA] px-3 py-2.5 text-[14px] font-medium text-text-1"
+              className="mt-1 w-full rounded-xl border border-[#E5E5EA] px-3 py-2.5 text-[14px] font-medium text-text"
             >
               <option value="">Todos</option>
               {productosOpciones.map((p) => (
@@ -173,7 +173,7 @@ export function CancelacionesShell({
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
               placeholder="Buscar en el motivo…"
-              className="mt-1 w-full rounded-xl border border-[#E5E5EA] px-3 py-2.5 text-[14px] font-medium text-text-1"
+              className="mt-1 w-full rounded-xl border border-[#E5E5EA] px-3 py-2.5 text-[14px] font-medium text-text"
             />
           </label>
 
