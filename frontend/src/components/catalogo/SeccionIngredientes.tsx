@@ -117,7 +117,7 @@ export function SeccionIngredientes({ ingredientes: initial }: SeccionIngredient
         <button
           onClick={handleTodosDisponibles}
           disabled={isPendingAll || todosDisponibles || ingredientes.length === 0}
-          className="rounded-xl bg-blue-600 px-3 py-2 text-[12px] font-semibold text-white shadow-[0_2px_8px_rgba(37,99,235,.25)] active:scale-[.97] disabled:opacity-40"
+          className="rounded-xl bg-[#173F2E] px-3 py-2 text-[12px] font-semibold text-white shadow-[0_2px_8px_rgba(23,63,46,.32)] active:scale-[.97] disabled:opacity-40"
         >
           {isPendingAll ? '…' : 'Todos ✓'}
         </button>
@@ -141,7 +141,7 @@ export function SeccionIngredientes({ ingredientes: initial }: SeccionIngredient
                 <button
                   onClick={() => handleToggle(ing.id)}
                   className={`relative flex-shrink-0 h-[24px] w-[42px] rounded-full transition-colors duration-200 ${
-                    ing.disponible ? 'bg-green-500' : 'bg-[#D1D1D6]'
+                    ing.disponible ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
                   }`}
                   aria-label={ing.disponible ? 'Marcar agotado' : 'Marcar disponible'}
                 >
@@ -154,7 +154,7 @@ export function SeccionIngredientes({ ingredientes: initial }: SeccionIngredient
 
                 <button
                   onClick={() => abrirSheet({ tipo: 'editar', ing })}
-                  className="text-[12px] font-medium text-blue-600 active:opacity-60"
+                  className="text-[12px] font-medium text-[#173F2E] active:opacity-60"
                 >
                   Editar
                 </button>
@@ -212,7 +212,7 @@ export function SeccionIngredientes({ ingredientes: initial }: SeccionIngredient
               value={formNombre}
               onChange={(e) => setFormNombre(e.target.value)}
               placeholder="Ej: Aguacate, Queso Oaxaca, Cebolla…"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500 focus:bg-white"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
             />
           </div>
 
@@ -224,7 +224,7 @@ export function SeccionIngredientes({ ingredientes: initial }: SeccionIngredient
             <button
               onClick={handleGuardar}
               disabled={isPendingForm}
-              className="flex-[2] rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
+              className="flex-[2] rounded-xl bg-[#173F2E] py-[14px] text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
             >
               {isPendingForm ? 'Guardando…' : 'Guardar'}
             </button>

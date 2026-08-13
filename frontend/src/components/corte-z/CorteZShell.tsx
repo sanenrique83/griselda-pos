@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
+import { HeaderB } from '@/components/ui/HeaderB'
+import { Boton } from '@/components/ui/Boton'
 import type { CorteZReporte } from '@/app/(app)/mas/corte-z/page'
 import { imprimirTicket, type TicketConfig } from '@/lib/print'
 
@@ -140,12 +141,12 @@ export function CorteZShell({
 
   return (
     <div className="min-h-full bg-s2">
-      {/* Header */}
-      <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <BotonRegresarMas />
-        <h1 className="mt-1 text-[20px] font-bold leading-tight">Corte Z</h1>
-        <p className="mt-0.5 text-[13px] text-text-3 capitalize">{fmtFechaLarga(reporte.fecha)}</p>
-      </div>
+      <HeaderB
+        backLabel="Más"
+        onBack={() => router.push('/mas')}
+        titulo="Corte Z"
+        subtitulo={<p className="text-[13px] text-text-3 capitalize">{fmtFechaLarga(reporte.fecha)}</p>}
+      />
 
       <div className="px-4 py-4 space-y-4">
         {/* ── Selector de fecha ─────────────────────────────────────────────── */}
@@ -156,12 +157,9 @@ export function CorteZShell({
             onChange={(e) => setFechaInput(e.target.value)}
             className="flex-1 rounded-xl border border-[#E5E5EA] px-3 py-2.5 text-[14px] font-medium text-text-1"
           />
-          <button
-            onClick={handleGenerar}
-            className="flex-shrink-0 rounded-xl bg-blue-600 px-4 py-2.5 text-[14px] font-semibold text-white active:opacity-70"
-          >
+          <Boton fullWidth={false} className="flex-shrink-0" onClick={handleGenerar}>
             Generar Corte Z
-          </button>
+          </Boton>
         </div>
 
         {!hayDatos && (
@@ -191,7 +189,7 @@ export function CorteZShell({
             label="Pedidos cerrados"
             value={String(reporte.pedidosCerrados)}
             unit={reporte.pedidosCerrados !== 1 ? 'pedidos' : 'pedido'}
-            color="blue"
+            color="indigo"
           />
         </div>
 
@@ -228,7 +226,7 @@ export function CorteZShell({
                 <div key={t.id} className="px-4 py-3">
                   <div className="flex items-center justify-between">
                     <p className="text-[14px] font-semibold">Turno #{t.id}</p>
-                    <span className="font-mono text-[14px] font-bold text-green-600">
+                    <span className="font-mono text-[14px] font-bold text-[#173F2E]">
                       ${fmtMoney(t.ventas)}
                     </span>
                   </div>
@@ -256,13 +254,9 @@ export function CorteZShell({
           >
             ↓ Exportar CSV
           </button>
-          <button
-            onClick={handleImprimir}
-            disabled={!hayDatos || imprimiendo}
-            className="flex-1 rounded-xl bg-blue-600 py-3.5 text-[14px] font-semibold text-white active:opacity-70 disabled:opacity-40"
-          >
+          <Boton className="flex-1" onClick={handleImprimir} disabled={!hayDatos || imprimiendo}>
             {imprimiendo ? 'Enviando…' : '🖨 Imprimir'}
-          </button>
+          </Boton>
         </div>
 
         <div className="h-2" />
@@ -283,12 +277,12 @@ function MetricCard({
   label: string
   value: string
   unit?: string
-  color: 'green' | 'blue' | 'amber' | 'violet'
+  color: 'green' | 'indigo' | 'amber' | 'violet'
   big?: boolean
 }) {
   const colorMap = {
-    green: { bg: 'bg-green-50', text: 'text-green-600' },
-    blue: { bg: 'bg-blue-50', text: 'text-blue-600' },
+    green: { bg: 'bg-[#173F2E]/5', text: 'text-[#173F2E]' },
+    indigo: { bg: 'bg-indigo-50', text: 'text-indigo-700' },
     amber: { bg: 'bg-amber-50', text: 'text-amber-600' },
     violet: { bg: 'bg-violet-50', text: 'text-violet-600' },
   }

@@ -110,7 +110,7 @@ export function SeccionCategorias({ categorias: initial }: SeccionCategoriasProp
               <div className="flex gap-3">
                 <button
                   onClick={() => abrirSheet({ tipo: 'editar', cat })}
-                  className="text-[12px] font-medium text-blue-600 active:opacity-60"
+                  className="text-[12px] font-medium text-[#173F2E] active:opacity-60"
                 >
                   Editar
                 </button>
@@ -162,7 +162,7 @@ export function SeccionCategorias({ categorias: initial }: SeccionCategoriasProp
               value={formNombre}
               onChange={(e) => setFormNombre(e.target.value)}
               placeholder="Ej: Tacos, Bebidas…"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
             />
           </div>
           <div>
@@ -174,7 +174,7 @@ export function SeccionCategorias({ categorias: initial }: SeccionCategoriasProp
               value={formOrden}
               onChange={(e) => setFormOrden(e.target.value)}
               placeholder="Ej: 1"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
             />
           </div>
           <div>
@@ -188,7 +188,7 @@ export function SeccionCategorias({ categorias: initial }: SeccionCategoriasProp
                   onClick={() => setFormModo(m)}
                   className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all ${
                     formModo === m
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-[#173F2E] text-white'
                       : 'bg-s2 text-text-2'
                   }`}
                 >
@@ -203,7 +203,7 @@ export function SeccionCategorias({ categorias: initial }: SeccionCategoriasProp
           <button
             onClick={handleGuardar}
             disabled={isPending}
-            className="w-full rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
+            className="w-full rounded-xl bg-[#173F2E] py-[14px] text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
           >
             {isPending ? 'Guardando…' : 'Guardar'}
           </button>
