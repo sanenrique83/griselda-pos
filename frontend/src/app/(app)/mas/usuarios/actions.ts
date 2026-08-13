@@ -160,3 +160,30 @@ export async function quitarPin(id: string): Promise<Err | undefined> {
 
   revalidatePath('/mas/usuarios')
 }
+
+// ─── Restablecer contraseña (admin) ────────────────────────────────────────
+// Mismo patrón que crearUsuario(): cliente admin (service_role), única API
+// que puede tocar auth.users. Acción sensible aparte de actualizarUsuario()
+// a propósito — no comparte sheet con el formulario general de edición.
+export async function restablecerPassword(
+  usuarioId: string,
+  nuevaPassword: string,
+): Promise<Err | undefined> {
+  const errAdmin = await verificarAdmin()
+  if (errAdmin) return errAdmin
+
+  if (nuevaPassword.length < 6) {
+    return { error: 'La contraseña debe tener al menos 6 caracteres.' }
+  }
+
+  let admin: ReturnType<typeof createAdminClient>
+  try {
+    admin = createAdminClient()
+  } catch (e) {
+    console.error('[restablecerPassword] cliente admin no disponible:', e)
+    return { error: 'Falta configurar SUPABASE_SERVICE_ROLE_KEY en el servidor.' }
+  }
+
+  const { error } = await admin.auth.admin.updateUserById(usuarioId, { password: nuevaPassword })
+  if (error) return { error: error.message ?? 'Error al restablecer la contraseña.' }
+}

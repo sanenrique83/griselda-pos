@@ -5,7 +5,14 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { HeaderB } from '@/components/ui/HeaderB'
 import { Boton } from '@/components/ui/Boton'
-import { crearUsuario, actualizarUsuario, actualizarPin, quitarPin } from '@/app/(app)/mas/usuarios/actions'
+import { Sheet } from '@/components/ui/Sheet'
+import {
+  crearUsuario,
+  actualizarUsuario,
+  actualizarPin,
+  quitarPin,
+  restablecerPassword,
+} from '@/app/(app)/mas/usuarios/actions'
 import type { UsuarioRow } from '@/app/(app)/mas/usuarios/page'
 import type { RolUsuario } from '@/lib/types/database.types'
 
@@ -31,6 +38,9 @@ interface UsuariosShellProps {
 export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
   const router = useRouter()
   const [usuarios, setUsuarios] = useState(initial)
+  // Activos es la vista default — el personal actual nunca debe competir
+  // visualmente con quien ya se dio de baja.
+  const [filtroActivo, setFiltroActivo] = useState<'activos' | 'inactivos'>('activos')
   const [sheet, setSheet] = useState<SheetMode>({ tipo: 'none' })
   const [isPending, startTransition] = useTransition()
   const [formError, setFormError] = useState<string | null>(null)
@@ -51,11 +61,24 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
   const [pinError, setPinError] = useState<string | null>(null)
   const [pinBanner, setPinBanner] = useState<string | null>(null)
 
+  // Restablecer contraseña — sheet aparte, apilado sobre el de "Editar
+  // usuario" (nunca mezclado en ese formulario general): es una acción
+  // sensible, con su propio endpoint (restablecerPassword, cliente admin).
+  const [resetPassOpen, setResetPassOpen] = useState(false)
+  const [fNuevaPassword, setFNuevaPassword] = useState('')
+  const [resetPassPending, startResetPassTransition] = useTransition()
+  const [resetPassError, setResetPassError] = useState<string | null>(null)
+  const [resetPassBanner, setResetPassBanner] = useState<string | null>(null)
+
   function abrirSheet(mode: SheetMode) {
     setFormError(null)
     setFPin('')
     setPinError(null)
     setPinBanner(null)
+    setResetPassOpen(false)
+    setFNuevaPassword('')
+    setResetPassError(null)
+    setResetPassBanner(null)
     if (mode.tipo === 'editar') {
       setFNombre(mode.usuario.nombre)
       setFRol(mode.usuario.rol)
@@ -190,7 +213,34 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
     })
   }
 
+  function handleRestablecerPassword() {
+    if (sheet.tipo !== 'editar') return
+    if (fNuevaPassword.length < 6) {
+      setResetPassError('La contraseña debe tener al menos 6 caracteres.')
+      return
+    }
+    const usuarioId = sheet.usuario.id
+    setResetPassError(null)
+    setResetPassBanner(null)
+    startResetPassTransition(async () => {
+      const result = await restablecerPassword(usuarioId, fNuevaPassword)
+      if (result?.error) {
+        setResetPassError(result.error)
+        return
+      }
+      setFNuevaPassword('')
+      setResetPassBanner('Contraseña actualizada ✓')
+      setTimeout(() => {
+        setResetPassBanner(null)
+        setResetPassOpen(false)
+      }, 1200)
+    })
+  }
+
   const sheetOpen = sheet.tipo !== 'none'
+  const activosCount = usuarios.filter((u) => u.activo).length
+  const inactivosCount = usuarios.length - activosCount
+  const usuariosFiltrados = usuarios.filter((u) => (filtroActivo === 'activos' ? u.activo : !u.activo))
 
   return (
     <div className="min-h-full bg-s2">
@@ -204,48 +254,82 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
             <p className="text-sm text-text-3">No hay usuarios.</p>
           </div>
         ) : (
-          <div className="rounded-2xl bg-white shadow-card overflow-hidden">
-            <div className="divide-y divide-[#F2F2F7]">
-              {usuarios.map((u) => (
-                <div key={u.id} className="px-4 py-3.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <p className="truncate text-sm font-semibold leading-tight">{u.nombre}</p>
-                        {!u.activo && (
-                          <span className="flex-shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600">
-                            Inactivo
-                          </span>
-                        )}
-                        {u.tienePin && (
-                          <span className="flex-shrink-0 rounded-full bg-[#173F2E]/10 px-2 py-0.5 text-[10px] font-semibold text-[#173F2E]">
-                            🔢 PIN
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-xs text-text-3">
-                        {ROLES.find((r) => r.value === u.rol)?.label ?? u.rol}
-                        {u.telefono && ` · ${u.telefono}`}
-                        {u.fechaContratacion && ` · Desde ${fmtFecha(u.fechaContratacion)}`}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => abrirSheet({ tipo: 'editar', usuario: u })}
-                      className="flex-shrink-0 text-[12px] font-medium text-[#173F2E] active:opacity-60"
-                    >
-                      Editar
-                    </button>
-                  </div>
-                  <Link
-                    href={`/mas/asistencia?usuarioId=${u.id}`}
-                    className="mt-2 inline-block text-[12px] font-medium text-text-3 active:opacity-60"
-                  >
-                    Ver historial de asistencia →
-                  </Link>
-                </div>
-              ))}
+          <>
+            {/* ── Chips: Activos / Inactivos ───────────────────────────────── */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFiltroActivo('activos')}
+                className={`flex-shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all ${
+                  filtroActivo === 'activos'
+                    ? 'bg-[#173F2E] text-white'
+                    : 'bg-white text-text-2 border border-[#D1D1D6]'
+                }`}
+              >
+                Activos ({activosCount})
+              </button>
+              <button
+                onClick={() => setFiltroActivo('inactivos')}
+                className={`flex-shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all ${
+                  filtroActivo === 'inactivos'
+                    ? 'bg-[#173F2E] text-white'
+                    : 'bg-white text-text-2 border border-[#D1D1D6]'
+                }`}
+              >
+                Inactivos ({inactivosCount})
+              </button>
             </div>
-          </div>
+
+            {usuariosFiltrados.length === 0 ? (
+              <div className="rounded-2xl bg-white shadow-card px-4 py-8 text-center">
+                <p className="text-sm text-text-3">
+                  {filtroActivo === 'activos' ? 'No hay usuarios activos.' : 'No hay usuarios inactivos.'}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+                <div className="divide-y divide-[#F2F2F7]">
+                  {usuariosFiltrados.map((u) => (
+                    <div key={u.id} className="px-4 py-3.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <p className="truncate text-sm font-semibold leading-tight">{u.nombre}</p>
+                            {!u.activo && (
+                              <span className="flex-shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600">
+                                Inactivo
+                              </span>
+                            )}
+                            {u.tienePin && (
+                              <span className="flex-shrink-0 rounded-full bg-[#173F2E]/10 px-2 py-0.5 text-[10px] font-semibold text-[#173F2E]">
+                                🔢 PIN
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-xs text-text-3">
+                            {ROLES.find((r) => r.value === u.rol)?.label ?? u.rol}
+                            {u.telefono && ` · ${u.telefono}`}
+                            {u.fechaContratacion && ` · Desde ${fmtFecha(u.fechaContratacion)}`}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => abrirSheet({ tipo: 'editar', usuario: u })}
+                          className="flex-shrink-0 text-[12px] font-medium text-[#173F2E] active:opacity-60"
+                        >
+                          Editar
+                        </button>
+                      </div>
+                      <Link
+                        href={`/mas/asistencia?usuarioId=${u.id}`}
+                        className="mt-2 inline-block text-[12px] font-medium text-text-3 active:opacity-60"
+                      >
+                        Ver historial de asistencia →
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <div className="h-2" />
@@ -362,7 +446,9 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
               <div className="min-w-0 pr-3">
                 <p className="text-[13px] text-text-2">Activo</p>
                 <p className="text-[11px] text-text-4">
-                  Desactivar preserva su historial — nunca se elimina un usuario.
+                  Desactivar le cierra la sesión en cuanto navegue y le impide volver a entrar —
+                  su historial de ventas, asistencia y turnos se conserva íntegro, nunca se
+                  elimina al usuario.
                 </p>
               </div>
               <button
@@ -422,6 +508,29 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
             </div>
           )}
 
+          {sheet.tipo === 'editar' && (
+            <div className="border-t border-[#F2F2F7] pt-3">
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                Contraseña de acceso
+              </label>
+              <p className="mb-2 text-[11px] text-text-4">
+                Define una nueva contraseña para este usuario — la actual deja de funcionar de
+                inmediato.
+              </p>
+              <Boton
+                variant="secundario"
+                onClick={() => {
+                  setFNuevaPassword('')
+                  setResetPassError(null)
+                  setResetPassBanner(null)
+                  setResetPassOpen(true)
+                }}
+              >
+                Restablecer contraseña
+              </Boton>
+            </div>
+          )}
+
           {formError && (
             <p className="rounded-card bg-red-50 px-4 py-3 text-sm text-red-600">{formError}</p>
           )}
@@ -443,6 +552,46 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
           </button>
         </div>
       </div>
+
+      {/* Sheet aparte: restablecer contraseña — apilado sobre "Editar
+          usuario", nunca mezclado en ese formulario general (acción
+          sensible). */}
+      <Sheet
+        open={resetPassOpen}
+        onClose={() => setResetPassOpen(false)}
+        title="Restablecer contraseña"
+        footer={
+          <div className="space-y-2">
+            <Boton onClick={handleRestablecerPassword} disabled={resetPassPending}>
+              {resetPassPending ? 'Guardando…' : 'Restablecer contraseña'}
+            </Boton>
+            <Boton variant="secundario" onClick={() => setResetPassOpen(false)}>
+              Cancelar
+            </Boton>
+          </div>
+        }
+      >
+        {sheet.tipo === 'editar' && (
+          <p className="text-[12px] text-text-4">
+            Se cambiará la contraseña de <span className="font-semibold text-text-2">{sheet.usuario.nombre}</span>.
+            La contraseña actual dejará de funcionar de inmediato.
+          </p>
+        )}
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-3">
+            Nueva contraseña *
+          </label>
+          <input
+            type="text"
+            value={fNuevaPassword}
+            onChange={(e) => setFNuevaPassword(e.target.value)}
+            placeholder="Mínimo 6 caracteres"
+            className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-[14px] outline-none focus:border-[#173F2E]"
+          />
+        </div>
+        {resetPassError && <p className="text-sm font-semibold text-red-600">{resetPassError}</p>}
+        {resetPassBanner && <p className="text-sm font-semibold text-[#173F2E]">{resetPassBanner}</p>}
+      </Sheet>
     </div>
   )
 }

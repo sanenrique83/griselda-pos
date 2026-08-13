@@ -6,7 +6,7 @@ import type { ComponentType } from 'react'
 import {
   ArrowLeftRight, Clock, BarChart3, Package, Printer, Users, ReceiptText,
   FileText, BookOpen, Armchair, Scissors, XCircle, Shield, Headphones,
-  NotebookText, LogOut, Monitor, ChevronRight,
+  NotebookText, LogOut, Monitor, ChevronRight, Lock,
 } from 'lucide-react'
 import { primerNombreValido } from '@/lib/nombreUsuario'
 import { HeaderA } from '@/components/ui/HeaderA'
@@ -70,36 +70,45 @@ export default async function MasPage() {
       <div className="px-4 py-4 space-y-5">
 
         {/* ── Tarjeta de usuario ────────────────────────────────────────────── */}
-        <div className="rounded-2xl bg-white shadow-card px-4 py-4 flex items-center gap-3.5">
-          <div className="h-12 w-12 flex-shrink-0 rounded-full bg-[#173F2E] flex items-center justify-center">
-            <span className="text-[16px] font-bold text-white">{iniciales(nombre)}</span>
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-semibold leading-tight truncate">{nombre}</p>
-            <span
-              className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                isAdmin
-                  ? 'bg-[#173F2E]/10 text-[#173F2E]'
-                  : 'bg-gray-100 text-text-3'
-              }`}
-            >
-              {isAdmin ? 'Administrador' : 'Mesero'}
-            </span>
-          </div>
-          <div className="h-9 w-px flex-shrink-0 bg-[#E5E5EA]" />
-          <div className="flex-shrink-0 text-right">
-            {turnoActivo ? (
-              <span className="flex items-center justify-end gap-1 text-[13px] font-semibold text-[#173F2E]">
-                <span className="h-2 w-2 rounded-full bg-[#173F2E]" />
-                Turno activo
+        <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+          <div className="px-4 py-4 flex items-center gap-3.5">
+            <div className="h-12 w-12 flex-shrink-0 rounded-full bg-[#173F2E] flex items-center justify-center">
+              <span className="text-[16px] font-bold text-white">{iniciales(nombre)}</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-semibold leading-tight truncate">{nombre}</p>
+              <span
+                className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                  isAdmin
+                    ? 'bg-[#173F2E]/10 text-[#173F2E]'
+                    : 'bg-gray-100 text-text-3'
+                }`}
+              >
+                {isAdmin ? 'Administrador' : 'Mesero'}
               </span>
-            ) : (
-              <span className="text-[13px] font-semibold text-text-4">Sin turno</span>
-            )}
-            <p className="mt-0.5 text-[11px] text-text-3">
-              {turnoActivo ? `desde ${fmtHora(turnoActivo.abierto_en)}` : '—'}
-            </p>
+            </div>
+            <div className="h-9 w-px flex-shrink-0 bg-[#E5E5EA]" />
+            <div className="flex-shrink-0 text-right">
+              {turnoActivo ? (
+                <span className="flex items-center justify-end gap-1 text-[13px] font-semibold text-[#173F2E]">
+                  <span className="h-2 w-2 rounded-full bg-[#173F2E]" />
+                  Turno activo
+                </span>
+              ) : (
+                <span className="text-[13px] font-semibold text-text-4">Sin turno</span>
+              )}
+              <p className="mt-0.5 text-[11px] text-text-3">
+                {turnoActivo ? `desde ${fmtHora(turnoActivo.abierto_en)}` : '—'}
+              </p>
+            </div>
           </div>
+          <Link
+            href="/cambiar-password"
+            className="flex items-center gap-2 border-t border-[#F2F2F7] px-4 py-2.5 text-[12px] font-medium text-text-3 active:bg-s2"
+          >
+            <Lock size={13} strokeWidth={2.2} />
+            Cambiar mi contraseña
+          </Link>
         </div>
 
         {/* ── Cambiar de usuario (PIN rápido) ─────────────────────────────────
