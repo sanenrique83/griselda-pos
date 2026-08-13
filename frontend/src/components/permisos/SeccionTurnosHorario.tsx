@@ -137,7 +137,7 @@ export function SeccionTurnosHorario({ turnosHorario: initial }: SeccionTurnosHo
                     {aInputTime(t.hora_inicio)} – {aInputTime(t.hora_fin)}
                   </p>
                 </div>
-                <span className="text-[12px] font-medium text-blue-600">Editar</span>
+                <span className="text-[12px] font-medium text-[#173F2E]">Editar</span>
               </button>
             ))}
           </div>
@@ -184,7 +184,7 @@ export function SeccionTurnosHorario({ turnosHorario: initial }: SeccionTurnosHo
               value={formNombre}
               onChange={(e) => setFormNombre(e.target.value)}
               placeholder="Ej: Matutino"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500 focus:bg-white"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
             />
           </div>
 
@@ -197,7 +197,7 @@ export function SeccionTurnosHorario({ turnosHorario: initial }: SeccionTurnosHo
                 type="time"
                 value={formHoraInicio}
                 onChange={(e) => setFormHoraInicio(e.target.value)}
-                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500 focus:bg-white"
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
               />
             </div>
             <div className="flex-1">
@@ -208,7 +208,7 @@ export function SeccionTurnosHorario({ turnosHorario: initial }: SeccionTurnosHo
                 type="time"
                 value={formHoraFin}
                 onChange={(e) => setFormHoraFin(e.target.value)}
-                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500 focus:bg-white"
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
               />
             </div>
           </div>
@@ -228,7 +228,7 @@ export function SeccionTurnosHorario({ turnosHorario: initial }: SeccionTurnosHo
               <button
                 onClick={() => setFormActivo((v) => !v)}
                 className={`relative flex-shrink-0 h-[26px] w-[46px] rounded-full transition-colors duration-200 ${
-                  formActivo ? 'bg-blue-600' : 'bg-[#D1D1D6]'
+                  formActivo ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
                 }`}
               >
                 <span
@@ -247,7 +247,7 @@ export function SeccionTurnosHorario({ turnosHorario: initial }: SeccionTurnosHo
           <button
             onClick={handleGuardar}
             disabled={isPending}
-            className="w-full rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+            className="w-full rounded-xl bg-[#173F2E] py-[14px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] disabled:opacity-40"
           >
             {isPending ? 'Guardando…' : 'Guardar'}
           </button>

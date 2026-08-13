@@ -146,7 +146,7 @@ export function SeccionMesas({ areas: initialAreas }: SeccionMesasProps) {
             <div className="flex gap-2">
               <button
                 onClick={() => abrirSheet({ tipo: 'editar-area', area })}
-                className="text-[12px] font-medium text-blue-600 active:opacity-60"
+                className="text-[12px] font-medium text-[#173F2E] active:opacity-60"
               >
                 Editar
               </button>
@@ -175,7 +175,7 @@ export function SeccionMesas({ areas: initialAreas }: SeccionMesasProps) {
                 <div className="flex gap-3">
                   <button
                     onClick={() => abrirSheet({ tipo: 'editar-mesa', mesa, areaId: area.id })}
-                    className="text-[12px] font-medium text-blue-600 active:opacity-60"
+                    className="text-[12px] font-medium text-[#173F2E] active:opacity-60"
                   >
                     Editar
                   </button>
@@ -194,7 +194,7 @@ export function SeccionMesas({ areas: initialAreas }: SeccionMesasProps) {
           <div className="px-4 py-3 border-t border-[#F2F2F7]">
             <button
               onClick={() => abrirSheet({ tipo: 'nueva-mesa', areaId: area.id })}
-              className="text-sm font-semibold text-blue-600 active:opacity-60"
+              className="text-sm font-semibold text-[#173F2E] active:opacity-60"
             >
               + Agregar mesa
             </button>
@@ -236,7 +236,7 @@ export function SeccionMesas({ areas: initialAreas }: SeccionMesasProps) {
                 type="number"
                 value={formNumero}
                 onChange={(e) => setFormNumero(e.target.value)}
-                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
               />
             </div>
           )}
@@ -249,7 +249,7 @@ export function SeccionMesas({ areas: initialAreas }: SeccionMesasProps) {
               value={formNombre}
               onChange={(e) => setFormNombre(e.target.value)}
               placeholder={sheet.tipo === 'nueva-area' || sheet.tipo === 'editar-area' ? 'Ej: Terraza' : 'Ej: Mesa junto a la ventana'}
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
             />
           </div>
           {(sheet.tipo === 'nueva-mesa' || sheet.tipo === 'editar-mesa') && (
@@ -262,7 +262,7 @@ export function SeccionMesas({ areas: initialAreas }: SeccionMesasProps) {
                 value={formCapacidad}
                 onChange={(e) => setFormCapacidad(e.target.value)}
                 placeholder="Ej: 4"
-                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
               />
             </div>
           )}
@@ -274,7 +274,7 @@ export function SeccionMesas({ areas: initialAreas }: SeccionMesasProps) {
           <button
             onClick={handleGuardar}
             disabled={isPending}
-            className="w-full rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+            className="w-full rounded-xl bg-[#173F2E] py-[14px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] disabled:opacity-40"
           >
             {isPending ? 'Guardando…' : 'Guardar'}
           </button>

@@ -106,7 +106,7 @@ export function SeccionProveedores({ proveedores: initial }: SeccionProveedoresP
 
                 <button
                   onClick={() => abrirSheet({ tipo: 'editar', prov })}
-                  className="flex-shrink-0 text-[12px] font-medium text-blue-600 active:opacity-60"
+                  className="flex-shrink-0 text-[12px] font-medium text-[#173F2E] active:opacity-60"
                 >
                   Editar
                 </button>
@@ -163,7 +163,7 @@ export function SeccionProveedores({ proveedores: initial }: SeccionProveedoresP
               value={formNombre}
               onChange={(e) => setFormNombre(e.target.value)}
               placeholder="Ej: Carnicería El Buen Corte"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500 focus:bg-white"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
             />
           </div>
 
@@ -176,7 +176,7 @@ export function SeccionProveedores({ proveedores: initial }: SeccionProveedoresP
               value={formTelefono}
               onChange={(e) => setFormTelefono(e.target.value)}
               placeholder="Ej: 33 1234 5678"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500 focus:bg-white"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
             />
           </div>
 
@@ -189,7 +189,7 @@ export function SeccionProveedores({ proveedores: initial }: SeccionProveedoresP
               value={formContacto}
               onChange={(e) => setFormContacto(e.target.value)}
               placeholder="Ej: Nombre de la persona con quien se trata"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500 focus:bg-white"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
             />
           </div>
 
@@ -202,7 +202,7 @@ export function SeccionProveedores({ proveedores: initial }: SeccionProveedoresP
               onChange={(e) => setFormNotas(e.target.value)}
               rows={3}
               placeholder="Ej: Entrega los martes y viernes"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500 focus:bg-white resize-none"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E] focus:bg-white resize-none"
             />
           </div>
 
@@ -215,7 +215,7 @@ export function SeccionProveedores({ proveedores: initial }: SeccionProveedoresP
           <button
             onClick={handleGuardar}
             disabled={isPending}
-            className="w-full rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+            className="w-full rounded-xl bg-[#173F2E] py-[14px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] disabled:opacity-40"
           >
             {isPending ? 'Guardando…' : 'Guardar'}
           </button>
