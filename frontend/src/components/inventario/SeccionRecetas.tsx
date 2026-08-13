@@ -6,7 +6,7 @@ import type { CategoriaConRecetas, EstadoReceta } from '@/app/(app)/mas/inventar
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const ESTADO_INFO: Record<EstadoReceta, { label: string; className: string }> = {
-  completa: { label: 'Completa', className: 'bg-emerald-50 text-emerald-600' },
+  completa: { label: 'Completa', className: 'bg-[#173F2E]/10 text-[#173F2E]' },
   incompleta: { label: 'Incompleta', className: 'bg-amber-50 text-amber-600' },
   sin_receta: { label: 'Sin receta', className: 'bg-s2 text-text-4' },
 }

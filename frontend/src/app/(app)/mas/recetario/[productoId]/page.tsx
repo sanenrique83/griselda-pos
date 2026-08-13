@@ -151,7 +151,7 @@ function DetalleShell({
       <div className="border-b border-[#E5E5EA] bg-white px-4 pt-3 pb-3">
         <Link
           href="/mas/recetario"
-          className="mb-2 inline-block text-[15px] font-medium text-blue-600 active:opacity-60"
+          className="mb-2 inline-block text-[15px] font-medium text-[#173F2E] active:opacity-60"
         >
           ‹ Recetario
         </Link>
