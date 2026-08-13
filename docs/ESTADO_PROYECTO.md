@@ -452,6 +452,38 @@ No hubo que revertir ninguna de las 3 — las tres lograron compactarse de verda
 
 ---
 
+## Bloque F — consolidación de color en el resto de la app (fuera de las 9 pantallas con mockup) — **completa**
+
+Las 9 pantallas con mockup (Mesas, Comanda, Menú, sheet de producto, captura rápida, Pedidos, Cobro, Historial, Dashboard, Más) ya habían consolidado su azul/esmeralda a verde bosque. El resto de la app (todo `/mas/*` más some administrativo, los sheets del flujo de POS que viven fuera de esas 9 pantallas, y el nav/login/cambio de usuario) nunca pasó por eso — se hizo un inventario completo primero (no se asumió), luego se aplicó el mismo criterio pantalla por pantalla, en tandas chicas con confirmación explícita de Rober de que cada tanda ya estaba en GitHub antes de seguir con la siguiente (después de que se acumularon varias tandas sin subir en algún punto de esta ronda).
+
+**Resultado final: 40 archivos tocados, 293 usos de `blue-*`/`emerald-*`/`green-*` genérico encontrados por el grep estándar** (`border-blue-|bg-blue-|text-blue-|border-emerald-|bg-emerald-|text-emerald-|border-green-|bg-green-|text-green-`) — 290 consolidados a verde bosque (`#173F2E`), 3 dejados sin tocar a propósito (ver excepciones abajo). Más un puñado de azules ocultos que ese grep no detecta por no ser clases con nombre, encontrados en auditorías retroactivas explícitas (ver abajo). `npx tsc --noEmit` limpio después de cada tanda, sin excepción.
+
+Por grupo:
+- **`/mas/*` (26 archivos, 251 usos)**: Cancelaciones, Catálogo (Shell + 4 secciones), Inventario (Shell + 7 secciones), Permisos (Shell + Turnos-horario), Usuarios, Impresoras, Ticket, Corte Z, Turno, Asistencia, Menú del día, Mapa de mesas, y el detalle de Recetario. `PermisosShell.tsx` fue el archivo más grande de todo el proyecto (38 usos) — la sección de "Propinas sugeridas" ya tenía verde bosque de una ronda anterior de Cobro y sirvió de plantilla exacta para las otras ~13 secciones estructuralmente idénticas.
+- **Sheets del flujo de POS + Mesas fuera de las 9 pantallas (10 archivos, 33 usos)**: el picker de sillas al abrir mesa (`ElegirSillaInicialShell.tsx`), los sheets de Unir/Mover/Reasignar/Separar mesa, combo, producto libre, asientos, `TarjetaMesa.tsx` y `SheetTurnos.tsx`.
+- **Login, nav global, cambio de usuario (3 archivos, 9 usos)**: `login/page.tsx`, `BottomNav.tsx` (visible en las 5 pantallas raíz), `CambiarUsuarioShell.tsx`.
+
+**3 excepciones dejadas sin tocar, a propósito, no por omisión:**
+- `VistaComanda.tsx` — el botón "Enviar a cocina" se queda azul, documentado en un comentario del propio código desde el rediseño original: fiel al mockup, "Cobrar" es la única acción de marca ahí.
+- `TarjetaMesa.tsx` (`ESTILO_TARJETA.azul`, 2 usos) — es el semáforo de mesa ("● Cobro parcial"), protegido por la regla de diseño transversal de `CLAUDE.md`: nunca se mezcla con el verde de marca aunque ambos sean tonos de verde/azul con significado. Solo se corrigió el spinner de carga de esa misma tarjeta (`border-blue-600`, sin relación con el semáforo).
+- `SheetComboSlots.tsx` (`text-green-600` del precio unitario en el header, 1 uso) — coincide con el mismo patrón ya usado en `SheetModificadores.tsx` (su pantalla hermana, ya rediseñada con mockup: precio unitario en verde, total en ámbar); cambiarlo aquí sin tocar también esa otra pantalla habría creado una inconsistencia nueva entre dos sheets del mismo flujo en vez de resolver una.
+
+**Otras 2 decisiones no triviales, sí aplicadas:**
+- `LienzoMesasEditor.tsx`, toggle "Fuera de servicio" — se dejó en gris neutro (`bg-text-2`) en vez de verde bosque a propósito: verde ahí comunicaría "todo bien" para un estado que en realidad es negativo (mesa deshabilitada).
+- `CorteZShell.tsx`, tarjeta `MetricCard` (4 colores para 4 métricas distintas) — el azul de "Pedidos cerrados" se reemplazó por `indigo` (no por verde), reusando la paleta ya establecida en `DashboardCharts.tsx`, para no terminar con dos tarjetas del mismo verde ("Ventas totales" y "Pedidos cerrados") y perder la distinción visual entre ambas.
+
+**Azules ocultos, invisibles al grep de clases, encontrados en 2 auditorías retroactivas explícitas** (`grep -rn "37, *99, *235\|37,99,235"` para sombras, más revisión manual de hex sueltos):
+- Sombras `shadow-[...rgba(37,99,235,...)]` acopladas a botones que ya se habían recoloreado a verde en rondas anteriores, dejando fondo verde con halo azul — corregidas a `rgba(23,63,46,...)` (mismo verde bosque que usa `Boton.tsx`) en varios archivos según se iban tocando.
+- Un hex suelto `#2563eb` en el anillo de selección de mesa de `LienzoMesasEditor.tsx` (estilo inline, no clase de Tailwind).
+- Un `rgba(37, 99, 235, 0.06)` inline en `ListaArrastrable.tsx` — componente **compartido** de arrastre (usado por Catálogo e Insumos), el highlight de "sobre este elemento" nunca había pasado por ningún grep de clases porque no es una.
+- Un `focus:ring-blue-600/20` en los 2 inputs de `login/page.tsx`, junto al `focus:border-blue-600` que sí detectaba el grep.
+
+**Bug relacionado, no de color, encontrado de paso y también corregido**: `text-text-1` se usaba en 4 archivos (`CancelacionesShell.tsx`×5, `CorteZShell.tsx`×2, `CambiarUsuarioShell.tsx`×1, `CobroShell.tsx`×1) pero **no es un token real** — `tailwind.config.ts` solo define `text`/`text-2`/`text-3`/`text-4`, nunca `text-1`. Tailwind ignora en silencio una clase que no reconoce (no rompe el build ni se ve mal a simple vista, cae al color heredado), así que llevaba tiempo sin notarse. Corregido a `text-text` (el token `DEFAULT` real) en los 4 archivos; confirmado con `grep -rn "text-text-1" frontend/src` sobre todo el proyecto que no queda en ningún otro lado.
+
+No se tocó ninguna migración, ninguna tabla, ningún dato — todo el trabajo de este bloque fue exclusivamente clases de Tailwind (y unos pocos estilos inline). Nada quedó pendiente de `supabase db push` por esta ronda.
+
+---
+
 ## Próxima vez que actualices este documento
 
 Cuando implementes cualquier cosa de la lista de "Todavía NO listos" (ver el documento de spec correspondiente — Bloque E, Bloque A, C6, etc.), regresa aquí y agrega su renglón. Este documento solo es útil si se mantiene al día — ya se dejó pasar una vez, no conviene que se repita.
