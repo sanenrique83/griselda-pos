@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
+import Image from 'next/image'
 import { Search, X, ShoppingCart, Trash2, Check, Minus, Plus, SlidersHorizontal } from 'lucide-react'
 import { cargarGuisados } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { ProductoCatalogo } from '@/app/(app)/pos/[pedidoId]/page'
@@ -162,8 +163,8 @@ export function SheetCapturaPida({
       header={
         <div className="flex flex-shrink-0 items-start gap-3 border-b border-[#E5E5EA] px-5 py-4">
           {producto?.foto_url ? (
-            <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-s2">
-              <img src={producto.foto_url} alt={producto.nombre} className="h-full w-full object-cover" />
+            <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-s2">
+              <Image fill src={producto.foto_url} alt={producto.nombre} className="object-cover" sizes="56px" />
             </div>
           ) : (
             <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-s2 text-2xl">
@@ -362,7 +363,7 @@ export function SheetCapturaPida({
             >
               <div className="relative h-[88px] w-full bg-s2">
                 {fotoUrl ? (
-                  <img src={fotoUrl} alt="" className="h-full w-full object-cover" />
+                  <Image fill src={fotoUrl} alt="" className="object-cover" sizes="45vw" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-3xl">
                     {producto?.emoji ?? '🍽️'}

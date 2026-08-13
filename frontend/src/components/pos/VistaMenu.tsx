@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState } from 'react'
+import Image from 'next/image'
 import { Search, ChevronRight, Plus, Minus, Settings2, UserPlus2, ArrowRight } from 'lucide-react'
 import { formatCurrency } from '@/components/ui/tokens'
 import type { ProductoCatalogo, CategoriaPOS, SubpedidoPOS } from '@/app/(app)/pos/[pedidoId]/page'
@@ -150,8 +151,8 @@ export function VistaMenu({
               {/* Imagen real si existe (foto_url, Catálogo → bucket "productos"),
                   emoji como respaldo — mismo patrón que SeccionProductos.tsx */}
               {producto.foto_url ? (
-                <div className="h-[52px] w-[52px] flex-shrink-0 overflow-hidden rounded-xl bg-s2">
-                  <img src={producto.foto_url} alt={producto.nombre} className="h-full w-full object-cover" />
+                <div className="relative h-[52px] w-[52px] flex-shrink-0 overflow-hidden rounded-xl bg-s2">
+                  <Image fill src={producto.foto_url} alt={producto.nombre} className="object-cover" sizes="52px" />
                 </div>
               ) : (
                 <div className="flex h-[52px] w-[52px] flex-shrink-0 items-center justify-center rounded-xl bg-s2 text-2xl">

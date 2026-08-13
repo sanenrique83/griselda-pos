@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
+import Image from 'next/image'
 import { X, Check, Minus, Plus } from 'lucide-react'
 import { cargarModificadores } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { GrupoMod, OpcionMod } from '@/app/(app)/pos/[pedidoId]/actions'
@@ -109,9 +110,9 @@ function CajaOpcion({
         seleccionada ? 'border-[#173F2E] bg-[#173F2E]/5' : 'border-[#D1D1D6] bg-white'
       }`}
     >
-      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-s2">
+      <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-s2">
         {fotoUrl ? (
-          <img src={fotoUrl} alt="" className="h-full w-full object-cover" />
+          <Image fill src={fotoUrl} alt="" className="object-cover" sizes="40px" />
         ) : (
           <span className="text-lg">{fallbackEmoji ?? '🍽️'}</span>
         )}
@@ -326,8 +327,8 @@ export function SheetModificadores({
       header={
         <div className="flex flex-shrink-0 items-start gap-3 border-b border-[#E5E5EA] px-5 py-4">
           {producto?.foto_url ? (
-            <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-s2">
-              <img src={producto.foto_url} alt={producto.nombre} className="h-full w-full object-cover" />
+            <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-s2">
+              <Image fill src={producto.foto_url} alt={producto.nombre} className="object-cover" sizes="56px" />
             </div>
           ) : (
             <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-s2 text-2xl">

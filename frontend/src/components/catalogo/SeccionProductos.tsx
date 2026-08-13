@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import {
   crearProducto,
   actualizarProducto,
@@ -750,8 +751,8 @@ export function SeccionProductos({
           </span>
         )}
         {prod.foto_url ? (
-          <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-s2">
-            <img src={prod.foto_url} alt={prod.nombre} className="h-full w-full object-cover" />
+          <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-s2">
+            <Image fill src={prod.foto_url} alt={prod.nombre} className="object-cover" sizes="40px" />
           </div>
         ) : prod.emoji ? (
           <span className="text-[22px] leading-none flex-shrink-0">{prod.emoji}</span>
@@ -1164,8 +1165,8 @@ export function SeccionProductos({
                             </span>
                           )}
                           {opcion.foto_url && (
-                            <div className="h-6 w-6 flex-shrink-0 overflow-hidden rounded bg-s2">
-                              <img src={opcion.foto_url} alt="" className="h-full w-full object-cover" />
+                            <div className="relative h-6 w-6 flex-shrink-0 overflow-hidden rounded bg-s2">
+                              <Image fill src={opcion.foto_url} alt="" className="object-cover" sizes="24px" />
                             </div>
                           )}
                           <span className="flex-1 text-[13px]">{opcion.nombre}</span>
