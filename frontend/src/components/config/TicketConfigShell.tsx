@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
+import { useRouter } from 'next/navigation'
+import { HeaderB } from '@/components/ui/HeaderB'
+import { Boton } from '@/components/ui/Boton'
 import { guardarConfigTicket } from '@/app/(app)/mas/configuracion/actions'
 import type { TicketConfig } from '@/lib/print'
 
@@ -32,6 +34,7 @@ interface Props {
 }
 
 export function TicketConfigShell({ initialConfig }: Props) {
+  const router = useRouter()
   const [form, setForm] = useState<TicketConfig>(initialConfig)
   const [saving, setSaving] = useState(false)
   const [banner, setBanner] = useState<string | null>(null)
@@ -56,11 +59,7 @@ export function TicketConfigShell({ initialConfig }: Props) {
 
   return (
     <div className="min-h-full bg-s2">
-      {/* Header */}
-      <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <BotonRegresarMas />
-        <h1 className="mt-1 text-[20px] font-bold leading-tight">Ticket de impresión</h1>
-      </div>
+      <HeaderB backLabel="Más" onBack={() => router.push('/mas')} titulo="Ticket de impresión" />
 
       <div className="px-4 py-4 space-y-5">
         <div className="rounded-2xl bg-white shadow-card overflow-hidden">
@@ -80,7 +79,7 @@ export function TicketConfigShell({ initialConfig }: Props) {
                   value={form[key]}
                   onChange={(e) => handleChange(key, e.target.value)}
                   placeholder={placeholder}
-                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
                 />
                 {hint && (
                   <p className="mt-1 text-xs text-text-3">{hint}</p>
@@ -91,20 +90,16 @@ export function TicketConfigShell({ initialConfig }: Props) {
             {banner && (
               <p
                 className={`text-xs font-semibold ${
-                  banner.includes('✓') ? 'text-green-600' : 'text-red-600'
+                  banner.includes('✓') ? 'text-[#173F2E]' : 'text-red-600'
                 }`}
               >
                 {banner}
               </p>
             )}
 
-            <button
-              onClick={handleGuardar}
-              disabled={saving}
-              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
-            >
+            <Boton onClick={handleGuardar} disabled={saving}>
               {saving ? 'Guardando…' : 'Guardar configuración'}
-            </button>
+            </Boton>
           </div>
         </div>
 

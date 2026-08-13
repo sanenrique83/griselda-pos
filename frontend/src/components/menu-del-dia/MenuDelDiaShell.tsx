@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
+import { HeaderB } from '@/components/ui/HeaderB'
 import { setTodosDisponibles } from '@/app/(app)/mas/menu-del-dia/actions'
 import { toggleDisponible } from '@/app/(app)/mas/catalogo/actions'
 import type { CategoriaMenu } from '@/app/(app)/mas/menu-del-dia/page'
@@ -70,34 +70,33 @@ export function MenuDelDiaShell({
 
   return (
     <div className="min-h-full bg-s2">
-      {/* Header */}
-      <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <BotonRegresarMas />
-        <div className="mt-1 flex items-start justify-between gap-2">
-          <div>
-            <h1 className="text-[20px] font-bold leading-tight">Menú del día</h1>
-            <p className="mt-0.5 text-[13px] text-text-3">
-              {disponiblesActuales} de {totalProductos} disponibles
-            </p>
-          </div>
-          <div className="flex gap-2 pt-0.5">
-            <button
-              onClick={handleTodosDisponibles}
-              disabled={isPendingAll || disponiblesActuales === totalProductos}
-              className="rounded-xl bg-blue-600 px-3 py-2 text-[12px] font-semibold text-white shadow-[0_2px_8px_rgba(37,99,235,.25)] active:scale-[.97] disabled:opacity-40"
-            >
-              {isPendingAll ? '…' : 'Todos ✓'}
-            </button>
-            <button
-              onClick={handleTodosDisponibles}
-              disabled={isPendingAll}
-              className="rounded-xl bg-s2 border border-[#D1D1D6] px-3 py-2 text-[12px] font-semibold text-text-2 active:scale-[.97] disabled:opacity-40"
-            >
-              Resetear
-            </button>
-          </div>
+      <HeaderB
+        backLabel="Más"
+        onBack={() => router.push('/mas')}
+        titulo="Menú del día"
+        subtitulo={
+          <p className="text-[13px] text-text-3">
+            {disponiblesActuales} de {totalProductos} disponibles
+          </p>
+        }
+      >
+        <div className="flex gap-2">
+          <button
+            onClick={handleTodosDisponibles}
+            disabled={isPendingAll || disponiblesActuales === totalProductos}
+            className="rounded-xl bg-[#173F2E] px-3 py-2 text-[12px] font-semibold text-white shadow-[0_2px_8px_rgba(23,63,46,.32)] active:scale-[.97] disabled:opacity-40"
+          >
+            {isPendingAll ? '…' : 'Todos ✓'}
+          </button>
+          <button
+            onClick={handleTodosDisponibles}
+            disabled={isPendingAll}
+            className="rounded-xl bg-s2 border border-[#D1D1D6] px-3 py-2 text-[12px] font-semibold text-text-2 active:scale-[.97] disabled:opacity-40"
+          >
+            Resetear
+          </button>
         </div>
-      </div>
+      </HeaderB>
 
       <div className="px-4 py-4 space-y-4">
 
@@ -153,7 +152,7 @@ export function MenuDelDiaShell({
                       <button
                         onClick={() => handleToggle(prod.id)}
                         className={`relative flex-shrink-0 h-[28px] w-[50px] rounded-full transition-colors duration-200 ${
-                          disp ? 'bg-blue-600' : 'bg-[#D1D1D6]'
+                          disp ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
                         }`}
                         aria-label={disp ? 'Marcar no disponible' : 'Marcar disponible'}
                       >

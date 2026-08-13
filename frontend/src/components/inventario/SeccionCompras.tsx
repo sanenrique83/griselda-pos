@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
+import { Boton } from '@/components/ui/Boton'
 import { obtenerHistorialCompras } from '@/app/(app)/mas/inventario/actions'
 import type { HistorialPrecioItem, ProveedorInventario } from '@/app/(app)/mas/inventario/page'
 
@@ -83,7 +83,7 @@ export function SeccionCompras({ historial: initial, proveedores }: SeccionCompr
       <select
         value={proveedorId}
         onChange={(e) => handleFiltro(e.target.value)}
-        className="w-full rounded-xl border-[1.5px] border-border bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+        className="w-full rounded-xl border-[1.5px] border-border bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#173F2E]"
       >
         <option value="">Todos los proveedores</option>
         {proveedores.map((p) => (
@@ -91,12 +91,7 @@ export function SeccionCompras({ historial: initial, proveedores }: SeccionCompr
         ))}
       </select>
 
-      <Link
-        href="/mas/inventario/compras/nueva"
-        className="block w-full rounded-2xl bg-blue-600 py-3.5 text-center text-sm font-bold text-white shadow-[0_2px_8px_rgba(37,99,235,.25)] active:scale-[.98]"
-      >
-        + Nueva compra
-      </Link>
+      <Boton href="/mas/inventario/compras/nueva">+ Nueva compra</Boton>
 
       {isPending && (
         <p className="text-center text-xs text-text-3">Cargando…</p>
@@ -113,7 +108,7 @@ export function SeccionCompras({ historial: initial, proveedores }: SeccionCompr
                     {fmtFecha(c.fecha)}{c.numeroNota ? ` · Nota ${c.numeroNota}` : ''}
                   </p>
                 </div>
-                <span className="ml-3 flex-shrink-0 font-mono text-sm font-bold text-green-600">
+                <span className="ml-3 flex-shrink-0 font-mono text-sm font-bold text-[#173F2E]">
                   ${fmtMoney(c.compraTotal)}
                 </span>
               </div>
@@ -155,7 +150,7 @@ function PrecioDelta({ item }: { item: HistorialPrecioItem }) {
   }
   if (item.diferencia < 0) {
     return (
-      <p className="mt-0.5 text-[11px] font-semibold text-green-600">
+      <p className="mt-0.5 text-[11px] font-semibold text-[#173F2E]">
         ▼ -${fmtMoney(Math.abs(item.diferencia))} vs. anterior (${fmtMoney(item.costoUnitarioAnterior)})
       </p>
     )
