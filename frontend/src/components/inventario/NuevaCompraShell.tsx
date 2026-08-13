@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { HeaderB } from '@/components/ui/HeaderB'
+import { Boton } from '@/components/ui/Boton'
 import { registrarCompra } from '@/app/(app)/mas/inventario/actions'
 import type { UnidadMedida } from '@/app/(app)/mas/inventario/page'
 
@@ -98,21 +100,11 @@ export function NuevaCompraShell({ proveedores, insumos }: NuevaCompraShellProps
       className="flex flex-col bg-s2"
       style={{ minHeight: 'calc(100dvh - 4rem - env(safe-area-inset-bottom, 0px))' }}
     >
-      {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 border-b border-[#E5E5EA] bg-white">
-        <div className="flex items-center gap-2 px-4 pt-3 pb-3">
-          <button
-            onClick={() => router.push('/mas/inventario?tab=compras')}
-            className="-ml-1 px-1 py-1 text-[15px] font-medium text-blue-600 active:opacity-60"
-          >
-            ‹ Inventario
-          </button>
-          <div className="flex-1 min-w-0 text-center">
-            <p className="text-[15px] font-semibold leading-tight">Nueva compra</p>
-          </div>
-          <div className="w-[76px]" />
-        </div>
-      </div>
+      <HeaderB
+        backLabel="Inventario"
+        onBack={() => router.push('/mas/inventario?tab=compras')}
+        titulo="Nueva compra"
+      />
 
       {/* ── Cuerpo scrolleable ────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
@@ -137,7 +129,7 @@ export function NuevaCompraShell({ proveedores, insumos }: NuevaCompraShellProps
               <select
                 value={proveedorId}
                 onChange={(e) => setProveedorId(e.target.value ? Number(e.target.value) : '')}
-                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
               >
                 <option value="">Seleccionar…</option>
                 {proveedores.map((p) => (
@@ -160,7 +152,7 @@ export function NuevaCompraShell({ proveedores, insumos }: NuevaCompraShellProps
                   type="date"
                   value={fecha}
                   onChange={(e) => setFecha(e.target.value)}
-                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
                 />
               </div>
               <div>
@@ -172,7 +164,7 @@ export function NuevaCompraShell({ proveedores, insumos }: NuevaCompraShellProps
                   value={numeroNota}
                   onChange={(e) => setNumeroNota(e.target.value)}
                   placeholder="Ej: A-1234"
-                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
                 />
               </div>
             </div>
@@ -202,7 +194,7 @@ export function NuevaCompraShell({ proveedores, insumos }: NuevaCompraShellProps
                   <select
                     value={l.insumoId}
                     onChange={(e) => actualizarLinea(l.key, { insumoId: e.target.value ? Number(e.target.value) : '' })}
-                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
                   >
                     <option value="">Seleccionar insumo…</option>
                     {insumos.map((i) => (
@@ -223,7 +215,7 @@ export function NuevaCompraShell({ proveedores, insumos }: NuevaCompraShellProps
                         value={l.cantidad}
                         onChange={(e) => actualizarLinea(l.key, { cantidad: e.target.value })}
                         placeholder="0"
-                        className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                        className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
                       />
                     </div>
                     <div>
@@ -238,7 +230,7 @@ export function NuevaCompraShell({ proveedores, insumos }: NuevaCompraShellProps
                         value={l.costoUnitario}
                         onChange={(e) => actualizarLinea(l.key, { costoUnitario: e.target.value })}
                         placeholder="0.00"
-                        className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                        className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
                       />
                     </div>
                   </div>
@@ -269,17 +261,13 @@ export function NuevaCompraShell({ proveedores, insumos }: NuevaCompraShellProps
       <div className="flex-shrink-0 border-t border-[#E5E5EA] bg-white px-4 pb-[calc(env(safe-area-inset-bottom,0px)+14px)] pt-3.5">
         <div className="mb-3 flex items-center justify-between">
           <p className="text-[13px] text-text-3">Total de la compra</p>
-          <span className="font-mono text-[22px] font-bold text-green-600">
+          <span className="font-mono text-[22px] font-bold text-[#173F2E]">
             ${fmtMoney(total)}
           </span>
         </div>
-        <button
-          onClick={handleGuardar}
-          disabled={isPending}
-          className="w-full rounded-xl bg-blue-600 py-[18px] text-base font-bold text-white shadow-[0_4px_14px_rgba(37,99,235,.35)] active:scale-[.98] disabled:opacity-40"
-        >
+        <Boton onClick={handleGuardar} disabled={isPending}>
           {isPending ? 'Guardando…' : '✓ Registrar compra'}
-        </button>
+        </Boton>
       </div>
     </div>
   )

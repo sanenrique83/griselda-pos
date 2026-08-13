@@ -77,7 +77,7 @@ function FilaArrastrable({
         position: 'relative',
         zIndex: isDragging ? 10 : undefined,
         opacity: isDragging ? 0.5 : 1,
-        backgroundColor: isOver ? 'rgba(37, 99, 235, 0.06)' : undefined,
+        backgroundColor: isOver ? 'rgba(23, 63, 46, 0.06)' : undefined,
       }}
     >
       {children({ ...attributes, ...listeners })}

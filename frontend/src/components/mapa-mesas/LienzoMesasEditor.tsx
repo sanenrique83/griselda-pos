@@ -12,7 +12,8 @@ import {
   type DragMoveEvent,
   type DragEndEvent,
 } from '@dnd-kit/core'
-import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
+import { HeaderB } from '@/components/ui/HeaderB'
+import { Boton } from '@/components/ui/Boton'
 import { MesaShape, dimensionesMesa, colorParaGrupo } from '@/components/mesas/MesaShape'
 import { TiempoMesa } from '@/components/mesas/TiempoMesa'
 import { guardarDisposicion } from '@/app/(app)/mas/mapa-mesas/actions'
@@ -455,47 +456,52 @@ export function LienzoMesasEditor({
 
   return (
     <div className="min-h-full bg-s2">
-      <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-0">
-        <BotonRegresarMas />
-        <h1 className="mt-1 text-[20px] font-bold leading-tight pb-3">Mapa de mesas</h1>
-        <p className="pb-3 text-[13px] text-text-3">
-          Arrastra cada mesa a su lugar · tócala para editar forma, tamaño y rotación
-        </p>
+      <HeaderB
+        backLabel="Más"
+        onBack={() => router.push('/mas')}
+        titulo="Mapa de mesas"
+        subtitulo={
+          <div>
+            <p className="pb-3 text-[13px] text-text-3">
+              Arrastra cada mesa a su lugar · tócala para editar forma, tamaño y rotación
+            </p>
 
-        {/* Pestañas de área — una por fila de `areas`, más "Sin área" y
-            "+ Nueva área" (crea directo desde aquí, sin ir a Catálogo). */}
-        <div className="flex overflow-x-auto scrollbar-none">
-          {areas.map((a) => (
-            <button
-              key={a.id}
-              onClick={() => seleccionarArea(a.id)}
-              className={`flex-shrink-0 px-1 py-2.5 text-[13px] font-semibold border-b-2 transition-colors mr-4 ${
-                areaSeleccionada === a.id
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-text-3'
-              }`}
-            >
-              {a.nombre}
-            </button>
-          ))}
-          <button
-            onClick={() => seleccionarArea('sin_area')}
-            className={`flex-shrink-0 px-1 py-2.5 text-[13px] font-semibold border-b-2 transition-colors mr-4 ${
-              areaSeleccionada === 'sin_area'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-text-3'
-            }`}
-          >
-            Sin área
-          </button>
-          <button
-            onClick={() => setSheetAreaOpen(true)}
-            className="flex-shrink-0 px-1 py-2.5 text-[13px] font-semibold text-blue-600"
-          >
-            + Nueva área
-          </button>
-        </div>
-      </div>
+            {/* Pestañas de área — una por fila de `areas`, más "Sin área" y
+                "+ Nueva área" (crea directo desde aquí, sin ir a Catálogo). */}
+            <div className="flex overflow-x-auto scrollbar-none">
+              {areas.map((a) => (
+                <button
+                  key={a.id}
+                  onClick={() => seleccionarArea(a.id)}
+                  className={`flex-shrink-0 px-1 py-2.5 text-[13px] font-semibold border-b-2 transition-colors mr-4 ${
+                    areaSeleccionada === a.id
+                      ? 'border-[#173F2E] text-[#173F2E]'
+                      : 'border-transparent text-text-3'
+                  }`}
+                >
+                  {a.nombre}
+                </button>
+              ))}
+              <button
+                onClick={() => seleccionarArea('sin_area')}
+                className={`flex-shrink-0 px-1 py-2.5 text-[13px] font-semibold border-b-2 transition-colors mr-4 ${
+                  areaSeleccionada === 'sin_area'
+                    ? 'border-[#173F2E] text-[#173F2E]'
+                    : 'border-transparent text-text-3'
+                }`}
+              >
+                Sin área
+              </button>
+              <button
+                onClick={() => setSheetAreaOpen(true)}
+                className="flex-shrink-0 px-1 py-2.5 text-[13px] font-semibold text-[#173F2E]"
+              >
+                + Nueva área
+              </button>
+            </div>
+          </div>
+        }
+      />
 
       <div className="px-4 py-4 space-y-3">
         {mesas.length === 0 ? (
@@ -513,7 +519,7 @@ export function LienzoMesasEditor({
             {mensaje && (
               <p
                 className={`text-center text-xs font-semibold ${
-                  mensaje.tipo === 'ok' ? 'text-green-600' : 'text-red-600'
+                  mensaje.tipo === 'ok' ? 'text-[#173F2E]' : 'text-red-600'
                 }`}
               >
                 {mensaje.texto}
@@ -647,7 +653,7 @@ export function LienzoMesasEditor({
                       })
                     }
                     className={`relative flex-shrink-0 h-[26px] w-[46px] rounded-full transition-colors duration-200 ${
-                      posicionSeleccionada.fueraDeServicio ? 'bg-blue-600' : 'bg-[#D1D1D6]'
+                      posicionSeleccionada.fueraDeServicio ? 'bg-text-2' : 'bg-[#D1D1D6]'
                     }`}
                   >
                     <span
@@ -660,15 +666,11 @@ export function LienzoMesasEditor({
               </div>
             )}
 
-            <button
-              onClick={handleGuardar}
-              disabled={dirty.size === 0 || guardando || uniendo}
-              className="w-full rounded-xl bg-blue-600 py-3.5 text-[15px] font-semibold text-white active:opacity-70 disabled:opacity-40"
-            >
+            <Boton onClick={handleGuardar} disabled={dirty.size === 0 || guardando || uniendo}>
               {guardando
                 ? 'Guardando…'
                 : `Guardar disposición${dirty.size > 0 ? ` (${dirty.size})` : ''}`}
-            </button>
+            </Boton>
           </>
         )}
 
@@ -709,22 +711,18 @@ export function LienzoMesasEditor({
           )}
         </div>
         <div className="flex-shrink-0 border-t border-[#E5E5EA] px-4 pb-[calc(env(safe-area-inset-bottom,0px)+14px)] pt-3.5 space-y-2">
-          <button
-            onClick={handleCrearArea}
-            disabled={creandoArea}
-            className="w-full rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
-          >
+          <Boton onClick={handleCrearArea} disabled={creandoArea}>
             {creandoArea ? 'Creando…' : 'Crear área'}
-          </button>
-          <button
+          </Boton>
+          <Boton
+            variant="secundario"
             onClick={() => {
               setSheetAreaOpen(false)
               setErrorArea(null)
             }}
-            className="w-full rounded-xl bg-s2 py-[14px] text-sm font-semibold text-text-2 active:scale-[.98]"
           >
             Cancelar
-          </button>
+          </Boton>
         </div>
       </div>
     </div>
@@ -773,7 +771,7 @@ function MesaDraggable({
   // imantada con otra (no solo la mesa destino) — así el gesto se siente
   // como "las dos se están por unir", no solo "esa otra mesa se resaltó".
   const colorFinal =
-    isDragging && magnetActivo ? COLOR_IMAN : seleccionada ? '#2563eb' : anilloColor
+    isDragging && magnetActivo ? COLOR_IMAN : seleccionada ? '#173F2E' : anilloColor
 
   const capacidad = Math.max(mesa.capacidad ?? 1, 1)
   const puntos = calcularPosicionesSillas(capacidad, posicion.forma, posicion.tamano, mesa.asientosHorario)
@@ -838,7 +836,7 @@ function SelectorForma({
           key={o.value}
           onClick={() => onChange(o.value)}
           className={`flex-1 rounded-lg px-2 py-2 text-[12px] font-semibold transition-colors ${
-            value === o.value ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+            value === o.value ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
           }`}
         >
           {o.label}
@@ -867,7 +865,7 @@ function SelectorTamano({
           key={o.value}
           onClick={() => onChange(o.value)}
           className={`flex-1 rounded-lg px-2 py-2 text-[12px] font-semibold transition-colors ${
-            value === o.value ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+            value === o.value ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
           }`}
         >
           {o.label}

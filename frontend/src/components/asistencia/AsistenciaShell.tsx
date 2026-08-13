@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { HeaderB } from '@/components/ui/HeaderB'
 import {
   marcarEntrada,
   marcarSalida,
@@ -64,6 +66,7 @@ export function AsistenciaShell({
   usuariosOpciones,
   filtrosIniciales,
 }: AsistenciaShellProps) {
+  const router = useRouter()
   const [entradaAbierta, setEntradaAbierta] = useState(entradaAbiertaEn)
   const [isPendingMarcar, startMarcarTransition] = useTransition()
   const [errorMarcar, setErrorMarcar] = useState<string | null>(null)
@@ -82,9 +85,7 @@ export function AsistenciaShell({
 
   return (
     <div className="min-h-full bg-s2">
-      <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <h1 className="text-[20px] font-bold leading-tight">Asistencia</h1>
-      </div>
+      <HeaderB backLabel="Más" onBack={() => router.push('/mas')} titulo="Asistencia" />
 
       <div className="px-4 py-4 space-y-4">
         {/* ── Marcar entrada / salida (propia) ────────────────────────────── */}
@@ -92,7 +93,7 @@ export function AsistenciaShell({
           {entradaAbierta ? (
             <>
               <p className="text-[13px] text-text-3">Entrada marcada</p>
-              <p className="mt-1 font-mono text-[22px] font-bold text-emerald-600">
+              <p className="mt-1 font-mono text-[22px] font-bold text-[#173F2E]">
                 {fmtHora(entradaAbierta)}
               </p>
             </>
@@ -106,7 +107,7 @@ export function AsistenciaShell({
             onClick={handleMarcar}
             disabled={isPendingMarcar}
             className={`mt-4 w-full rounded-xl py-[14px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(0,0,0,.15)] active:scale-[.98] disabled:opacity-40 ${
-              entradaAbierta ? 'bg-red-600' : 'bg-blue-600'
+              entradaAbierta ? 'bg-red-600' : 'bg-[#173F2E]'
             }`}
           >
             {isPendingMarcar ? 'Guardando…' : entradaAbierta ? 'Marcar salida' : 'Marcar entrada'}
@@ -178,7 +179,7 @@ function HistorialAdmin({
         <select
           value={usuarioId}
           onChange={(e) => setUsuarioId(e.target.value)}
-          className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[13px] outline-none focus:border-blue-500"
+          className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[13px] outline-none focus:border-[#173F2E]"
         >
           <option value="">Todo el personal</option>
           {usuariosOpciones.map((u) => (
@@ -195,7 +196,7 @@ function HistorialAdmin({
               type="date"
               value={desde}
               onChange={(e) => setDesde(e.target.value)}
-              className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[13px] outline-none focus:border-blue-500"
+              className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[13px] outline-none focus:border-[#173F2E]"
             />
           </div>
           <div className="flex-1">
@@ -206,7 +207,7 @@ function HistorialAdmin({
               type="date"
               value={hasta}
               onChange={(e) => setHasta(e.target.value)}
-              className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[13px] outline-none focus:border-blue-500"
+              className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[13px] outline-none focus:border-[#173F2E]"
             />
           </div>
         </div>
@@ -225,7 +226,7 @@ function HistorialAdmin({
         <button
           onClick={handleExportar}
           disabled={isPendingCSV}
-          className="w-full rounded-lg bg-blue-600 py-2.5 text-[13px] font-bold text-white active:opacity-80 disabled:opacity-40"
+          className="w-full rounded-lg bg-[#173F2E] py-2.5 text-[13px] font-bold text-white active:opacity-80 disabled:opacity-40"
         >
           {isPendingCSV ? 'Generando…' : '⬇ Exportar CSV'}
         </button>
@@ -251,7 +252,7 @@ function HistorialAdmin({
               </div>
               <span
                 className={`flex-shrink-0 font-mono text-[12px] font-semibold ${
-                  a.salida ? 'text-text-2' : 'text-emerald-600'
+                  a.salida ? 'text-text-2' : 'text-[#173F2E]'
                 }`}
               >
                 {fmtDuracion(a.entrada, a.salida)}
