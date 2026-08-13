@@ -122,7 +122,7 @@ export function SeccionMermas({ insumos, mermas: initial, filtrosIniciales }: Se
 
       <button
         onClick={() => setSheetOpen(true)}
-        className="block w-full rounded-2xl bg-blue-600 py-3.5 text-center text-sm font-bold text-white shadow-[0_2px_8px_rgba(37,99,235,.25)] active:scale-[.98]"
+        className="block w-full rounded-2xl bg-[#173F2E] py-3.5 text-center text-sm font-bold text-white shadow-[0_2px_8px_rgba(23,63,46,.32)] active:scale-[.98]"
       >
         + Registrar merma
       </button>
@@ -138,7 +138,7 @@ export function SeccionMermas({ insumos, mermas: initial, filtrosIniciales }: Se
               type="date"
               value={desde}
               onChange={(e) => setDesde(e.target.value)}
-              className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[13px] outline-none focus:border-blue-500"
+              className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[13px] outline-none focus:border-[#173F2E]"
             />
           </div>
           <div className="flex-1">
@@ -149,14 +149,14 @@ export function SeccionMermas({ insumos, mermas: initial, filtrosIniciales }: Se
               type="date"
               value={hasta}
               onChange={(e) => setHasta(e.target.value)}
-              className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[13px] outline-none focus:border-blue-500"
+              className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[13px] outline-none focus:border-[#173F2E]"
             />
           </div>
         </div>
         <select
           value={insumoFiltroId}
           onChange={(e) => setInsumoFiltroId(e.target.value ? Number(e.target.value) : '')}
-          className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[13px] outline-none focus:border-blue-500"
+          className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[13px] outline-none focus:border-[#173F2E]"
         >
           <option value="">Todos los insumos</option>
           {insumos.map((i) => (
@@ -183,7 +183,7 @@ export function SeccionMermas({ insumos, mermas: initial, filtrosIniciales }: Se
             key={v.id}
             onClick={() => setVista(v.id)}
             className={`flex-1 rounded-lg py-2 text-[12px] font-semibold transition-all ${
-              vista === v.id ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+              vista === v.id ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
             }`}
           >
             {v.label}
@@ -318,7 +318,7 @@ function SheetMerma({
             <select
               value={insumoId}
               onChange={(e) => setInsumoId(e.target.value ? Number(e.target.value) : '')}
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500 focus:bg-white"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
             >
               <option value="">Selecciona un insumo…</option>
               {insumos.map((i) => (
@@ -340,7 +340,7 @@ function SheetMerma({
                 value={cantidad}
                 onChange={(e) => setCantidad(e.target.value)}
                 placeholder="0"
-                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 pr-16 text-sm outline-none focus:border-blue-500 focus:bg-white"
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 pr-16 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
               />
               {insumo && (
                 <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-text-4">
@@ -366,13 +366,13 @@ function SheetMerma({
                   onClick={() => setMotivoIdx(idx)}
                   className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors ${
                     motivoIdx === idx
-                      ? 'bg-blue-50 border-[1.5px] border-blue-300'
+                      ? 'bg-[#173F2E]/5 border-[1.5px] border-[#173F2E]/40'
                       : 'bg-s2 border-[1.5px] border-transparent'
                   }`}
                 >
                   <div
                     className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-bold text-white transition-all ${
-                      motivoIdx === idx ? 'border-blue-500 bg-blue-500' : 'border-border'
+                      motivoIdx === idx ? 'border-[#173F2E] bg-[#173F2E]' : 'border-border'
                     }`}
                   >
                     {motivoIdx === idx && '✓'}
@@ -387,7 +387,7 @@ function SheetMerma({
                 value={motivoOtro}
                 onChange={(e) => setMotivoOtro(e.target.value)}
                 placeholder="Describe el motivo…"
-                className="mt-2 w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500 focus:bg-white"
+                className="mt-2 w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
               />
             )}
           </div>
@@ -399,7 +399,7 @@ function SheetMerma({
           <button
             onClick={handleRegistrar}
             disabled={isPending}
-            className="w-full rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
+            className="w-full rounded-xl bg-[#173F2E] py-[14px] text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
           >
             {isPending ? 'Registrando…' : 'Registrar merma'}
           </button>

@@ -218,7 +218,7 @@ export function SeccionInsumos({ insumos: initial, tiposInsumo: tiposInicial }: 
           <button
             onClick={() => setFiltroTab('todos')}
             className={`flex-shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all ${
-              filtroTab === 'todos' ? 'bg-blue-600 text-white' : 'bg-white text-text-2 border border-[#D1D1D6]'
+              filtroTab === 'todos' ? 'bg-[#173F2E] text-white' : 'bg-white text-text-2 border border-[#D1D1D6]'
             }`}
           >
             Todos
@@ -228,7 +228,7 @@ export function SeccionInsumos({ insumos: initial, tiposInsumo: tiposInicial }: 
               key={t.id}
               onClick={() => setFiltroTab(t.id)}
               className={`flex-shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all ${
-                filtroTab === t.id ? 'bg-blue-600 text-white' : 'bg-white text-text-2 border border-[#D1D1D6]'
+                filtroTab === t.id ? 'bg-[#173F2E] text-white' : 'bg-white text-text-2 border border-[#D1D1D6]'
               }`}
             >
               {t.nombre}
@@ -237,7 +237,7 @@ export function SeccionInsumos({ insumos: initial, tiposInsumo: tiposInicial }: 
           <button
             onClick={() => setFiltroTab('sin_clasificar')}
             className={`flex-shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all ${
-              filtroTab === 'sin_clasificar' ? 'bg-blue-600 text-white' : 'bg-white text-text-2 border border-[#D1D1D6]'
+              filtroTab === 'sin_clasificar' ? 'bg-[#173F2E] text-white' : 'bg-white text-text-2 border border-[#D1D1D6]'
             }`}
           >
             Sin clasificar
@@ -280,7 +280,7 @@ export function SeccionInsumos({ insumos: initial, tiposInsumo: tiposInicial }: 
 
                   <button
                     onClick={() => abrirSheet({ tipo: 'editar', ins })}
-                    className="flex-shrink-0 text-[12px] font-medium text-blue-600 active:opacity-60"
+                    className="flex-shrink-0 text-[12px] font-medium text-[#173F2E] active:opacity-60"
                   >
                     Editar
                   </button>
@@ -340,7 +340,7 @@ export function SeccionInsumos({ insumos: initial, tiposInsumo: tiposInicial }: 
               value={formNombre}
               onChange={(e) => setFormNombre(e.target.value)}
               placeholder="Ej: Cebolla, Carne de res, Tortilla de maíz…"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500 focus:bg-white"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
             />
           </div>
 
@@ -351,7 +351,7 @@ export function SeccionInsumos({ insumos: initial, tiposInsumo: tiposInicial }: 
             <select
               value={formUnidad}
               onChange={(e) => setFormUnidad(e.target.value as UnidadMedida)}
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
             >
               {UNIDADES.map((u) => (
                 <option key={u} value={u}>{u}</option>
@@ -370,7 +370,7 @@ export function SeccionInsumos({ insumos: initial, tiposInsumo: tiposInicial }: 
                   type="button"
                   onClick={() => setFormModoObtencion(m)}
                   className={`flex-1 rounded-lg py-2 text-[12px] font-semibold transition-all ${
-                    formModoObtencion === m ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+                    formModoObtencion === m ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
                   }`}
                 >
                   {m === 'comprado' ? 'Comprado' : 'Derivado'}
@@ -391,7 +391,7 @@ export function SeccionInsumos({ insumos: initial, tiposInsumo: tiposInicial }: 
             <select
               value={formTipoInsumoId ?? ''}
               onChange={(e) => setFormTipoInsumoId(e.target.value ? Number(e.target.value) : null)}
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
             >
               <option value="">Sin clasificar</option>
               {tiposInsumo.map((t) => (
@@ -412,7 +412,7 @@ export function SeccionInsumos({ insumos: initial, tiposInsumo: tiposInicial }: 
               value={formStockMinimo}
               onChange={(e) => setFormStockMinimo(e.target.value)}
               placeholder="0"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500 focus:bg-white"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
             />
             <p className="mt-1 text-[11px] text-text-3">
               Umbral para avisar cuando el stock esté bajo.
@@ -442,7 +442,7 @@ export function SeccionInsumos({ insumos: initial, tiposInsumo: tiposInicial }: 
           <button
             onClick={handleGuardar}
             disabled={isPending}
-            className="w-full rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+            className="w-full rounded-xl bg-[#173F2E] py-[14px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] disabled:opacity-40"
           >
             {isPending ? 'Guardando…' : 'Guardar'}
           </button>
@@ -496,11 +496,11 @@ export function SeccionInsumos({ insumos: initial, tiposInsumo: tiposInicial }: 
                           value={tipoEditandoNombre}
                           onChange={(e) => setTipoEditandoNombre(e.target.value)}
                           autoFocus
-                          className="flex-1 rounded-lg border-[1.5px] border-blue-400 bg-white px-2.5 py-1.5 text-[13px] outline-none"
+                          className="flex-1 rounded-lg border-[1.5px] border-[#173F2E]/50 bg-white px-2.5 py-1.5 text-[13px] outline-none"
                         />
                         <button
                           onClick={handleGuardarTipo}
-                          className="flex-shrink-0 text-[12px] font-semibold text-blue-600 active:opacity-60"
+                          className="flex-shrink-0 text-[12px] font-semibold text-[#173F2E] active:opacity-60"
                         >
                           Guardar
                         </button>
@@ -516,7 +516,7 @@ export function SeccionInsumos({ insumos: initial, tiposInsumo: tiposInicial }: 
                         <span className="flex-1 text-[13px]">{t.nombre}</span>
                         <button
                           onClick={() => abrirEditarTipo(t)}
-                          className="flex-shrink-0 text-[12px] font-medium text-blue-600 active:opacity-60"
+                          className="flex-shrink-0 text-[12px] font-medium text-[#173F2E] active:opacity-60"
                         >
                           Editar
                         </button>
@@ -543,12 +543,12 @@ export function SeccionInsumos({ insumos: initial, tiposInsumo: tiposInicial }: 
               onChange={(e) => setNuevoTipoNombre(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleCrearTipo() }}
               placeholder="Ej: Carnes, Guisados…"
-              className="flex-1 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500 focus:bg-white"
+              className="flex-1 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
             />
             <button
               onClick={handleCrearTipo}
               disabled={!nuevoTipoNombre.trim()}
-              className="flex-shrink-0 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
+              className="flex-shrink-0 rounded-xl bg-[#173F2E] px-4 py-3 text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
             >
               + Agregar
             </button>

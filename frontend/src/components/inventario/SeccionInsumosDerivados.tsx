@@ -107,7 +107,7 @@ export function SeccionInsumosDerivados({ insumos }: SeccionInsumosDerivadosProp
                 <button
                   onClick={() => setSheetProduccion(d)}
                   disabled={!tieneReceta}
-                  className="rounded-lg bg-blue-50 px-2.5 py-1.5 text-[12px] font-semibold text-blue-700 active:opacity-70 disabled:opacity-40"
+                  className="rounded-lg bg-[#173F2E]/10 px-2.5 py-1.5 text-[12px] font-semibold text-[#173F2E] active:opacity-70 disabled:opacity-40"
                 >
                   Producir
                 </button>
@@ -241,7 +241,7 @@ function SheetReceta({
                           ),
                         )
                       }}
-                      className="min-w-0 flex-[2] rounded-lg border-[1.5px] border-border bg-white px-2.5 py-2 text-[12px] outline-none focus:border-blue-500"
+                      className="min-w-0 flex-[2] rounded-lg border-[1.5px] border-border bg-white px-2.5 py-2 text-[12px] outline-none focus:border-[#173F2E]"
                     >
                       <option value="">Insumo componente…</option>
                       {candidatos.map((c) => (
@@ -260,7 +260,7 @@ function SheetReceta({
                         )
                       }
                       placeholder="Cant."
-                      className="w-16 flex-shrink-0 rounded-lg border-[1.5px] border-border bg-white px-2 py-2 text-[12px] outline-none focus:border-blue-500"
+                      className="w-16 flex-shrink-0 rounded-lg border-[1.5px] border-border bg-white px-2 py-2 text-[12px] outline-none focus:border-[#173F2E]"
                     />
                     <span className="w-10 flex-shrink-0 text-[11px] text-text-4">{l.unidad}</span>
                     <button
@@ -292,7 +292,7 @@ function SheetReceta({
           <button
             onClick={handleGuardar}
             disabled={isPending || loading}
-            className="w-full rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
+            className="w-full rounded-xl bg-[#173F2E] py-[14px] text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
           >
             {isPending ? 'Guardando…' : 'Guardar receta'}
           </button>
@@ -363,7 +363,7 @@ function SheetProduccion({
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {resultado ? (
-            <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3.5 text-sm font-medium text-emerald-700">
+            <div className="rounded-xl bg-[#173F2E]/5 border border-[#173F2E]/15 px-4 py-3.5 text-sm font-medium text-[#173F2E]">
               {resultado}
             </div>
           ) : (
@@ -379,7 +379,7 @@ function SheetProduccion({
                   min="0"
                   value={tandas}
                   onChange={(e) => setTandas(e.target.value)}
-                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500 focus:bg-white"
+                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
                 />
               </div>
 
@@ -415,7 +415,7 @@ function SheetProduccion({
                     value={cantidadObtenida}
                     onChange={(e) => setCantidadObtenida(e.target.value)}
                     placeholder="0"
-                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 pr-16 text-sm outline-none focus:border-blue-500 focus:bg-white"
+                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 pr-16 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
                   />
                   <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-text-4">
                     {insumo.unidad_medida}
@@ -435,7 +435,7 @@ function SheetProduccion({
                   value={notas}
                   onChange={(e) => setNotas(e.target.value)}
                   rows={2}
-                  className="w-full resize-none rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                  className="w-full resize-none rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
                 />
               </div>
 
@@ -448,7 +448,7 @@ function SheetProduccion({
           {resultado ? (
             <button
               onClick={onClose}
-              className="w-full rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white active:scale-[.98]"
+              className="w-full rounded-xl bg-[#173F2E] py-[14px] text-sm font-bold text-white active:scale-[.98]"
             >
               Cerrar
             </button>
@@ -457,7 +457,7 @@ function SheetProduccion({
               <button
                 onClick={handleRegistrar}
                 disabled={isPending}
-                className="w-full rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
+                className="w-full rounded-xl bg-[#173F2E] py-[14px] text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
               >
                 {isPending ? 'Registrando…' : 'Registrar producción'}
               </button>
