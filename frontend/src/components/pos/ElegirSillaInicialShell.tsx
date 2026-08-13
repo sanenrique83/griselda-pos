@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { HeaderB } from '@/components/ui/HeaderB'
+import { Boton } from '@/components/ui/Boton'
 import { DiagramaSillas } from './DiagramaSillas'
 import { DiagramaSillasCadena } from './DiagramaSillasCadena'
 import { abrirPedidoMesa, abrirPedidoMesaCombinada } from '@/app/(app)/pos/nueva/[mesaId]/actions'
@@ -79,21 +81,7 @@ export function ElegirSillaInicialShell({
       className="flex flex-col"
       style={{ height: 'calc(100dvh - 4rem - env(safe-area-inset-bottom, 0px))' }}
     >
-      {/* Header */}
-      <div className="flex-shrink-0 bg-white border-b border-[#E5E5EA] px-4 pt-3 pb-3">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => router.push('/mesas')}
-            className="-ml-1 px-1 py-1 text-[15px] font-medium text-blue-600 active:opacity-60"
-          >
-            ‹ Mesas
-          </button>
-          <div className="flex-1 min-w-0 text-center">
-            <p className="text-[15px] font-semibold leading-tight truncate">{mesaLabel}</p>
-          </div>
-          <div className="w-12" />
-        </div>
-      </div>
+      <HeaderB backLabel="Mesas" onBack={() => router.push('/mesas')} titulo={mesaLabel} />
 
       {/* Cuerpo */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
@@ -113,8 +101,8 @@ export function ElegirSillaInicialShell({
                 onClick={() => setSillaElegida(sillaNum)}
                 className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-[13px] font-bold transition-transform active:scale-90 ${
                   sillaElegida === sillaNum
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-blue-400 bg-blue-50 text-blue-700'
+                    ? 'border-[#173F2E] bg-[#173F2E] text-white'
+                    : 'border-border bg-s2 text-text-2'
                 }`}
               >
                 {sillaNum}
@@ -133,8 +121,8 @@ export function ElegirSillaInicialShell({
                 onClick={() => setSillaElegida(sillaNum)}
                 className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-[13px] font-bold transition-transform active:scale-90 ${
                   sillaElegida === sillaNum
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-blue-400 bg-blue-50 text-blue-700'
+                    ? 'border-[#173F2E] bg-[#173F2E] text-white'
+                    : 'border-border bg-s2 text-text-2'
                 }`}
               >
                 {sillaNum}
@@ -152,17 +140,13 @@ export function ElegirSillaInicialShell({
 
       {/* Pie fijo */}
       <div className="flex-shrink-0 border-t border-[#E5E5EA] bg-white px-4 pb-[calc(env(safe-area-inset-bottom,0px)+14px)] pt-3.5">
-        <button
-          onClick={handleConfirmar}
-          disabled={sillaElegida === null || isPending}
-          className="w-full rounded-xl bg-blue-600 py-[15px] text-[15px] font-bold text-white shadow-[0_4px_14px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
-        >
+        <Boton onClick={handleConfirmar} disabled={sillaElegida === null || isPending}>
           {isPending
             ? 'Abriendo mesa…'
             : sillaElegida !== null
               ? `Confirmar silla ${sillaElegida} y abrir mesa`
               : 'Elige una silla para continuar'}
-        </button>
+        </Boton>
       </div>
     </div>
   )

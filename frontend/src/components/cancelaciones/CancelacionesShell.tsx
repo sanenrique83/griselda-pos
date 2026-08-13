@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
+import { HeaderB } from '@/components/ui/HeaderB'
+import { Tarjeta } from '@/components/ui/Tarjeta'
+import { Boton } from '@/components/ui/Boton'
 import type {
   CancelacionRow,
   CancelacionesFiltros,
@@ -87,18 +89,20 @@ export function CancelacionesShell({
 
   return (
     <div className="min-h-full bg-s2">
-      {/* Header */}
-      <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <BotonRegresarMas />
-        <h1 className="mt-1 text-[20px] font-bold leading-tight">Cancelaciones</h1>
-        <p className="mt-0.5 text-[13px] text-text-3">
-          {filtros.desde} → {filtros.hasta}
-        </p>
-      </div>
+      <HeaderB
+        backLabel="Más"
+        onBack={() => router.push('/mas')}
+        titulo="Cancelaciones"
+        subtitulo={
+          <p className="text-[13px] text-text-3">
+            {filtros.desde} → {filtros.hasta}
+          </p>
+        }
+      />
 
       <div className="px-4 py-4 space-y-4">
         {/* ── Filtros ───────────────────────────────────────────────────────── */}
-        <div className="rounded-2xl bg-white shadow-card px-4 py-4 space-y-3">
+        <Tarjeta className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <label className="block">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
@@ -173,19 +177,15 @@ export function CancelacionesShell({
             />
           </label>
 
-          <button
-            onClick={handleFiltrar}
-            className="w-full rounded-xl bg-blue-600 py-3 text-[14px] font-semibold text-white active:opacity-70"
-          >
-            Filtrar
-          </button>
-        </div>
+          <Boton onClick={handleFiltrar}>Filtrar</Boton>
+        </Tarjeta>
 
         {/* ── Tabla ─────────────────────────────────────────────────────────── */}
         {filas.length === 0 ? (
-          <div className="rounded-2xl bg-white shadow-card px-4 py-8 text-center">
-            <p className="text-2xl mb-2">🗑️</p>
-            <p className="text-sm text-text-3">Sin cancelaciones en este rango.</p>
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="mb-3 text-[48px]">🗑️</p>
+            <p className="text-[15px] font-semibold text-text-2">Sin cancelaciones en este rango</p>
+            <p className="mt-1 text-sm text-text-3">Prueba ajustando las fechas o los filtros.</p>
           </div>
         ) : (
           <div className="rounded-2xl bg-white shadow-card overflow-hidden">
@@ -237,13 +237,9 @@ export function CancelacionesShell({
           </div>
         )}
 
-        <button
-          onClick={() => exportarCSV(filas, filtros)}
-          disabled={filas.length === 0}
-          className="w-full rounded-xl bg-white border border-[#E5E5EA] py-3.5 text-[14px] font-semibold text-text-2 active:opacity-70 disabled:opacity-40"
-        >
+        <Boton variant="secundario" onClick={() => exportarCSV(filas, filtros)} disabled={filas.length === 0}>
           ↓ Exportar CSV
-        </button>
+        </Boton>
 
         <div className="h-2" />
       </div>

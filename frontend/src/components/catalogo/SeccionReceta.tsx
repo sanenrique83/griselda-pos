@@ -409,7 +409,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                             prev.map((x) => (x.key === l.key ? { ...x, productoId: v } : x)),
                           )
                         }}
-                        className="min-w-0 flex-[2] rounded-lg border-[1.5px] border-border bg-white px-2.5 py-2 text-[12px] outline-none focus:border-blue-500"
+                        className="min-w-0 flex-[2] rounded-lg border-[1.5px] border-border bg-white px-2.5 py-2 text-[12px] outline-none focus:border-[#173F2E]"
                       >
                         <option value="">Producto…</option>
                         {candidatosCombo.map((p) => (
@@ -426,7 +426,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                             prev.map((x) => (x.key === l.key ? { ...x, cantidad: e.target.value } : x)),
                           )
                         }
-                        className="w-14 flex-shrink-0 rounded-lg border-[1.5px] border-border bg-white px-2 py-2 text-center text-[12px] outline-none focus:border-blue-500"
+                        className="w-14 flex-shrink-0 rounded-lg border-[1.5px] border-border bg-white px-2 py-2 text-center text-[12px] outline-none focus:border-[#173F2E]"
                       />
                       <span className="w-20 flex-shrink-0 text-right font-mono text-[11px] text-text-3">
                         {l.productoId === '' ? '' : subtotal === null ? 'incompleto' : `$${fmtMoney(subtotal)}`}
@@ -464,12 +464,12 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                 </span>
               </div>
 
-              {saved && <p className="text-[12px] font-medium text-green-600">Componentes guardados.</p>}
+              {saved && <p className="text-[12px] font-medium text-[#173F2E]">Componentes guardados.</p>}
 
               <button
                 onClick={handleGuardarCombo}
                 disabled={isPending}
-                className="w-full rounded-xl bg-blue-600 py-2.5 text-[13px] font-bold text-white active:opacity-80 disabled:opacity-40"
+                className="w-full rounded-xl bg-[#173F2E] py-2.5 text-[13px] font-bold text-white active:opacity-80 disabled:opacity-40"
               >
                 {isPending ? 'Guardando…' : 'Guardar componentes'}
               </button>
@@ -506,7 +506,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                             )
                           }
                           placeholder="Ej: Bebida a elegir"
-                          className="min-w-0 flex-1 rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[12px] outline-none focus:border-blue-500"
+                          className="min-w-0 flex-1 rounded-lg border-[1.5px] border-border bg-s2 px-2.5 py-2 text-[12px] outline-none focus:border-[#173F2E]"
                         />
                         <button
                           onClick={() => setLineasSlot((prev) => prev.filter((x) => x.key !== s.key))}
@@ -525,7 +525,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                             )
                           }
                           className={`relative h-[24px] w-[42px] rounded-full transition-colors duration-200 ${
-                            s.requerido ? 'bg-blue-600' : 'bg-[#D1D1D6]'
+                            s.requerido ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
                           }`}
                         >
                           <span
@@ -582,13 +582,13 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                 </button>
 
                 {savedSlots && (
-                  <p className="mt-2 text-[12px] font-medium text-green-600">Slots guardados.</p>
+                  <p className="mt-2 text-[12px] font-medium text-[#173F2E]">Slots guardados.</p>
                 )}
 
                 <button
                   onClick={handleGuardarSlots}
                   disabled={isPendingSlots}
-                  className="mt-2 w-full rounded-xl bg-blue-600 py-2.5 text-[13px] font-bold text-white active:opacity-80 disabled:opacity-40"
+                  className="mt-2 w-full rounded-xl bg-[#173F2E] py-2.5 text-[13px] font-bold text-white active:opacity-80 disabled:opacity-40"
                 >
                   {isPendingSlots ? 'Guardando…' : 'Guardar slots'}
                 </button>
@@ -606,7 +606,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                       type="button"
                       onClick={() => handleModoChange(m)}
                       className={`flex-1 rounded-lg py-2 text-[12px] font-semibold transition-all ${
-                        modoPreparacion === m ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+                        modoPreparacion === m ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
                       }`}
                     >
                       {m === 'por_orden' ? 'Por orden' : m === 'por_lote' ? 'Por lote' : 'Reventa'}
@@ -629,7 +629,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
                   placeholder={modoPreparacion === 'reventa' ? 'Ej: Llavero agave' : 'Ej: Tacos de bistec'}
-                  className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
+                  className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-[#173F2E]"
                 />
               </div>
 
@@ -643,7 +643,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                         value={rendimiento}
                         onChange={(e) => setRendimiento(e.target.value)}
                         placeholder="Ej: 10 tacos"
-                        className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
+                        className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-[#173F2E]"
                       />
                     </div>
                     <div>
@@ -654,7 +654,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                         min={0}
                         value={tiempoPrep}
                         onChange={(e) => setTiempoPrep(e.target.value)}
-                        className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
+                        className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-[#173F2E]"
                       />
                     </div>
                   </div>
@@ -666,7 +666,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                       onChange={(e) => setInstrucciones(e.target.value)}
                       rows={4}
                       placeholder="Pasos de preparación…"
-                      className="w-full resize-none rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
+                      className="w-full resize-none rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-[#173F2E]"
                     />
                   </div>
                 </>
@@ -683,7 +683,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                       min="0"
                       value={porcionesDisponibles}
                       onChange={(e) => setPorcionesDisponibles(e.target.value)}
-                      className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
+                      className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-[#173F2E]"
                     />
                   </div>
                   <div>
@@ -696,7 +696,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                       value={rendimientoEsperado}
                       onChange={(e) => setRendimientoEsperado(e.target.value)}
                       placeholder="Porciones / unidad insumo"
-                      className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
+                      className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-[#173F2E]"
                     />
                   </div>
                 </div>
@@ -714,7 +714,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                         const v = e.target.value ? Number(e.target.value) : ''
                         setLineasInsumo([{ key: lineasInsumo[0]?.key ?? nuevaLineaInsumo().key, insumoId: v, cantidad: '1' }])
                       }}
-                      className="min-w-0 flex-1 rounded-lg border-[1.5px] border-border bg-white px-2.5 py-2 text-[12px] outline-none focus:border-blue-500"
+                      className="min-w-0 flex-1 rounded-lg border-[1.5px] border-border bg-white px-2.5 py-2 text-[12px] outline-none focus:border-[#173F2E]"
                     >
                       <option value="">Insumo…</option>
                       {insumos.map((i) => (
@@ -778,7 +778,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                                           prev.map((x) => (x.key === l.key ? { ...x, insumoId: v } : x)),
                                         )
                                       }}
-                                      className="min-w-0 flex-[2] rounded-lg border-[1.5px] border-border bg-white px-2.5 py-2 text-[12px] outline-none focus:border-blue-500"
+                                      className="min-w-0 flex-[2] rounded-lg border-[1.5px] border-border bg-white px-2.5 py-2 text-[12px] outline-none focus:border-[#173F2E]"
                                     >
                                       <option value="">Insumo…</option>
                                       {insumos.map((i) => (
@@ -797,7 +797,7 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                                         )
                                       }
                                       placeholder="Cant."
-                                      className="w-16 flex-shrink-0 rounded-lg border-[1.5px] border-border bg-white px-2 py-2 text-[12px] outline-none focus:border-blue-500"
+                                      className="w-16 flex-shrink-0 rounded-lg border-[1.5px] border-border bg-white px-2 py-2 text-[12px] outline-none focus:border-[#173F2E]"
                                     />
                                     <span className="w-10 flex-shrink-0 text-[11px] text-text-4">
                                       {insumo?.unidad_medida ?? ''}
@@ -861,12 +861,12 @@ export function SeccionReceta({ producto, productos, insumos, grupos }: SeccionR
                 </p>
               )}
 
-              {saved && <p className="text-[12px] font-medium text-green-600">Receta guardada.</p>}
+              {saved && <p className="text-[12px] font-medium text-[#173F2E]">Receta guardada.</p>}
 
               <button
                 onClick={handleGuardarReceta}
                 disabled={isPending}
-                className="w-full rounded-xl bg-blue-600 py-2.5 text-[13px] font-bold text-white active:opacity-80 disabled:opacity-40"
+                className="w-full rounded-xl bg-[#173F2E] py-2.5 text-[13px] font-bold text-white active:opacity-80 disabled:opacity-40"
               >
                 {isPending ? 'Guardando…' : 'Guardar receta'}
               </button>

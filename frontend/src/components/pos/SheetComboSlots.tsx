@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
+import { Sheet } from '@/components/ui/Sheet'
+import { Boton } from '@/components/ui/Boton'
 import type { ComboSlot } from '@/app/(app)/pos/[pedidoId]/actions'
 import type { ProductoCatalogo } from '@/app/(app)/pos/[pedidoId]/page'
 
@@ -76,21 +78,11 @@ export function SheetComboSlots({ producto, slots, onConfirmar, onClose }: Sheet
   const total = producto ? producto.precio * cantidad : 0
 
   return (
-    <>
-      <div
-        className={`fixed inset-0 z-[60] bg-black/40 transition-opacity duration-200 ${
-          open ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-        onClick={onClose}
-      />
-
-      <div
-        className={`fixed bottom-0 left-0 right-0 z-[60] flex max-h-[92vh] flex-col rounded-t-[20px] bg-white transition-transform duration-300 ease-out ${
-          open ? 'translate-y-0' : 'translate-y-full'
-        }`}
-      >
-        <div className="mx-auto mt-3 h-1 w-10 flex-shrink-0 rounded-full bg-s3" />
-
+    <Sheet
+      open={open}
+      onClose={onClose}
+      maxHeightClass="max-h-[92vh]"
+      header={
         <div className="flex-shrink-0 border-b border-[#E5E5EA] px-5 py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -104,80 +96,9 @@ export function SheetComboSlots({ producto, slots, onConfirmar, onClose }: Sheet
             )}
           </div>
         </div>
-
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
-          {slots.map((slot) => {
-            const elegido = seleccion.get(slot.id)
-            const cumplido = !slot.requerido || elegido !== undefined
-
-            return (
-              <div key={slot.id}>
-                <div className="mb-2.5 flex items-center gap-2">
-                  <span className="text-[15px] font-semibold">{slot.nombre}</span>
-                  {slot.requerido ? (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors ${
-                        cumplido ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'
-                      }`}
-                    >
-                      {cumplido ? '✓ Listo' : 'Elige 1'}
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-s2 px-2 py-0.5 text-[11px] font-semibold text-text-3">
-                      Opcional
-                    </span>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  {slot.opciones.map((opcion) => {
-                    const sel = elegido === opcion.productoId
-                    return (
-                      <button
-                        key={opcion.id}
-                        onClick={() => elegir(slot.id, opcion.productoId)}
-                        className={`flex w-full items-center gap-3 rounded-xl border-[1.5px] p-3.5 text-left transition-all active:scale-[.98] ${
-                          sel ? 'border-blue-500 bg-blue-50' : 'border-[#D1D1D6] bg-white'
-                        }`}
-                      >
-                        <div
-                          className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold text-white transition-all ${
-                            sel ? 'border-blue-600 bg-blue-600' : 'border-border'
-                          }`}
-                        >
-                          {sel && '✓'}
-                        </div>
-                        <span className="text-lg">{opcion.emoji ?? '🍽️'}</span>
-                        <span className="flex-1 text-sm font-medium">{opcion.nombre}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-3">
-              Nota para cocina (opcional)
-            </label>
-            <input
-              type="text"
-              value={notas}
-              onChange={(e) => setNotas(e.target.value)}
-              placeholder="Ej: sin cebolla, extra limón…"
-              className="w-full rounded-card border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-600"
-            />
-          </div>
-
-          {error && (
-            <p className="rounded-card bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
-          )}
-
-          <div className="h-2" />
-        </div>
-
-        <div className="flex-shrink-0 border-t border-[#E5E5EA] px-4 pb-[calc(env(safe-area-inset-bottom,0px)+14px)] pt-3.5">
+      }
+      footer={
+        <>
           <div className="mb-3 flex items-center justify-between">
             <p className="max-w-[60%] truncate text-[13px] text-text-2">{producto?.nombre ?? ''}</p>
             <span className="font-mono text-xl font-bold text-amber-600">${total.toFixed(2)}</span>
@@ -202,20 +123,87 @@ export function SheetComboSlots({ producto, slots, onConfirmar, onClose }: Sheet
               </button>
             </div>
 
-            <button
+            <Boton
+              fullWidth={false}
+              className="flex-1"
               onClick={handleConfirmar}
               disabled={!valido || isPending}
-              className="flex-1 rounded-xl bg-blue-600 py-[11px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
             >
               {isPending
                 ? 'Agregando…'
                 : slotsPendientes[0]
                   ? `Elige ${slotsPendientes[0].nombre}`
                   : '✓ Agregar a comanda'}
-            </button>
+            </Boton>
           </div>
-        </div>
+        </>
+      }
+    >
+      {slots.map((slot) => {
+        const elegido = seleccion.get(slot.id)
+        const cumplido = !slot.requerido || elegido !== undefined
+
+        return (
+          <div key={slot.id}>
+            <div className="mb-2.5 flex items-center gap-2">
+              <span className="text-[15px] font-semibold">{slot.nombre}</span>
+              {slot.requerido ? (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+                    cumplido ? 'bg-[#173F2E]/10 text-[#173F2E]' : 'bg-amber-50 text-amber-700'
+                  }`}
+                >
+                  {cumplido ? '✓ Listo' : 'Elige 1'}
+                </span>
+              ) : (
+                <span className="rounded-full bg-s2 px-2 py-0.5 text-[11px] font-semibold text-text-3">
+                  Opcional
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              {slot.opciones.map((opcion) => {
+                const sel = elegido === opcion.productoId
+                return (
+                  <button
+                    key={opcion.id}
+                    onClick={() => elegir(slot.id, opcion.productoId)}
+                    className={`flex w-full items-center gap-3 rounded-xl border-[1.5px] p-3.5 text-left transition-all active:scale-[.98] ${
+                      sel ? 'border-[#173F2E] bg-[#173F2E]/5' : 'border-border bg-white'
+                    }`}
+                  >
+                    <div
+                      className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold text-white transition-all ${
+                        sel ? 'border-[#173F2E] bg-[#173F2E]' : 'border-border'
+                      }`}
+                    >
+                      {sel && '✓'}
+                    </div>
+                    <span className="text-lg">{opcion.emoji ?? '🍽️'}</span>
+                    <span className="flex-1 text-sm font-medium">{opcion.nombre}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+
+      <div>
+        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-3">
+          Nota para cocina (opcional)
+        </label>
+        <input
+          type="text"
+          value={notas}
+          onChange={(e) => setNotas(e.target.value)}
+          placeholder="Ej: sin cebolla, extra limón…"
+          className="w-full rounded-card border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
+        />
       </div>
-    </>
+
+      {error && <p className="rounded-card bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
+    </Sheet>
   )
 }

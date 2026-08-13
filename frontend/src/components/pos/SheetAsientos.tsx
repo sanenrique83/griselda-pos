@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Sheet } from '@/components/ui/Sheet'
+import { Boton } from '@/components/ui/Boton'
 import { DiagramaSillas } from './DiagramaSillas'
 import { DiagramaSillasCadena } from './DiagramaSillasCadena'
 import { asignarSilla } from '@/app/(app)/pos/[pedidoId]/actions'
@@ -81,9 +83,9 @@ export function SheetAsientos({
           esPropia
             ? 'border-amber-500 bg-amber-50 text-amber-700 active:scale-90'
             : ocupante
-              ? 'border-[#D1D1D6] bg-s2 text-text-3'
+              ? 'border-border bg-s2 text-text-3'
               : asignable
-                ? 'border-blue-500 bg-blue-50 text-blue-700 active:scale-90'
+                ? 'border-[#173F2E] bg-[#173F2E]/5 text-[#173F2E] active:scale-90'
                 : 'border-[#E5E5EA] bg-white text-text-4'
         } ${!tappable ? 'cursor-default' : ''}`}
       >
@@ -100,19 +102,10 @@ export function SheetAsientos({
       : 0
 
   return (
-    <>
-      <div
-        className={`fixed inset-0 z-[60] bg-black/40 transition-opacity duration-200 ${
-          open ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-        onClick={handleClose}
-      />
-      <div
-        className={`fixed bottom-0 left-0 right-0 z-[60] flex max-h-[85vh] flex-col rounded-t-[20px] bg-white transition-transform duration-300 ease-out ${
-          open ? 'translate-y-0' : 'translate-y-full'
-        }`}
-      >
-        <div className="mx-auto mt-3 h-1 w-10 flex-shrink-0 rounded-full bg-s3" />
+    <Sheet
+      open={open}
+      onClose={handleClose}
+      header={
         <div className="flex-shrink-0 border-b border-[#E5E5EA] px-5 py-4">
           <h2 className="text-[17px] font-bold">Asientos</h2>
           <p className="mt-0.5 text-[13px] text-text-3">
@@ -121,82 +114,72 @@ export function SheetAsientos({
               : 'Toca una silla vacía para asignarla — o su propia silla para quitarla.'}
           </p>
         </div>
-
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {!mesaSillas && !mesasCadena ? (
-            <p className="py-8 text-center text-sm text-text-3">
-              Este pedido no tiene mesa asignada.
-            </p>
+      }
+      footer={
+        <Boton variant="secundario" onClick={handleClose}>
+          Cerrar
+        </Boton>
+      }
+    >
+      {!mesaSillas && !mesasCadena ? (
+        <p className="py-8 text-center text-sm text-text-3">Este pedido no tiene mesa asignada.</p>
+      ) : (
+        <>
+          {/* ── Diagrama de la mesa con marcadores de silla ─────────────── */}
+          {mesasCadena ? (
+            <DiagramaSillasCadena
+              mesas={
+                numSillas > capacidadCadena
+                  ? [
+                      ...mesasCadena.slice(0, -1),
+                      {
+                        capacidad:
+                          mesasCadena[mesasCadena.length - 1].capacidad +
+                          (numSillas - capacidadCadena),
+                      },
+                    ]
+                  : mesasCadena
+              }
+              renderSilla={renderSilla}
+            />
           ) : (
-            <>
-              {/* ── Diagrama de la mesa con marcadores de silla ─────────────── */}
-              {mesasCadena ? (
-                <DiagramaSillasCadena
-                  mesas={
-                    numSillas > capacidadCadena
-                      ? [
-                          ...mesasCadena.slice(0, -1),
-                          {
-                            capacidad:
-                              mesasCadena[mesasCadena.length - 1].capacidad +
-                              (numSillas - capacidadCadena),
-                          },
-                        ]
-                      : mesasCadena
-                  }
-                  renderSilla={renderSilla}
-                />
-              ) : (
-                mesaSillas && (
-                  <DiagramaSillas
-                    forma={mesaSillas.forma}
-                    tamano={mesaSillas.tamano}
-                    rotacion={mesaSillas.rotacion}
-                    asientosHorario={mesaSillas.asientosHorario}
-                    numSillas={numSillas}
-                    renderSilla={renderSilla}
-                  />
-                )
-              )}
-
-              {/* ── Lista de comensales ──────────────────────────────────────── */}
-              <div className="space-y-2">
-                {subpedidos.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setComensalSeleccionadoId(s.id)}
-                    className={`w-full flex items-center justify-between rounded-xl border-[1.5px] px-4 py-3 text-left transition-all active:scale-[.98] ${
-                      comensalSeleccionadoId === s.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-[#D1D1D6] bg-white'
-                    }`}
-                  >
-                    <span className="text-[14px] font-medium">
-                      {s.nombre ?? `Comensal ${s.comensal_numero}`}
-                    </span>
-                    <span className="text-[12px] font-semibold text-text-3">
-                      {s.silla_numero ? `Silla ${s.silla_numero}` : 'Sin silla'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              {error && (
-                <p className="rounded-card bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
-              )}
-            </>
+            mesaSillas && (
+              <DiagramaSillas
+                forma={mesaSillas.forma}
+                tamano={mesaSillas.tamano}
+                rotacion={mesaSillas.rotacion}
+                asientosHorario={mesaSillas.asientosHorario}
+                numSillas={numSillas}
+                renderSilla={renderSilla}
+              />
+            )
           )}
-        </div>
 
-        <div className="flex-shrink-0 border-t border-[#E5E5EA] px-4 pb-[calc(env(safe-area-inset-bottom,0px)+14px)] pt-3.5">
-          <button
-            onClick={handleClose}
-            className="w-full rounded-xl bg-s2 py-[14px] text-sm font-semibold text-text-2 active:scale-[.98]"
-          >
-            Cerrar
-          </button>
-        </div>
-      </div>
-    </>
+          {/* ── Lista de comensales ──────────────────────────────────────── */}
+          <div className="space-y-2">
+            {subpedidos.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setComensalSeleccionadoId(s.id)}
+                className={`w-full flex items-center justify-between rounded-xl border-[1.5px] px-4 py-3 text-left transition-all active:scale-[.98] ${
+                  comensalSeleccionadoId === s.id
+                    ? 'border-[#173F2E] bg-[#173F2E]/5'
+                    : 'border-border bg-white'
+                }`}
+              >
+                <span className="text-[14px] font-medium">
+                  {s.nombre ?? `Comensal ${s.comensal_numero}`}
+                </span>
+                <span className="text-[12px] font-semibold text-text-3">
+                  {s.silla_numero ? `Silla ${s.silla_numero}` : 'Sin silla'}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {error && <p className="rounded-card bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
+        </>
+      )}
+    </Sheet>
   )
 }

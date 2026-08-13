@@ -72,7 +72,7 @@ export function TarjetaMesa({
       {/* Spinner mientras se crea el pedido */}
       {isPending && (
         <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/70">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#173F2E] border-t-transparent" />
         </div>
       )}
 

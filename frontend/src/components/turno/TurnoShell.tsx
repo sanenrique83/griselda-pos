@@ -2,7 +2,9 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
+import { HeaderB } from '@/components/ui/HeaderB'
+import { Boton } from '@/components/ui/Boton'
+import { Sheet } from '@/components/ui/Sheet'
 import { abrirTurno, cerrarTurno, registrarMovimiento } from '@/app/(app)/mas/turno/actions'
 import type { TurnoResumen, MovimientoCajaItem, RecordatorioFinTurno } from '@/app/(app)/mas/turno/page'
 
@@ -42,20 +44,19 @@ function round2(n: number) {
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export function TurnoShell({ turnoActivo, diferenciaAlertaMonto, recordatorioFinTurno = null }: TurnoShellProps) {
+  const router = useRouter()
   return (
     <div>
-      {/* Header */}
-      <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <BotonRegresarMas />
-        <h1 className="mt-1 text-[20px] font-bold leading-tight">Turno</h1>
-        {turnoActivo ? (
-          <p className="mt-0.5 text-[13px] text-text-3">
-            #{turnoActivo.id} · {fmtFecha(turnoActivo.abierto_en)}
+      <HeaderB
+        backLabel="Más"
+        onBack={() => router.push('/mas')}
+        titulo="Turno"
+        subtitulo={
+          <p className="text-[13px] text-text-3">
+            {turnoActivo ? `#${turnoActivo.id} · ${fmtFecha(turnoActivo.abierto_en)}` : 'Sin turno activo'}
           </p>
-        ) : (
-          <p className="mt-0.5 text-[13px] text-text-3">Sin turno activo</p>
-        )}
-      </div>
+        }
+      />
 
       <div className="px-4 py-4 space-y-4">
         {turnoActivo ? (
@@ -120,7 +121,7 @@ function AbrirTurnoForm() {
               value={fondo}
               onChange={(e) => setFondo(e.target.value)}
               placeholder="0.00"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-10 pr-4 font-mono text-[22px] font-bold outline-none focus:border-blue-600 focus:bg-white"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-10 pr-4 font-mono text-[22px] font-bold outline-none focus:border-[#173F2E] focus:bg-white"
             />
           </div>
           <p className="mt-1.5 text-xs text-text-3">
@@ -136,7 +137,7 @@ function AbrirTurnoForm() {
               onClick={() => setFondo(String(v))}
               className={`rounded-full border-[1.5px] px-3.5 py-1.5 text-[13px] font-semibold transition-all active:scale-95 ${
                 parseFloat(fondo) === v
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  ? 'border-[#173F2E] bg-[#173F2E]/5 text-[#173F2E]'
                   : 'border-border bg-s2 text-text-2'
               }`}
             >
@@ -151,13 +152,9 @@ function AbrirTurnoForm() {
           </p>
         )}
 
-        <button
-          onClick={handleAbrir}
-          disabled={isPending}
-          className="w-full rounded-xl bg-blue-600 py-[18px] text-base font-bold text-white shadow-[0_4px_14px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
-        >
+        <Boton onClick={handleAbrir} disabled={isPending}>
           {isPending ? 'Abriendo turno…' : '▶ Abrir turno'}
-        </button>
+        </Boton>
       </div>
     </div>
   )
@@ -254,9 +251,9 @@ function TurnoActivo({
       {/* Recordatorio proactivo de fin de turno programado — informativo, no
           bloqueante, distinto del ámbar de "necesita atención" de abajo. */}
       {recordatorioFinTurno && (
-        <div className="flex items-start gap-2.5 rounded-xl bg-blue-50 border border-blue-100 px-3.5 py-3">
+        <div className="flex items-start gap-2.5 rounded-xl bg-[#173F2E]/5 border border-[#173F2E]/15 px-3.5 py-3">
           <span className="text-[18px] mt-0.5">⏰</span>
-          <p className="text-xs font-medium text-blue-700">
+          <p className="text-xs font-medium text-[#173F2E]">
             Tu turno programado ({recordatorioFinTurno.nombre}) termina en{' '}
             {recordatorioFinTurno.minutosRestantes} min.
           </p>
@@ -359,7 +356,7 @@ function TurnoActivo({
           )}
           <div className="flex items-center justify-between bg-s2 px-4 py-3.5">
             <p className="text-[14px] font-bold">Teórico en caja</p>
-            <span className="font-mono text-[17px] font-bold text-blue-600">
+            <span className="font-mono text-[17px] font-bold text-text">
               ${fmtMoney(turno.efectivoTeorico)}
             </span>
           </div>
@@ -401,7 +398,7 @@ function TurnoActivo({
               value={efectivoContado}
               onChange={(e) => setEfectivoContado(e.target.value)}
               placeholder="0.00"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-10 pr-4 font-mono text-[22px] font-bold outline-none focus:border-blue-600 focus:bg-white"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-10 pr-4 font-mono text-[22px] font-bold outline-none focus:border-[#173F2E] focus:bg-white"
             />
           </div>
 
@@ -410,9 +407,9 @@ function TurnoActivo({
             <div
               className={`flex items-center justify-between rounded-xl px-4 py-3.5 ${
                 Math.abs(diferencia) < 0.01
-                  ? 'bg-emerald-50 border border-emerald-100'
+                  ? 'bg-[#173F2E]/5 border border-[#173F2E]/15'
                   : diferencia > 0
-                    ? 'bg-blue-50 border border-blue-100'
+                    ? 'bg-amber-50 border border-amber-100'
                     : 'bg-red-50 border border-red-100'
               }`}
             >
@@ -420,9 +417,9 @@ function TurnoActivo({
                 <p
                   className={`text-sm font-bold ${
                     Math.abs(diferencia) < 0.01
-                      ? 'text-emerald-700'
+                      ? 'text-[#173F2E]'
                       : diferencia > 0
-                        ? 'text-blue-700'
+                        ? 'text-amber-700'
                         : 'text-red-700'
                   }`}
                 >
@@ -443,9 +440,9 @@ function TurnoActivo({
               <span
                 className={`font-mono text-[22px] font-bold ${
                   Math.abs(diferencia) < 0.01
-                    ? 'text-emerald-600'
+                    ? 'text-[#173F2E]'
                     : diferencia > 0
-                      ? 'text-blue-600'
+                      ? 'text-amber-600'
                       : 'text-red-600'
                 }`}
               >
@@ -464,7 +461,7 @@ function TurnoActivo({
               onChange={(e) => setNotas(e.target.value)}
               placeholder="Ej: corte sin novedad, propinas repartidas…"
               rows={2}
-              className="w-full resize-none rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-600"
+              className="w-full resize-none rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
             />
           </div>
         </div>
@@ -480,7 +477,7 @@ function TurnoActivo({
         <div className="grid grid-cols-2 gap-2.5 p-3">
           <button
             onClick={() => { setSheetMovimiento('fondo'); setMontoMov(''); setNotasMov(''); setErrorMov(null) }}
-            className="flex items-center justify-center gap-2 rounded-xl bg-blue-50 py-3.5 text-[14px] font-semibold text-blue-700 active:scale-[.97]"
+            className="flex items-center justify-center gap-2 rounded-xl bg-[#173F2E]/10 py-3.5 text-[14px] font-semibold text-[#173F2E] active:scale-[.97]"
           >
             💰 Depositar
           </button>
@@ -512,7 +509,7 @@ function TurnoActivo({
                 </div>
                 <span
                   className={`font-mono text-[14px] font-semibold ${
-                    m.tipo === 'fondo' ? 'text-blue-600' : 'text-amber-600'
+                    m.tipo === 'fondo' ? 'text-[#173F2E]' : 'text-amber-600'
                   }`}
                 >
                   {m.tipo === 'fondo' ? '+' : '−'}${fmtMoney(m.monto)}
@@ -528,77 +525,65 @@ function TurnoActivo({
       </div>
 
       {/* ── Sheet: Registrar movimiento ─────────────────────────────────────── */}
-      {sheetMovimiento && (
-        <>
-          <div
-            className="fixed inset-0 z-[65] bg-black/40"
-            onClick={() => setSheetMovimiento(null)}
-          />
-          <div className="fixed bottom-0 left-0 right-0 z-[70] rounded-t-2xl bg-white max-h-[85vh] flex flex-col">
-            <div className="flex-shrink-0 px-4 pt-5 pb-3 border-b border-[#E5E5EA]">
-              <p className="text-[16px] font-bold">
-                {sheetMovimiento === 'fondo' ? '💰 Depositar a caja' : '🏦 Retirar de caja'}
-              </p>
-            </div>
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-3">
-                  Monto
-                </label>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-mono text-[22px] font-bold text-text-3">
-                    $
-                  </span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min={0.01}
-                    step="0.01"
-                    value={montoMov}
-                    onChange={(e) => setMontoMov(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-10 pr-4 font-mono text-[22px] font-bold outline-none focus:border-blue-600 focus:bg-white"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-3">
-                  Nota (opcional)
-                </label>
-                <textarea
-                  value={notasMov}
-                  onChange={(e) => setNotasMov(e.target.value)}
-                  placeholder="Ej: cambio para el día, pago de proveedor…"
-                  rows={2}
-                  className="w-full resize-none rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-600"
-                />
-              </div>
-              {errorMov && (
-                <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{errorMov}</p>
-              )}
-            </div>
-            <div className="flex-shrink-0 px-4 py-4 border-t border-[#E5E5EA] space-y-2.5">
+      <Sheet
+        open={sheetMovimiento !== null}
+        onClose={() => setSheetMovimiento(null)}
+        title={sheetMovimiento === 'fondo' ? '💰 Depositar a caja' : '🏦 Retirar de caja'}
+        footer={
+          <div className="space-y-2.5">
+            {sheetMovimiento === 'fondo' ? (
+              <Boton onClick={handleRegistrarMovimiento} disabled={isPendingMov}>
+                {isPendingMov ? 'Guardando…' : 'Confirmar depósito'}
+              </Boton>
+            ) : (
               <button
                 onClick={handleRegistrarMovimiento}
                 disabled={isPendingMov}
-                className={`w-full rounded-xl py-[15px] text-[15px] font-bold text-white active:scale-[.98] disabled:opacity-40 ${
-                  sheetMovimiento === 'fondo'
-                    ? 'bg-blue-600 shadow-[0_4px_14px_rgba(37,99,235,.28)]'
-                    : 'bg-amber-500 shadow-[0_4px_14px_rgba(245,158,11,.28)]'
-                }`}
+                className="w-full rounded-xl bg-amber-500 py-[15px] text-[15px] font-bold text-white shadow-[0_4px_14px_rgba(245,158,11,.28)] active:scale-[.98] disabled:opacity-40"
               >
-                {isPendingMov ? 'Guardando…' : sheetMovimiento === 'fondo' ? 'Confirmar depósito' : 'Confirmar retiro'}
+                {isPendingMov ? 'Guardando…' : 'Confirmar retiro'}
               </button>
-              <button
-                onClick={() => setSheetMovimiento(null)}
-                className="w-full rounded-xl bg-s2 py-[15px] text-[15px] font-semibold text-text-2 active:scale-[.98]"
-              >
-                Cancelar
-              </button>
-            </div>
+            )}
+            <Boton variant="secundario" onClick={() => setSheetMovimiento(null)}>
+              Cancelar
+            </Boton>
           </div>
-        </>
-      )}
+        }
+      >
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-3">
+            Monto
+          </label>
+          <div className="relative">
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-mono text-[22px] font-bold text-text-3">
+              $
+            </span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0.01}
+              step="0.01"
+              value={montoMov}
+              onChange={(e) => setMontoMov(e.target.value)}
+              placeholder="0.00"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-4 pl-10 pr-4 font-mono text-[22px] font-bold outline-none focus:border-[#173F2E] focus:bg-white"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-3">
+            Nota (opcional)
+          </label>
+          <textarea
+            value={notasMov}
+            onChange={(e) => setNotasMov(e.target.value)}
+            placeholder="Ej: cambio para el día, pago de proveedor…"
+            rows={2}
+            className="w-full resize-none rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
+          />
+        </div>
+        {errorMov && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{errorMov}</p>}
+      </Sheet>
 
       {error && (
         <div className="rounded-2xl bg-red-50 border border-red-100 px-4 py-3.5 text-sm text-red-600">
@@ -626,21 +611,17 @@ function TurnoActivo({
       )}
 
       {/* Botón de cierre */}
-      <button
+      <Boton
+        variant="peligro"
         onClick={handleCerrar}
-        disabled={
-          isPending ||
-          turno.pedidosAbiertos > 0 ||
-          isNaN(numContado)
-        }
-        className="w-full rounded-xl bg-red-600 py-[18px] text-base font-bold text-white shadow-[0_4px_14px_rgba(220,38,38,.25)] active:scale-[.98] disabled:opacity-40"
+        disabled={isPending || turno.pedidosAbiertos > 0 || isNaN(numContado)}
       >
         {isPending
           ? 'Cerrando turno…'
           : confirmandoCierre && diferenciaExcedeUmbral
             ? 'Sí, cerrar de todas formas'
             : '⏹ Cerrar turno'}
-      </button>
+      </Boton>
 
       <p className="text-center text-[11px] text-text-4 pb-2">
         Esta acción no se puede deshacer. Registra el efectivo contado con cuidado.
@@ -679,7 +660,7 @@ function ResumenRow({
       </p>
       <span
         className={`font-mono text-sm font-semibold ${
-          green ? 'text-green-600' : ''
+          green ? 'text-[#173F2E]' : ''
         }`}
       >
         {value}

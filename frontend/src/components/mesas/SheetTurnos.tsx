@@ -33,9 +33,9 @@ export function SheetTurnos({ open, onClose, turnosCerrados, turnoActivoId }: Sh
     <Sheet open={open} onClose={onClose} title="Turnos">
       <button
         onClick={verTurnoActivo}
-        className="flex w-full items-center justify-between rounded-xl border border-green-200 bg-green-50 px-3.5 py-3 text-left active:opacity-70"
+        className="flex w-full items-center justify-between rounded-xl border border-[#173F2E]/20 bg-[#173F2E]/5 px-3.5 py-3 text-left active:opacity-70"
       >
-        <span className="text-[13px] font-semibold text-green-700">● Turno #{turnoActivoId} (activo)</span>
+        <span className="text-[13px] font-semibold text-[#173F2E]">● Turno #{turnoActivoId} (activo)</span>
       </button>
 
       {turnosCerrados.length === 0 ? (

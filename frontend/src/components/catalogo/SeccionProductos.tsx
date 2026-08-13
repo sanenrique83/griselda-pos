@@ -767,7 +767,7 @@ export function SeccionProductos({
           onClick={() => handleToggleDisponible(prod.id, prod.disponible)}
           disabled={isPending}
           className={`relative flex-shrink-0 h-[24px] w-[42px] rounded-full transition-colors duration-200 disabled:opacity-40 ${
-            prod.disponible ? 'bg-green-500' : 'bg-[#D1D1D6]'
+            prod.disponible ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
           }`}
         >
           <span
@@ -778,7 +778,7 @@ export function SeccionProductos({
         </button>
         <button
           onClick={() => abrirSheet({ tipo: 'editar', prod })}
-          className="text-[12px] font-medium text-blue-600 active:opacity-60"
+          className="text-[12px] font-medium text-[#173F2E] active:opacity-60"
         >
           Editar
         </button>
@@ -806,7 +806,7 @@ export function SeccionProductos({
         <button
           onClick={() => setFiltroCat(null)}
           className={`flex-shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all ${
-            filtroCat === null ? 'bg-blue-600 text-white' : 'bg-white text-text-2 border border-[#D1D1D6]'
+            filtroCat === null ? 'bg-[#173F2E] text-white' : 'bg-white text-text-2 border border-[#D1D1D6]'
           }`}
         >
           Todos
@@ -816,7 +816,7 @@ export function SeccionProductos({
             key={c.id}
             onClick={() => setFiltroCat(c.id)}
             className={`flex-shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all ${
-              filtroCat === c.id ? 'bg-blue-600 text-white' : 'bg-white text-text-2 border border-[#D1D1D6]'
+              filtroCat === c.id ? 'bg-[#173F2E] text-white' : 'bg-white text-text-2 border border-[#D1D1D6]'
             }`}
           >
             {c.nombre}
@@ -889,7 +889,7 @@ export function SeccionProductos({
                 value={formNombre}
                 onChange={(e) => setFormNombre(e.target.value)}
                 placeholder="Ej: Taco de bistec"
-                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
               />
             </div>
             <div className="w-16">
@@ -901,7 +901,7 @@ export function SeccionProductos({
                 value={formEmoji}
                 onChange={(e) => setFormEmoji(e.target.value)}
                 placeholder="🌮"
-                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3 py-3 text-center text-lg outline-none focus:border-blue-500"
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3 py-3 text-center text-lg outline-none focus:border-[#173F2E]"
               />
             </div>
           </div>
@@ -921,7 +921,7 @@ export function SeccionProductos({
                 value={formPrecio}
                 onChange={(e) => setFormPrecio(e.target.value)}
                 placeholder="0.00"
-                className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-3 pl-8 pr-3.5 font-mono text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-3 pl-8 pr-3.5 font-mono text-sm outline-none focus:border-[#173F2E]"
               />
             </div>
           </div>
@@ -936,7 +936,7 @@ export function SeccionProductos({
               value={formDesc}
               onChange={(e) => setFormDesc(e.target.value)}
               placeholder="Descripción breve…"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
             />
           </div>
 
@@ -955,7 +955,7 @@ export function SeccionProductos({
                   <button
                     type="button"
                     onClick={() => imgInputRef.current?.click()}
-                    className="rounded-lg bg-s2 px-3 py-1.5 text-xs font-semibold text-blue-600 active:opacity-60"
+                    className="rounded-lg bg-s2 px-3 py-1.5 text-xs font-semibold text-[#173F2E] active:opacity-60"
                   >
                     Cambiar imagen
                   </button>
@@ -993,7 +993,7 @@ export function SeccionProductos({
             <select
               value={formCat}
               onChange={(e) => setFormCat(Number(e.target.value))}
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
             >
               {categorias.map((c) => (
                 <option key={c.id} value={c.id}>{c.nombre}</option>
@@ -1012,7 +1012,7 @@ export function SeccionProductos({
                   key={m}
                   onClick={() => setFormModo(m)}
                   className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all ${
-                    formModo === m ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+                    formModo === m ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
                   }`}
                 >
                   {m === 'estandar' ? 'Estándar' : 'Rápido'}
@@ -1032,7 +1032,7 @@ export function SeccionProductos({
             <button
               onClick={() => setFormEsCombo((v) => !v)}
               className={`relative ml-3 flex-shrink-0 h-[26px] w-[46px] rounded-full transition-colors duration-200 ${
-                formEsCombo ? 'bg-blue-600' : 'bg-[#D1D1D6]'
+                formEsCombo ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
               }`}
             >
               <span
@@ -1053,14 +1053,14 @@ export function SeccionProductos({
                 type="time"
                 value={formHorarioDesde}
                 onChange={(e) => setFormHorarioDesde(e.target.value)}
-                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
               />
               <span className="text-text-3">–</span>
               <input
                 type="time"
                 value={formHorarioHasta}
                 onChange={(e) => setFormHorarioHasta(e.target.value)}
-                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
               />
               {(formHorarioDesde || formHorarioHasta) && (
                 <button
@@ -1132,7 +1132,7 @@ export function SeccionProductos({
                       </div>
                       <button
                         onClick={() => abrirFormGrupo(grupo)}
-                        className="flex-shrink-0 rounded-full p-1 text-blue-600 active:opacity-60"
+                        className="flex-shrink-0 rounded-full p-1 text-[#173F2E] active:opacity-60"
                         title="Editar grupo"
                       >
                         ✎
@@ -1176,7 +1176,7 @@ export function SeccionProductos({
                           )}
                           <button
                             onClick={() => abrirEditarOpcion(grupo.id, opcion)}
-                            className="text-[12px] text-blue-600 active:opacity-60"
+                            className="text-[12px] text-[#173F2E] active:opacity-60"
                             title="Editar opción"
                           >
                             ✎
@@ -1204,7 +1204,7 @@ export function SeccionProductos({
                     {opFormId === grupo.id ? (
                       <div className="space-y-2 border-t border-[#E5E5EA] px-3 py-2.5">
                         {opEditandoId && (
-                          <p className="text-[11px] font-semibold text-blue-600">Editando opción</p>
+                          <p className="text-[11px] font-semibold text-[#173F2E]">Editando opción</p>
                         )}
                         {/* Selector de ingrediente (opcional) — solo al crear */}
                         {!opEditandoId && ingredientes.length > 0 && (
@@ -1218,7 +1218,7 @@ export function SeccionProductos({
                                 if (ing) setFoNombre(ing.nombre)
                               }
                             }}
-                            className="w-full rounded-lg border-[1.5px] border-border bg-white px-3 py-2 text-[13px] outline-none focus:border-blue-500"
+                            className="w-full rounded-lg border-[1.5px] border-border bg-white px-3 py-2 text-[13px] outline-none focus:border-[#173F2E]"
                           >
                             <option value="">Sin ingrediente</option>
                             {ingredientes.map((ing) => (
@@ -1233,7 +1233,7 @@ export function SeccionProductos({
                           value={foNombre}
                           onChange={(e) => setFoNombre(e.target.value)}
                           placeholder="Nombre de la opción"
-                          className="w-full rounded-lg border-[1.5px] border-border bg-white px-3 py-2 text-[13px] outline-none focus:border-blue-500"
+                          className="w-full rounded-lg border-[1.5px] border-border bg-white px-3 py-2 text-[13px] outline-none focus:border-[#173F2E]"
                         />
 
                         {/* Imagen propia (opcional) — mismo mecanismo de
@@ -1257,7 +1257,7 @@ export function SeccionProductos({
                           <button
                             type="button"
                             onClick={() => foImgInputRef.current?.click()}
-                            className="rounded-lg bg-s2 px-2.5 py-1.5 text-[11px] font-semibold text-blue-600 active:opacity-60"
+                            className="rounded-lg bg-s2 px-2.5 py-1.5 text-[11px] font-semibold text-[#173F2E] active:opacity-60"
                           >
                             {foImgPreview ? 'Cambiar imagen' : 'Imagen (opcional)'}
                           </button>
@@ -1289,7 +1289,7 @@ export function SeccionProductos({
                             value={foPrecio}
                             onChange={(e) => setFoPrecio(e.target.value)}
                             placeholder="0.00"
-                            className="w-full rounded-lg border-[1.5px] border-border bg-white py-2 pl-8 pr-3 font-mono text-[13px] outline-none focus:border-blue-500"
+                            className="w-full rounded-lg border-[1.5px] border-border bg-white py-2 pl-8 pr-3 font-mono text-[13px] outline-none focus:border-[#173F2E]"
                           />
                         </div>
                         {/* Categoría para Modo captura rápida (opcional) — datalist
@@ -1305,7 +1305,7 @@ export function SeccionProductos({
                             value={foEtiquetaCapturaRapida}
                             onChange={(e) => setFoEtiquetaCapturaRapida(e.target.value)}
                             placeholder="Ej. Clásicos, Guisados, Vegetarianos"
-                            className="w-full rounded-lg border-[1.5px] border-border bg-white px-3 py-2 text-[13px] outline-none focus:border-blue-500"
+                            className="w-full rounded-lg border-[1.5px] border-border bg-white px-3 py-2 text-[13px] outline-none focus:border-[#173F2E]"
                           />
                           <datalist id={`etiquetas-captura-rapida-${grupo.id}`}>
                             {[...new Set(
@@ -1327,21 +1327,21 @@ export function SeccionProductos({
                               type="time"
                               value={foHorarioDesde}
                               onChange={(e) => setFoHorarioDesde(e.target.value)}
-                              className="w-full rounded-lg border-[1.5px] border-border bg-white px-2 py-2 text-[13px] outline-none focus:border-blue-500"
+                              className="w-full rounded-lg border-[1.5px] border-border bg-white px-2 py-2 text-[13px] outline-none focus:border-[#173F2E]"
                             />
                             <span className="text-text-3">–</span>
                             <input
                               type="time"
                               value={foHorarioHasta}
                               onChange={(e) => setFoHorarioHasta(e.target.value)}
-                              className="w-full rounded-lg border-[1.5px] border-border bg-white px-2 py-2 text-[13px] outline-none focus:border-blue-500"
+                              className="w-full rounded-lg border-[1.5px] border-border bg-white px-2 py-2 text-[13px] outline-none focus:border-[#173F2E]"
                             />
                           </div>
                         </div>
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleGuardarOpcion(grupo.id)}
-                            className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-[13px] font-semibold text-white active:opacity-80"
+                            className="flex-1 rounded-lg bg-[#173F2E] px-3 py-2 text-[13px] font-semibold text-white active:opacity-80"
                           >
                             {opEditandoId ? 'Guardar' : 'Agregar'}
                           </button>
@@ -1365,7 +1365,7 @@ export function SeccionProductos({
                     ) : (
                       <button
                         onClick={() => abrirOpcionForm(grupo.id)}
-                        className="w-full border-t border-[#F2F2F7] px-3 py-2 text-left text-[12px] font-semibold text-blue-600 active:opacity-60"
+                        className="w-full border-t border-[#F2F2F7] px-3 py-2 text-left text-[12px] font-semibold text-[#173F2E] active:opacity-60"
                       >
                         + Agregar opción
                       </button>
@@ -1389,7 +1389,7 @@ export function SeccionProductos({
                       value={fgNombre}
                       onChange={(e) => setFgNombre(e.target.value)}
                       placeholder="Ej: Guisado, Salsas, Extras…"
-                      className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
+                      className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-[#173F2E]"
                     />
                   </div>
 
@@ -1430,7 +1430,7 @@ export function SeccionProductos({
                         value={fgConector}
                         onChange={(e) => setFgConector(e.target.value)}
                         placeholder="Ej: con, de, sin…"
-                        className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
+                        className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-[#173F2E]"
                       />
                     </div>
                     <div className="flex-1">
@@ -1442,7 +1442,7 @@ export function SeccionProductos({
                         value={fgPrefijoUnica}
                         onChange={(e) => setFgPrefijoUnica(e.target.value)}
                         placeholder="Ej: de"
-                        className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
+                        className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-[#173F2E]"
                       />
                     </div>
                   </div>
@@ -1468,7 +1468,7 @@ export function SeccionProductos({
                       },
                     ])
                     return (
-                      <p className="rounded-lg bg-blue-50 px-3 py-2 text-[12px] text-blue-700">
+                      <p className="rounded-lg bg-[#173F2E]/5 px-3 py-2 text-[12px] text-[#173F2E]">
                         Vista previa: <span className="font-semibold">{frase}</span>
                       </p>
                     )
@@ -1480,7 +1480,7 @@ export function SeccionProductos({
                     <button
                       onClick={() => setFgRequerido((v) => !v)}
                       className={`relative h-[26px] w-[46px] rounded-full transition-colors duration-200 ${
-                        fgRequerido ? 'bg-blue-600' : 'bg-[#D1D1D6]'
+                        fgRequerido ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
                       }`}
                     >
                       <span
@@ -1503,7 +1503,7 @@ export function SeccionProductos({
                           min={1}
                           value={fgMin}
                           onChange={(e) => setFgMin(e.target.value)}
-                          className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
+                          className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-[#173F2E]"
                         />
                       </div>
                     )}
@@ -1516,7 +1516,7 @@ export function SeccionProductos({
                         min={1}
                         value={fgMax}
                         onChange={(e) => setFgMax(e.target.value)}
-                        className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
+                        className="w-full rounded-lg border-[1.5px] border-border bg-s2 px-3 py-2.5 text-[13px] outline-none focus:border-[#173F2E]"
                       />
                     </div>
                   </div>
@@ -1576,7 +1576,7 @@ export function SeccionProductos({
                     <button
                       onClick={() => setFgRapido((v) => !v)}
                       className={`relative ml-3 flex-shrink-0 h-[26px] w-[46px] rounded-full transition-colors duration-200 ${
-                        fgRapido ? 'bg-blue-600' : 'bg-[#D1D1D6]'
+                        fgRapido ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
                       }`}
                     >
                       <span
@@ -1591,7 +1591,7 @@ export function SeccionProductos({
                   <div className="flex gap-2 pt-1">
                     <button
                       onClick={handleGuardarGrupo}
-                      className="flex-[2] rounded-xl bg-blue-600 py-2.5 text-[13px] font-bold text-white active:opacity-80"
+                      className="flex-[2] rounded-xl bg-[#173F2E] py-2.5 text-[13px] font-bold text-white active:opacity-80"
                     >
                       {grupoEditandoId !== null ? 'Guardar cambios' : 'Crear grupo'}
                     </button>
@@ -1633,7 +1633,7 @@ export function SeccionProductos({
           <button
             onClick={handleGuardar}
             disabled={isPending}
-            className="w-full rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
+            className="w-full rounded-xl bg-[#173F2E] py-[14px] text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
           >
             {isPending ? 'Guardando…' : 'Guardar producto'}
           </button>
