@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
+import { HeaderB } from '@/components/ui/HeaderB'
 import {
   toggleImpresionGlobal,
   actualizarImpresora,
@@ -308,16 +308,7 @@ export function ImpresionShell({ initialData }: { initialData: ConfigData }) {
   return (
     <div className="min-h-full bg-s2">
 
-      {/* Header */}
-      <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <div className="flex items-center gap-2">
-          <BotonRegresarMas />
-          <h1 className="flex-1 text-center text-[16px] font-semibold">
-            Impresoras
-          </h1>
-          <div className="w-12" />
-        </div>
-      </div>
+      <HeaderB backLabel="Más" onBack={() => router.push('/mas')} titulo="Impresoras" />
 
       {/* Error banner */}
       {errorMsg && (
@@ -356,7 +347,7 @@ export function ImpresionShell({ initialData }: { initialData: ConfigData }) {
             </p>
             <button
               onClick={() => abrirSheet({ tipo: 'nueva-impresora' })}
-              className="text-[13px] font-semibold text-blue-600 active:opacity-60"
+              className="text-[13px] font-semibold text-[#173F2E] active:opacity-60"
             >
               + Agregar
             </button>
@@ -402,7 +393,7 @@ export function ImpresionShell({ initialData }: { initialData: ConfigData }) {
             <button
               onClick={() => abrirSheet({ tipo: 'nuevo-grupo' })}
               disabled={data.impresoras.length === 0}
-              className="text-[13px] font-semibold text-blue-600 active:opacity-60 disabled:opacity-40"
+              className="text-[13px] font-semibold text-[#173F2E] active:opacity-60 disabled:opacity-40"
             >
               + Agregar
             </button>
@@ -467,7 +458,7 @@ export function ImpresionShell({ initialData }: { initialData: ConfigData }) {
               value={formNombre}
               onChange={(e) => setFormNombre(e.target.value)}
               placeholder={isGrupoSheet ? 'Ej: Cocina, Barra…' : 'Ej: Cocina Principal'}
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
             />
           </div>
 
@@ -483,7 +474,7 @@ export function ImpresionShell({ initialData }: { initialData: ConfigData }) {
                   value={formIp}
                   onChange={(e) => setFormIp(e.target.value)}
                   placeholder="192.168.1.100"
-                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 font-mono text-sm outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 font-mono text-sm outline-none focus:border-[#173F2E]"
                 />
               </div>
               <div>
@@ -495,7 +486,7 @@ export function ImpresionShell({ initialData }: { initialData: ConfigData }) {
                   value={formPuerto}
                   onChange={(e) => setFormPuerto(e.target.value)}
                   placeholder="9100"
-                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 font-mono text-sm outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 font-mono text-sm outline-none focus:border-[#173F2E]"
                 />
               </div>
               <div>
@@ -508,7 +499,7 @@ export function ImpresionShell({ initialData }: { initialData: ConfigData }) {
                       key={a}
                       onClick={() => setFormAncho(a)}
                       className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all ${
-                        formAncho === a ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+                        formAncho === a ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
                       }`}
                     >
                       {a}
@@ -532,7 +523,7 @@ export function ImpresionShell({ initialData }: { initialData: ConfigData }) {
                   <select
                     value={formImpresoraId}
                     onChange={(e) => setFormImpresoraId(Number(e.target.value))}
-                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
                   >
                     {data.impresoras.map((imp) => (
                       <option key={imp.id} value={imp.id}>
@@ -584,7 +575,7 @@ export function ImpresionShell({ initialData }: { initialData: ConfigData }) {
                             <div
                               className={`h-5 w-5 rounded flex-shrink-0 border-2 flex items-center justify-center transition-colors ${
                                 checked
-                                  ? 'bg-blue-600 border-blue-600'
+                                  ? 'bg-[#173F2E] border-[#173F2E]'
                                   : 'border-[#C7C7CC] bg-white'
                               }`}
                             >
@@ -608,7 +599,7 @@ export function ImpresionShell({ initialData }: { initialData: ConfigData }) {
           <button
             onClick={handleGuardar}
             disabled={isPending}
-            className="w-full rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
+            className="w-full rounded-xl bg-[#173F2E] py-[14px] text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
           >
             {isPending ? 'Guardando…' : 'Guardar'}
           </button>
@@ -657,7 +648,7 @@ function ImpresoraCard({
           <div className="flex items-center gap-3">
             <button
               onClick={onEditar}
-              className="text-[12px] font-medium text-blue-600 active:opacity-60"
+              className="text-[12px] font-medium text-[#173F2E] active:opacity-60"
             >
               Editar
             </button>
@@ -684,7 +675,7 @@ function ImpresoraCard({
                 }}
                 className={`px-3 py-1.5 transition-colors active:opacity-70 ${
                   imp.ancho_papel === size
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-[#173F2E] text-white'
                     : 'bg-s2 text-text-3'
                 }`}
               >
@@ -751,7 +742,7 @@ function GrupoRow({
         <div className="flex items-center gap-3">
           <button
             onClick={onEditar}
-            className="text-[12px] font-medium text-blue-600 active:opacity-60"
+            className="text-[12px] font-medium text-[#173F2E] active:opacity-60"
           >
             Editar
           </button>
@@ -779,7 +770,7 @@ function GrupoRow({
           <select
             value={grupo.impresora_id}
             onChange={(e) => onReasignar(Number(e.target.value))}
-            className="flex-1 rounded-lg border border-border bg-s2 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:bg-white"
+            className="flex-1 rounded-lg border border-border bg-s2 px-3 py-2 text-sm outline-none focus:border-[#173F2E] focus:bg-white"
           >
             {impresoras.map((imp) => (
               <option key={imp.id} value={imp.id}>
@@ -852,7 +843,7 @@ function Toggle({
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
       className={`relative h-[28px] w-[50px] flex-shrink-0 rounded-full transition-colors duration-200 focus:outline-none ${
-        checked ? 'bg-blue-600' : 'bg-[#C7C7CC]'
+        checked ? 'bg-[#173F2E]' : 'bg-[#C7C7CC]'
       } ${disabled ? 'cursor-not-allowed opacity-40' : 'active:opacity-80'}`}
     >
       <span

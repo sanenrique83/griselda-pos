@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
+import { HeaderB } from '@/components/ui/HeaderB'
+import { Boton } from '@/components/ui/Boton'
 import { crearUsuario, actualizarUsuario, actualizarPin, quitarPin } from '@/app/(app)/mas/usuarios/actions'
 import type { UsuarioRow } from '@/app/(app)/mas/usuarios/page'
 import type { RolUsuario } from '@/lib/types/database.types'
@@ -27,6 +29,7 @@ interface UsuariosShellProps {
 }
 
 export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
+  const router = useRouter()
   const [usuarios, setUsuarios] = useState(initial)
   const [sheet, setSheet] = useState<SheetMode>({ tipo: 'none' })
   const [isPending, startTransition] = useTransition()
@@ -191,18 +194,10 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
 
   return (
     <div className="min-h-full bg-s2">
-      <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <BotonRegresarMas />
-        <h1 className="mt-1 text-[20px] font-bold leading-tight">Usuarios</h1>
-      </div>
+      <HeaderB backLabel="Más" onBack={() => router.push('/mas')} titulo="Usuarios" />
 
       <div className="px-4 py-4 space-y-4">
-        <button
-          onClick={() => abrirSheet({ tipo: 'nuevo' })}
-          className="w-full rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98]"
-        >
-          + Nuevo usuario
-        </button>
+        <Boton onClick={() => abrirSheet({ tipo: 'nuevo' })}>+ Nuevo usuario</Boton>
 
         {usuarios.length === 0 ? (
           <div className="rounded-2xl bg-white shadow-card px-4 py-8 text-center">
@@ -223,7 +218,7 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
                           </span>
                         )}
                         {u.tienePin && (
-                          <span className="flex-shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600">
+                          <span className="flex-shrink-0 rounded-full bg-[#173F2E]/10 px-2 py-0.5 text-[10px] font-semibold text-[#173F2E]">
                             🔢 PIN
                           </span>
                         )}
@@ -236,7 +231,7 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
                     </div>
                     <button
                       onClick={() => abrirSheet({ tipo: 'editar', usuario: u })}
-                      className="flex-shrink-0 text-[12px] font-medium text-blue-600 active:opacity-60"
+                      className="flex-shrink-0 text-[12px] font-medium text-[#173F2E] active:opacity-60"
                     >
                       Editar
                     </button>
@@ -287,7 +282,7 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
                   value={fEmail}
                   onChange={(e) => setFEmail(e.target.value)}
                   placeholder="mesero@lamenuderia.com"
-                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-[14px] outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-[14px] outline-none focus:border-[#173F2E]"
                 />
               </div>
               <div>
@@ -299,7 +294,7 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
                   value={fPassword}
                   onChange={(e) => setFPassword(e.target.value)}
                   placeholder="Mínimo 6 caracteres"
-                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-[14px] outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-[14px] outline-none focus:border-[#173F2E]"
                 />
               </div>
             </>
@@ -314,7 +309,7 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
               value={fNombre}
               onChange={(e) => setFNombre(e.target.value)}
               placeholder="Nombre completo"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-[14px] outline-none focus:border-blue-500"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-[14px] outline-none focus:border-[#173F2E]"
             />
           </div>
 
@@ -328,7 +323,7 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
                   key={r.value}
                   onClick={() => setFRol(r.value)}
                   className={`flex-1 rounded-lg px-2 py-2.5 text-[12px] font-semibold transition-colors ${
-                    fRol === r.value ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+                    fRol === r.value ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
                   }`}
                 >
                   {r.label}
@@ -346,7 +341,7 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
               value={fTelefono}
               onChange={(e) => setFTelefono(e.target.value)}
               placeholder="Ej: 3312345678"
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-[14px] outline-none focus:border-blue-500"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-[14px] outline-none focus:border-[#173F2E]"
             />
           </div>
 
@@ -358,7 +353,7 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
               type="date"
               value={fFechaContratacion}
               onChange={(e) => setFFechaContratacion(e.target.value)}
-              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-[14px] outline-none focus:border-blue-500"
+              className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-[14px] outline-none focus:border-[#173F2E]"
             />
           </div>
 
@@ -373,7 +368,7 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
               <button
                 onClick={() => setFActivo((v) => !v)}
                 className={`relative flex-shrink-0 h-[26px] w-[46px] rounded-full transition-colors duration-200 ${
-                  fActivo ? 'bg-blue-600' : 'bg-[#D1D1D6]'
+                  fActivo ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
                 }`}
               >
                 <span
@@ -403,12 +398,12 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
                   value={fPin}
                   onChange={(e) => setFPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   placeholder="0000"
-                  className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold tracking-widest outline-none focus:border-blue-500"
+                  className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold tracking-widest outline-none focus:border-[#173F2E]"
                 />
                 <button
                   onClick={handleGuardarPin}
                   disabled={pinPending}
-                  className="flex-1 rounded-xl bg-blue-600 py-3 text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
+                  className="flex-1 rounded-xl bg-[#173F2E] py-3 text-sm font-bold text-white active:scale-[.98] disabled:opacity-40"
                 >
                   {pinPending ? '…' : 'Guardar PIN'}
                 </button>
@@ -423,7 +418,7 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
                 </button>
               )}
               {pinError && <p className="mt-2 text-xs font-semibold text-red-600">{pinError}</p>}
-              {pinBanner && <p className="mt-2 text-xs font-semibold text-green-600">{pinBanner}</p>}
+              {pinBanner && <p className="mt-2 text-xs font-semibold text-[#173F2E]">{pinBanner}</p>}
             </div>
           )}
 
@@ -436,7 +431,7 @@ export function UsuariosShell({ usuarios: initial }: UsuariosShellProps) {
           <button
             onClick={handleGuardar}
             disabled={isPending}
-            className="w-full rounded-xl bg-blue-600 py-[14px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+            className="w-full rounded-xl bg-[#173F2E] py-[14px] text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] disabled:opacity-40"
           >
             {isPending ? 'Guardando…' : sheet.tipo === 'editar' ? 'Guardar cambios' : 'Crear usuario'}
           </button>

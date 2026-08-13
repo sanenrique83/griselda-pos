@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { BotonRegresarMas } from '@/components/layout/BotonRegresarMas'
+import { useRouter } from 'next/navigation'
+import { HeaderB } from '@/components/ui/HeaderB'
 import {
   actualizarPermiso,
   actualizarBanco,
@@ -103,7 +104,7 @@ function ToggleRow({
         onClick={() => onChange(!value)}
         disabled={disabled}
         className={`relative flex-shrink-0 h-[28px] w-[50px] rounded-full transition-colors duration-200 disabled:opacity-40 ${
-          value ? 'bg-blue-600' : 'bg-[#D1D1D6]'
+          value ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
         }`}
       >
         <span
@@ -119,6 +120,7 @@ function ToggleRow({
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
+  const router = useRouter()
   const [permisos, setPermisos] = useState<ConfigPermisos>(config)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -462,11 +464,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
 
   return (
     <div className="min-h-full bg-s2">
-      {/* Header */}
-      <div className="bg-white border-b border-[#E5E5EA] px-4 pt-4 pb-3">
-        <BotonRegresarMas />
-        <h1 className="mt-1 text-[20px] font-bold leading-tight">Permisos y config.</h1>
-      </div>
+      <HeaderB backLabel="Más" onBack={() => router.push('/mas')} titulo="Permisos y config." />
 
       <div className="px-4 py-4 space-y-5">
 
@@ -513,7 +511,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                 value={banco}
                 onChange={(e) => setBanco(e.target.value)}
                 placeholder="Ej: BBVA"
-                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
               />
             </div>
             <div>
@@ -526,7 +524,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                 onChange={(e) => setClabe(e.target.value)}
                 placeholder="18 dígitos"
                 maxLength={18}
-                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 font-mono text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 font-mono text-sm outline-none focus:border-[#173F2E]"
               />
             </div>
             <div>
@@ -538,18 +536,18 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                 value={titular}
                 onChange={(e) => setTitular(e.target.value)}
                 placeholder="Nombre completo"
-                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-sm outline-none focus:border-[#173F2E]"
               />
             </div>
             {bancoBanner && (
-              <p className={`text-xs font-semibold ${bancoBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-xs font-semibold ${bancoBanner.includes('✓') ? 'text-[#173F2E]' : 'text-red-600'}`}>
                 {bancoBanner}
               </p>
             )}
             <button
               onClick={handleGuardarBanco}
               disabled={savingBanco}
-              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+              className="w-full rounded-xl bg-[#173F2E] py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] disabled:opacity-40"
             >
               {savingBanco ? 'Guardando…' : 'Guardar datos bancarios'}
             </button>
@@ -609,7 +607,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                 step={1}
                 value={timeoutMin}
                 onChange={(e) => setTimeoutMin(e.target.value)}
-                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-blue-500"
+                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-[#173F2E]"
               />
             </div>
             <p className="text-xs text-text-3">
@@ -617,14 +615,14 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
               automáticamente. Usa 0 para desactivarlo.
             </p>
             {timeoutBanner && (
-              <p className={`text-xs font-semibold ${timeoutBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-xs font-semibold ${timeoutBanner.includes('✓') ? 'text-[#173F2E]' : 'text-red-600'}`}>
                 {timeoutBanner}
               </p>
             )}
             <button
               onClick={handleGuardarTimeout}
               disabled={savingTimeout}
-              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+              className="w-full rounded-xl bg-[#173F2E] py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] disabled:opacity-40"
             >
               {savingTimeout ? 'Guardando…' : 'Guardar tiempo de inactividad'}
             </button>
@@ -658,7 +656,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                 value={alertaMin}
                 onChange={(e) => setAlertaMin(e.target.value)}
                 disabled={!permisos.alerta_mesa_sin_atender}
-                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-blue-500 disabled:opacity-40"
+                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-[#173F2E] disabled:opacity-40"
               />
             </div>
             <p className="text-xs text-text-3">
@@ -666,14 +664,14 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
               rojo al pasar este tiempo desde que se abrió.
             </p>
             {alertaBanner && (
-              <p className={`text-xs font-semibold ${alertaBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-xs font-semibold ${alertaBanner.includes('✓') ? 'text-[#173F2E]' : 'text-red-600'}`}>
                 {alertaBanner}
               </p>
             )}
             <button
               onClick={handleGuardarAlertaMinutos}
               disabled={savingAlerta || !permisos.alerta_mesa_sin_atender}
-              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+              className="w-full rounded-xl bg-[#173F2E] py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] disabled:opacity-40"
             >
               {savingAlerta ? 'Guardando…' : 'Guardar minutos de alerta'}
             </button>
@@ -708,7 +706,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                 value={ventasBajasPct}
                 onChange={(e) => setVentasBajasPct(e.target.value)}
                 disabled={!permisos.alerta_ventas_bajas_activa}
-                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-blue-500 disabled:opacity-40"
+                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-[#173F2E] disabled:opacity-40"
               />
             </div>
             <p className="text-xs text-text-3">
@@ -717,14 +715,14 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
               estar mal en este momento — no tiene relación con la predicción de demanda de mañana.
             </p>
             {ventasBajasBanner && (
-              <p className={`text-xs font-semibold ${ventasBajasBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-xs font-semibold ${ventasBajasBanner.includes('✓') ? 'text-[#173F2E]' : 'text-red-600'}`}>
                 {ventasBajasBanner}
               </p>
             )}
             <button
               onClick={handleGuardarVentasBajasUmbral}
               disabled={savingVentasBajas || !permisos.alerta_ventas_bajas_activa}
-              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+              className="w-full rounded-xl bg-[#173F2E] py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] disabled:opacity-40"
             >
               {savingVentasBajas ? 'Guardando…' : 'Guardar umbral de alerta'}
             </button>
@@ -752,7 +750,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                   step="1"
                   value={turnoDiferenciaMonto}
                   onChange={(e) => setTurnoDiferenciaMonto(e.target.value)}
-                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-3 pl-7 pr-3.5 text-center font-mono text-lg font-bold outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border-[1.5px] border-border bg-s2 py-3 pl-7 pr-3.5 text-center font-mono text-lg font-bold outline-none focus:border-[#173F2E]"
                 />
               </div>
             </div>
@@ -762,14 +760,14 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
               antes de proceder — no bloquea el cierre, solo avisa.
             </p>
             {turnoDiferenciaBanner && (
-              <p className={`text-xs font-semibold ${turnoDiferenciaBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-xs font-semibold ${turnoDiferenciaBanner.includes('✓') ? 'text-[#173F2E]' : 'text-red-600'}`}>
                 {turnoDiferenciaBanner}
               </p>
             )}
             <button
               onClick={handleGuardarTurnoDiferencia}
               disabled={savingTurnoDiferencia}
-              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+              className="w-full rounded-xl bg-[#173F2E] py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] disabled:opacity-40"
             >
               {savingTurnoDiferencia ? 'Guardando…' : 'Guardar umbral de diferencia'}
             </button>
@@ -809,7 +807,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                 value={recordatorioFinTurnoMin}
                 onChange={(e) => setRecordatorioFinTurnoMin(e.target.value)}
                 disabled={!permisos.recordatorio_fin_turno_activo}
-                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-blue-500 disabled:opacity-40"
+                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-[#173F2E] disabled:opacity-40"
               />
             </div>
             <p className="text-xs text-text-3">
@@ -817,14 +815,14 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
               turno" arriba) — sin coincidencia clara al abrir, no hay recordatorio que mostrar.
             </p>
             {recordatorioFinTurnoBanner && (
-              <p className={`text-xs font-semibold ${recordatorioFinTurnoBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-xs font-semibold ${recordatorioFinTurnoBanner.includes('✓') ? 'text-[#173F2E]' : 'text-red-600'}`}>
                 {recordatorioFinTurnoBanner}
               </p>
             )}
             <button
               onClick={handleGuardarRecordatorioFinTurno}
               disabled={savingRecordatorioFinTurno || !permisos.recordatorio_fin_turno_activo}
-              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+              className="w-full rounded-xl bg-[#173F2E] py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] disabled:opacity-40"
             >
               {savingRecordatorioFinTurno ? 'Guardando…' : 'Guardar minutos del recordatorio'}
             </button>
@@ -858,7 +856,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                 value={precuentaMin}
                 onChange={(e) => setPrecuentaMin(e.target.value)}
                 disabled={!permisos.alerta_precuenta_activa}
-                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-blue-500 disabled:opacity-40"
+                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-[#173F2E] disabled:opacity-40"
               />
             </div>
             <p className="text-xs text-text-3">
@@ -866,14 +864,14 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
               limpia solo en cuanto se registra cualquier cobro real sobre ese pedido.
             </p>
             {precuentaBanner && (
-              <p className={`text-xs font-semibold ${precuentaBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-xs font-semibold ${precuentaBanner.includes('✓') ? 'text-[#173F2E]' : 'text-red-600'}`}>
                 {precuentaBanner}
               </p>
             )}
             <button
               onClick={handleGuardarPrecuentaMinutos}
               disabled={savingPrecuenta || !permisos.alerta_precuenta_activa}
-              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+              className="w-full rounded-xl bg-[#173F2E] py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] disabled:opacity-40"
             >
               {savingPrecuenta ? 'Guardando…' : 'Guardar minutos de alerta'}
             </button>
@@ -899,7 +897,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                 step={1}
                 value={tiempoMesaMin}
                 onChange={(e) => setTiempoMesaMin(e.target.value)}
-                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-blue-500"
+                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-[#173F2E]"
               />
             </div>
             <p className="text-xs text-text-3">
@@ -908,14 +906,14 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
               rojo a partir de 1.5x. Independiente del semáforo de color de la mesa.
             </p>
             {tiempoMesaBanner && (
-              <p className={`text-xs font-semibold ${tiempoMesaBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-xs font-semibold ${tiempoMesaBanner.includes('✓') ? 'text-[#173F2E]' : 'text-red-600'}`}>
                 {tiempoMesaBanner}
               </p>
             )}
             <button
               onClick={handleGuardarTiempoMesa}
               disabled={savingTiempoMesa}
-              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+              className="w-full rounded-xl bg-[#173F2E] py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] disabled:opacity-40"
             >
               {savingTiempoMesa ? 'Guardando…' : 'Guardar umbral de temporizador'}
             </button>
@@ -940,7 +938,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                     key={o.value}
                     onClick={() => handleCambiarFormatoMods(o.value)}
                     className={`flex-1 rounded-lg px-2 py-2.5 text-[12px] font-semibold transition-colors ${
-                      formatoMods === o.value ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+                      formatoMods === o.value ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
                     }`}
                   >
                     {o.label}
@@ -954,7 +952,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
               y Pata&quot;) configurada por grupo en Catálogo → Productos → editar grupo.
             </p>
             {formatoModsBanner && (
-              <p className={`text-xs font-semibold ${formatoModsBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-xs font-semibold ${formatoModsBanner.includes('✓') ? 'text-[#173F2E]' : 'text-red-600'}`}>
                 {formatoModsBanner}
               </p>
             )}
@@ -969,7 +967,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                 step={1}
                 value={modsPorLinea}
                 onChange={(e) => setModsPorLinea(e.target.value)}
-                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-blue-500"
+                className="w-24 rounded-xl border-[1.5px] border-border bg-s2 px-3.5 py-3 text-center font-mono text-lg font-bold outline-none focus:border-[#173F2E]"
               />
             </div>
             <p className="text-xs text-text-3">
@@ -977,14 +975,14 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
               con &quot;+&quot; — ahorra papel cuando hay muchos. Usa 1 para uno por línea.
             </p>
             {modsPorLineaBanner && (
-              <p className={`text-xs font-semibold ${modsPorLineaBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-xs font-semibold ${modsPorLineaBanner.includes('✓') ? 'text-[#173F2E]' : 'text-red-600'}`}>
                 {modsPorLineaBanner}
               </p>
             )}
             <button
               onClick={handleGuardarModsPorLinea}
               disabled={savingModsPorLinea}
-              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(37,99,235,.28)] active:scale-[.98] disabled:opacity-40"
+              className="w-full rounded-xl bg-[#173F2E] py-3 text-sm font-bold text-white shadow-[0_3px_10px_rgba(23,63,46,.32)] active:scale-[.98] disabled:opacity-40"
             >
               {savingModsPorLinea ? 'Guardando…' : 'Guardar modificadores por línea'}
             </button>
@@ -1009,7 +1007,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                     key={o.value}
                     onClick={() => handleCambiarOrdenProductos(o.value)}
                     className={`flex-1 rounded-lg px-2 py-2.5 text-[12px] font-semibold transition-colors ${
-                      ordenProductos === o.value ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+                      ordenProductos === o.value ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
                     }`}
                   >
                     {o.label}
@@ -1027,7 +1025,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                     key={o.value}
                     onClick={() => handleCambiarOrdenModificadores(o.value)}
                     className={`flex-1 rounded-lg px-2 py-2.5 text-[12px] font-semibold transition-colors ${
-                      ordenModificadores === o.value ? 'bg-blue-600 text-white' : 'bg-s2 text-text-2'
+                      ordenModificadores === o.value ? 'bg-[#173F2E] text-white' : 'bg-s2 text-text-2'
                     }`}
                   >
                     {o.label}
@@ -1044,20 +1042,20 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
                     step={1}
                     value={popularidadDias}
                     onChange={(e) => setPopularidadDias(e.target.value)}
-                    className="w-16 rounded-lg border-[1.5px] border-border bg-s2 px-2 py-1.5 text-center font-mono text-sm font-bold outline-none focus:border-blue-500"
+                    className="w-16 rounded-lg border-[1.5px] border-border bg-s2 px-2 py-1.5 text-center font-mono text-sm font-bold outline-none focus:border-[#173F2E]"
                   />
                   <span className="text-xs text-text-3">días</span>
                   <button
                     onClick={handleGuardarPopularidadDias}
                     disabled={savingPopularidadDias}
-                    className="ml-auto rounded-lg bg-blue-600 px-3 py-1.5 text-[12px] font-semibold text-white active:opacity-80 disabled:opacity-40"
+                    className="ml-auto rounded-lg bg-[#173F2E] px-3 py-1.5 text-[12px] font-semibold text-white active:opacity-80 disabled:opacity-40"
                   >
                     {savingPopularidadDias ? 'Guardando…' : 'Guardar'}
                   </button>
                 </div>
               )}
               {popularidadDiasBanner && (
-                <p className={`mt-1.5 text-xs font-semibold ${popularidadDiasBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+                <p className={`mt-1.5 text-xs font-semibold ${popularidadDiasBanner.includes('✓') ? 'text-[#173F2E]' : 'text-red-600'}`}>
                   {popularidadDiasBanner}
                 </p>
               )}
@@ -1069,7 +1067,7 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
               de Catálogo se queda con el orden personalizado mientras se edita.
             </p>
             {ordenBanner && (
-              <p className={`text-xs font-semibold ${ordenBanner.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-xs font-semibold ${ordenBanner.includes('✓') ? 'text-[#173F2E]' : 'text-red-600'}`}>
                 {ordenBanner}
               </p>
             )}
