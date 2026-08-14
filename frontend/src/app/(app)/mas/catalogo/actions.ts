@@ -167,6 +167,7 @@ export async function crearProducto(data: {
   es_combo?: boolean
   horario_desde?: string | null
   horario_hasta?: string | null
+  favorito?: boolean
 }): Promise<{ id: number } | Err> {
   const supabase = await createClient()
   const { data: prod, error } = await supabase
@@ -182,6 +183,7 @@ export async function crearProducto(data: {
       es_combo: data.es_combo ?? false,
       horario_desde: data.horario_desde ?? null,
       horario_hasta: data.horario_hasta ?? null,
+      favorito: data.favorito ?? false,
       activo: true,
       disponible: true,
       orden: 99,
@@ -230,6 +232,7 @@ export async function actualizarProducto(
     es_combo?: boolean
     horario_desde?: string | null
     horario_hasta?: string | null
+    favorito?: boolean
   },
 ): Promise<Err | undefined> {
   const supabase = await createClient()

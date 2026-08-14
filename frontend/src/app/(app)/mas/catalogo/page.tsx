@@ -46,6 +46,7 @@ export type ProductoCatalogo = {
   // Disponibilidad automática por horario (F9-04) — NULL en ambos = sin restricción.
   horario_desde: string | null
   horario_hasta: string | null
+  favorito: boolean
 }
 
 export type InsumoCatalogo = {
@@ -124,7 +125,7 @@ export default async function CatalogoPage() {
     supabase.from('categorias').select('id, nombre, orden, activa, modo_captura').eq('activa', true).order('orden'),
     supabase
       .from('productos')
-      .select('id, nombre, descripcion, precio, emoji, foto_url, disponible, activo, modo_captura, categoria_id, es_combo, orden, horario_desde, horario_hasta')
+      .select('id, nombre, descripcion, precio, emoji, foto_url, disponible, activo, modo_captura, categoria_id, es_combo, orden, horario_desde, horario_hasta, favorito')
       .eq('activo', true)
       .order(ordenProductos.column, { ascending: ordenProductos.ascending }),
     // Una sola fuente para insumos e "ingredientes" (unificados) — ver
@@ -176,6 +177,7 @@ export default async function CatalogoPage() {
     orden: p.orden ?? 0,
     horario_desde: p.horario_desde ?? null,
     horario_hasta: p.horario_hasta ?? null,
+    favorito: p.favorito ?? false,
   }))
 
   const insumos: InsumoCatalogo[] = (rawInsumos ?? []).map((i: any) => ({

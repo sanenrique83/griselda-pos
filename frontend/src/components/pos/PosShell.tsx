@@ -60,6 +60,7 @@ interface PosShellProps {
   mesaSillas?: MesaSillas
   mesasCadena?: MesaCadenaItem[] | null
   ticketConfig: TicketConfig
+  mostrarFavoritos?: boolean
 }
 
 export function PosShell({
@@ -84,6 +85,7 @@ export function PosShell({
   mesaSillas = null,
   ticketConfig,
   mesasCadena = null,
+  mostrarFavoritos = true,
 }: PosShellProps) {
   const router = useRouter()
   const [vista, setVista] = useState<'menu' | 'comanda'>('menu')
@@ -368,6 +370,7 @@ export function PosShell({
             onAgregarLibre={() => setSheetLibreOpen(true)}
             onAgregarComensal={handleAgregarComensalMenu}
             isPendingAgregarComensal={isPendingComensalMenu}
+            mostrarFavoritos={mostrarFavoritos}
           />
         ) : (
           <VistaComanda

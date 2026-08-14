@@ -16,6 +16,7 @@ interface VistaMenuProps {
   onAgregarLibre?: () => void
   onAgregarComensal?: () => void
   isPendingAgregarComensal?: boolean
+  mostrarFavoritos?: boolean
 }
 
 export function VistaMenu({
@@ -28,6 +29,7 @@ export function VistaMenu({
   onAgregarLibre,
   onAgregarComensal,
   isPendingAgregarComensal = false,
+  mostrarFavoritos = true,
 }: VistaMenuProps) {
   const [categoriaActiva, setCategoriaActiva] = useState<number | null>(null)
   const [busqueda, setBusqueda] = useState('')
@@ -55,9 +57,96 @@ export function VistaMenu({
   // Búsqueda por nombre — no existía antes de este rediseño (el mockup la
   // daba por hecha); se agregó aquí como filtro puramente client-side sobre
   // los productos ya cargados, sin tocar ninguna query ni server action.
+  const busquedaActiva = busqueda.trim().length > 0
+
+  // Sección "⭐ Favoritos" (config_sistema.mostrar_favoritos): solo tiene
+  // sentido en la vista general sin filtrar — si el mesero ya filtró por
+  // categoría o está buscando, no aporta nada repetir los favoritos aparte.
+  const mostrarSeccionFavoritos =
+    mostrarFavoritos && categoriaActiva === null && !busquedaActiva && productos.some((p) => p.favorito)
+  const productosFavoritos = mostrarSeccionFavoritos ? productos.filter((p) => p.favorito) : []
+
   const productosFiltrados = productos
     .filter((p) => (categoriaActiva ? p.categoria_id === categoriaActiva : true))
-    .filter((p) => (busqueda.trim() ? p.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()) : true))
+    .filter((p) => (busquedaActiva ? p.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()) : true))
+    .filter((p) => !(mostrarSeccionFavoritos && p.favorito))
+
+  // Misma tarjeta para la sección Favoritos y la lista normal — factorizada
+  // para no duplicar el JSX entre ambas.
+  function renderTarjetaProducto(producto: ProductoCatalogo) {
+    const agotado = !producto.disponible
+    const categoriaNombre = categoriaNombrePorId.get(producto.categoria_id)
+
+    return (
+      <div
+        key={producto.id}
+        onClick={() => !agotado && onAgregarProducto(producto)}
+        className={`mx-3 mb-2 flex cursor-pointer items-center gap-3 rounded-xl border border-[#E5E5EA] bg-white p-3.5 shadow-card transition-transform active:scale-[.98] ${
+          agotado ? 'opacity-60' : ''
+        }`}
+      >
+        {/* Imagen real si existe (foto_url, Catálogo → bucket "productos"),
+            emoji como respaldo — mismo patrón que SeccionProductos.tsx */}
+        {producto.foto_url ? (
+          <div className="relative h-[52px] w-[52px] flex-shrink-0 overflow-hidden rounded-xl bg-s2">
+            <Image fill src={producto.foto_url} alt={producto.nombre} className="object-cover" sizes="52px" />
+          </div>
+        ) : (
+          <div className="flex h-[52px] w-[52px] flex-shrink-0 items-center justify-center rounded-xl bg-s2 text-2xl">
+            {producto.emoji ?? '🍽️'}
+          </div>
+        )}
+
+        {/* Info */}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14px] font-bold text-text">
+            {producto.favorito && <span className="mr-1">⭐</span>}
+            {producto.nombre}
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {categoriaNombre && (
+              <span className="rounded-full bg-s2 px-2 py-0.5 text-[10px] font-semibold text-text-2">
+                {categoriaNombre}
+              </span>
+            )}
+            {producto.es_combo && (
+              <span className="flex items-center gap-0.5 rounded-full bg-s2 px-2 py-0.5 text-[10px] font-semibold text-text-2">
+                <Settings2 size={10} strokeWidth={2.4} />
+                Personalizable
+              </span>
+            )}
+            {agotado && (
+              <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600">
+                Agotado
+              </span>
+            )}
+          </div>
+          {!agotado && (
+            <p className="mt-1 font-mono text-[13px] font-bold text-green-600">
+              {formatCurrency(producto.precio)}
+            </p>
+          )}
+        </div>
+
+        {/* Botón +/− */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            if (!agotado) onAgregarProducto(producto)
+          }}
+          disabled={agotado}
+          aria-label={agotado ? 'Producto agotado' : `Agregar ${producto.nombre}`}
+          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-white transition-transform active:scale-90 ${
+            agotado
+              ? 'bg-s3 text-text-4'
+              : 'bg-[#173F2E] shadow-[0_2px_8px_rgba(23,63,46,.32)] active:bg-[#0F2E21]'
+          }`}
+        >
+          {agotado ? <Minus size={18} strokeWidth={2.4} /> : <Plus size={18} strokeWidth={2.4} />}
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -130,83 +219,21 @@ export function VistaMenu({
           </button>
         )}
 
-        {productosFiltrados.length === 0 && (
+        {mostrarSeccionFavoritos && (
+          <>
+            <p className="mx-3 mb-1.5 mt-1 text-[12px] font-bold text-text-2">⭐ Favoritos</p>
+            {productosFavoritos.map((producto) => renderTarjetaProducto(producto))}
+            <p className="mx-3 mb-1.5 mt-3 text-[12px] font-bold text-text-2">Todos los productos</p>
+          </>
+        )}
+
+        {productosFiltrados.length === 0 && productosFavoritos.length === 0 && (
           <p className="py-12 text-center text-sm text-text-3">
-            {busqueda.trim() ? 'Sin resultados para tu búsqueda.' : 'No hay productos en esta categoría.'}
+            {busquedaActiva ? 'Sin resultados para tu búsqueda.' : 'No hay productos en esta categoría.'}
           </p>
         )}
 
-        {productosFiltrados.map((producto) => {
-          const agotado = !producto.disponible
-          const categoriaNombre = categoriaNombrePorId.get(producto.categoria_id)
-
-          return (
-            <div
-              key={producto.id}
-              onClick={() => !agotado && onAgregarProducto(producto)}
-              className={`mx-3 mb-2 flex cursor-pointer items-center gap-3 rounded-xl border border-[#E5E5EA] bg-white p-3.5 shadow-card transition-transform active:scale-[.98] ${
-                agotado ? 'opacity-60' : ''
-              }`}
-            >
-              {/* Imagen real si existe (foto_url, Catálogo → bucket "productos"),
-                  emoji como respaldo — mismo patrón que SeccionProductos.tsx */}
-              {producto.foto_url ? (
-                <div className="relative h-[52px] w-[52px] flex-shrink-0 overflow-hidden rounded-xl bg-s2">
-                  <Image fill src={producto.foto_url} alt={producto.nombre} className="object-cover" sizes="52px" />
-                </div>
-              ) : (
-                <div className="flex h-[52px] w-[52px] flex-shrink-0 items-center justify-center rounded-xl bg-s2 text-2xl">
-                  {producto.emoji ?? '🍽️'}
-                </div>
-              )}
-
-              {/* Info */}
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[14px] font-bold text-text">{producto.nombre}</p>
-                <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                  {categoriaNombre && (
-                    <span className="rounded-full bg-s2 px-2 py-0.5 text-[10px] font-semibold text-text-2">
-                      {categoriaNombre}
-                    </span>
-                  )}
-                  {producto.es_combo && (
-                    <span className="flex items-center gap-0.5 rounded-full bg-s2 px-2 py-0.5 text-[10px] font-semibold text-text-2">
-                      <Settings2 size={10} strokeWidth={2.4} />
-                      Personalizable
-                    </span>
-                  )}
-                  {agotado && (
-                    <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600">
-                      Agotado
-                    </span>
-                  )}
-                </div>
-                {!agotado && (
-                  <p className="mt-1 font-mono text-[13px] font-bold text-green-600">
-                    {formatCurrency(producto.precio)}
-                  </p>
-                )}
-              </div>
-
-              {/* Botón +/− */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (!agotado) onAgregarProducto(producto)
-                }}
-                disabled={agotado}
-                aria-label={agotado ? 'Producto agotado' : `Agregar ${producto.nombre}`}
-                className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-white transition-transform active:scale-90 ${
-                  agotado
-                    ? 'bg-s3 text-text-4'
-                    : 'bg-[#173F2E] shadow-[0_2px_8px_rgba(23,63,46,.32)] active:bg-[#0F2E21]'
-                }`}
-              >
-                {agotado ? <Minus size={18} strokeWidth={2.4} /> : <Plus size={18} strokeWidth={2.4} />}
-              </button>
-            </div>
-          )
-        })}
+        {productosFiltrados.map((producto) => renderTarjetaProducto(producto))}
       </div>
 
       {/* Footer fijo: Nuevo comensal / Siguiente comensal — sólido verde

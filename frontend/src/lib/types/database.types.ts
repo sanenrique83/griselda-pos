@@ -133,6 +133,8 @@ export interface ConfigSistema {
   // de esta columna a esa tabla, sin mover el punto donde se verifica (ver
   // CobroShell.tsx).
   cobro_solo_admin: boolean
+  // Sección "⭐ Favoritos" al inicio del menú del POS — ver productos.favorito.
+  mostrar_favoritos: boolean
 }
 
 export interface Area {
@@ -207,6 +209,9 @@ export interface Producto {
   // manual `disponible` — NULL en ambos = sin restricción.
   horario_desde: string | null
   horario_hasta: string | null
+  // Sección "⭐ Favoritos" al inicio del menú del POS (VistaMenu.tsx) —
+  // condicionada también a config_sistema.mostrar_favoritos.
+  favorito: boolean
 }
 
 export interface ComboProducto {

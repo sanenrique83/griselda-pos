@@ -510,6 +510,22 @@ export function PermisosShell({ config, turnosHorario }: PermisosShellProps) {
           />
         </div>
 
+        {/* ── Menú ──────────────────────────────────────────────────────────── */}
+        <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+          <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+              Menú
+            </p>
+          </div>
+          <ToggleRow
+            label="Mostrar sección Favoritos"
+            desc="Si hay productos marcados ⭐ Favorito en Catálogo, aparecen agrupados al inicio del menú del POS"
+            value={permisos.mostrar_favoritos}
+            onChange={(v) => handleToggle('mostrar_favoritos', v)}
+            disabled={isPending}
+          />
+        </div>
+
         {/* ── Datos de transferencia ────────────────────────────────────────── */}
         <div className="rounded-2xl bg-white shadow-card overflow-hidden">
           <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">

@@ -85,6 +85,7 @@ export type ProductoCatalogo = {
   modo_captura: 'estandar' | 'rapido'
   categoria_id: number
   es_combo: boolean
+  favorito: boolean
 }
 
 export type CategoriaPOS = {
@@ -237,7 +238,7 @@ export default async function PosPage({
         'cancelaciones_mesero, cancelar_pedido_mesero, orden_productos, ' +
           'ticket_nombre, ticket_subtitulo, ticket_direccion, ticket_telefono, ticket_rfc, ' +
           'ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea, ' +
-          'formato_modificadores_ticket',
+          'formato_modificadores_ticket, mostrar_favoritos',
       )
       .eq('id', 1)
       .single(),
@@ -249,6 +250,7 @@ export default async function PosPage({
   const puedeAnularPedido =
     esAdmin || (config as any)?.cancelar_pedido_mesero === true
   const ordenProductos = columnaOrden((config as any)?.orden_productos)
+  const mostrarFavoritos = (config as any)?.mostrar_favoritos !== false
   const meseroNombre: string = primerNombreValido((perfil as any)?.nombre, user?.email?.split('@')[0])
   const rol: 'admin' | 'mesero' = (perfil as any)?.rol === 'admin' ? 'admin' : 'mesero'
   const tipoMesa: 'mesa' | 'llevar' | 'mostrador' =
@@ -291,7 +293,7 @@ export default async function PosPage({
     supabase
       .from('productos')
       .select(
-        'id, nombre, descripcion, precio, emoji, foto_url, disponible, modo_captura, categoria_id, es_combo, horario_desde, horario_hasta',
+        'id, nombre, descripcion, precio, emoji, foto_url, disponible, modo_captura, categoria_id, es_combo, horario_desde, horario_hasta, favorito',
       )
       .eq('activo', true)
       .order(ordenProductos.column, { ascending: ordenProductos.ascending }),
@@ -419,6 +421,7 @@ export default async function PosPage({
     modo_captura: p.modo_captura ?? 'estandar',
     categoria_id: p.categoria_id,
     es_combo: p.es_combo ?? false,
+    favorito: p.favorito ?? false,
   }))
 
   return (
@@ -444,6 +447,7 @@ export default async function PosPage({
       mesaSillas={mesaSillas}
       mesasCadena={mesasCadena}
       ticketConfig={ticketConfig}
+      mostrarFavoritos={mostrarFavoritos}
     />
   )
 }

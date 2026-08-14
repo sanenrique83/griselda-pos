@@ -107,6 +107,7 @@ export function SeccionProductos({
   const [formCat, setFormCat] = useState<number>(categorias[0]?.id ?? 0)
   const [formModo, setFormModo] = useState<'estandar' | 'rapido'>('estandar')
   const [formEsCombo, setFormEsCombo] = useState(false)
+  const [formFavorito, setFormFavorito] = useState(false)
   // Disponibilidad automática por horario (F9-04) — '' = sin restricción
   const [formHorarioDesde, setFormHorarioDesde] = useState('')
   const [formHorarioHasta, setFormHorarioHasta] = useState('')
@@ -178,6 +179,7 @@ export function SeccionProductos({
       setFormCat(mode.prod.categoria_id)
       setFormModo(mode.prod.modo_captura)
       setFormEsCombo(mode.prod.es_combo)
+      setFormFavorito(mode.prod.favorito)
       setFormHorarioDesde(mode.prod.horario_desde?.slice(0, 5) ?? '')
       setFormHorarioHasta(mode.prod.horario_hasta?.slice(0, 5) ?? '')
       setExistingFotoUrl(mode.prod.foto_url ?? null)
@@ -214,6 +216,7 @@ export function SeccionProductos({
       setFormCat(filtroCat ?? categorias[0]?.id ?? 0)
       setFormModo('estandar')
       setFormEsCombo(false)
+      setFormFavorito(false)
       setFormHorarioDesde('')
       setFormHorarioHasta('')
       setExistingFotoUrl(null)
@@ -277,6 +280,7 @@ export function SeccionProductos({
           es_combo: formEsCombo,
           horario_desde: horarioDesde,
           horario_hasta: horarioHasta,
+          favorito: formFavorito,
         })
         if ('error' in result) { setError(result.error); return }
         router.refresh()
@@ -304,6 +308,7 @@ export function SeccionProductos({
           es_combo: formEsCombo,
           horario_desde: horarioDesde,
           horario_hasta: horarioHasta,
+          favorito: formFavorito,
         })
         if (result?.error) { setError(result.error); return }
         const catNombre = categorias.find((c) => c.id === formCat)?.nombre ?? ''
@@ -323,6 +328,7 @@ export function SeccionProductos({
                   es_combo: formEsCombo,
                   horario_desde: horarioDesde,
                   horario_hasta: horarioHasta,
+                  favorito: formFavorito,
                 }
               : p,
           ),
@@ -758,7 +764,10 @@ export function SeccionProductos({
           <span className="text-[22px] leading-none flex-shrink-0">{prod.emoji}</span>
         ) : null}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium leading-tight">{prod.nombre}</p>
+          <p className="text-sm font-medium leading-tight">
+            {prod.favorito && <span className="mr-1">⭐</span>}
+            {prod.nombre}
+          </p>
           <p className="text-xs text-text-3 mt-0.5">
             ${prod.precio.toFixed(2)} · {prod.categoria_nombre}
           </p>
@@ -1039,6 +1048,28 @@ export function SeccionProductos({
               <span
                 className={`absolute top-[3px] h-[20px] w-[20px] rounded-full bg-white shadow transition-transform duration-200 ${
                   formEsCombo ? 'translate-x-[22px]' : 'translate-x-[3px]'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* ⭐ Favorito */}
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <span className="text-[13px] text-text-2">⭐ Favorito</span>
+              <p className="text-[11px] text-text-4">
+                Aparece en la sección "Favoritos" al inicio del menú del POS
+              </p>
+            </div>
+            <button
+              onClick={() => setFormFavorito((v) => !v)}
+              className={`relative ml-3 flex-shrink-0 h-[26px] w-[46px] rounded-full transition-colors duration-200 ${
+                formFavorito ? 'bg-[#173F2E]' : 'bg-[#D1D1D6]'
+              }`}
+            >
+              <span
+                className={`absolute top-[3px] h-[20px] w-[20px] rounded-full bg-white shadow transition-transform duration-200 ${
+                  formFavorito ? 'translate-x-[22px]' : 'translate-x-[3px]'
                 }`}
               />
             </button>
