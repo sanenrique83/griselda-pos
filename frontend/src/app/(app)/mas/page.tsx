@@ -6,10 +6,11 @@ import type { ComponentType } from 'react'
 import {
   ArrowLeftRight, Clock, BarChart3, Package, Printer, Users, ReceiptText,
   FileText, BookOpen, Armchair, Scissors, XCircle, Shield, Headphones,
-  NotebookText, LogOut, Monitor, ChevronRight, SlidersHorizontal,
+  NotebookText, Monitor, ChevronRight, SlidersHorizontal,
 } from 'lucide-react'
 import { primerNombreValido } from '@/lib/nombreUsuario'
 import { HeaderA } from '@/components/ui/HeaderA'
+import { LogoutButton } from '@/components/mas/LogoutButton'
 import pkg from '../../../../package.json'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -62,6 +63,13 @@ export default async function MasPage() {
     .order('abierto_en', { ascending: false })
     .limit(1)
     .maybeSingle()
+
+  const { data: config } = await supabase
+    .from('config_sistema')
+    .select('mensaje_despedida')
+    .eq('id', 1)
+    .single()
+  const mensajeDespedida = config?.mensaje_despedida ?? '¡Gracias por tu trabajo hoy! Nos vemos pronto.'
 
   return (
     <div className="min-h-full bg-s2">
@@ -196,7 +204,7 @@ export default async function MasPage() {
             Cuenta
           </p>
           <div className="rounded-2xl bg-white shadow-card overflow-hidden">
-            <LogoutRow />
+            <LogoutButton mensajeDespedida={mensajeDespedida} />
           </div>
         </div>
 
@@ -280,25 +288,3 @@ function FilaAdmin({
   )
 }
 
-function LogoutRow() {
-  async function logout() {
-    'use server'
-    const supabase = await createClient()
-    await supabase.auth.signOut()
-    redirect('/login')
-  }
-
-  return (
-    <form action={logout}>
-      <button
-        type="submit"
-        className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-red-50"
-      >
-        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
-          <LogOut size={17} strokeWidth={2} />
-        </span>
-        <p className="text-[14px] font-semibold text-red-600">Cerrar sesión</p>
-      </button>
-    </form>
-  )
-}

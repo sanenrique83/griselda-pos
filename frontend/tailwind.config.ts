@@ -39,6 +39,15 @@ const config: Config = {
       spacing: {
         safe: 'env(safe-area-inset-bottom)',
       },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+      },
+      animation: {
+        fadeIn: 'fadeIn .25s ease-out',
+      },
     },
   },
   plugins: [],

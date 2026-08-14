@@ -135,6 +135,9 @@ export interface ConfigSistema {
   cobro_solo_admin: boolean
   // Sección "⭐ Favoritos" al inicio del menú del POS — ver productos.favorito.
   mostrar_favoritos: boolean
+  // Mostrado brevemente en pantalla al cerrar sesión (LogoutButton.tsx) —
+  // NO es parte del ticket impreso, no confundir con ticket_pie.
+  mensaje_despedida: string
 }
 
 export interface Area {

@@ -20,7 +20,7 @@ export default async function ConfiguracionPage() {
   const { data: config } = await supabase
     .from('config_sistema')
     .select(
-      'ticket_nombre, ticket_subtitulo, ticket_direccion, ticket_telefono, ticket_rfc, ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea, formato_modificadores_ticket',
+      'ticket_nombre, ticket_subtitulo, ticket_direccion, ticket_telefono, ticket_rfc, ticket_linea1, ticket_linea2, ticket_pie, ticket_pie2, modificadores_por_linea, formato_modificadores_ticket, mensaje_despedida',
     )
     .eq('id', 1)
     .single()
@@ -39,5 +39,10 @@ export default async function ConfiguracionPage() {
     formato_modificadores_ticket: (config as any)?.formato_modificadores_ticket ?? 'agrupado',
   }
 
-  return <TicketConfigShell initialConfig={ticketConfig} />
+  const mensajeDespedidaInicial: string =
+    (config as any)?.mensaje_despedida ?? '¡Gracias por tu trabajo hoy! Nos vemos pronto.'
+
+  return (
+    <TicketConfigShell initialConfig={ticketConfig} mensajeDespedidaInicial={mensajeDespedidaInicial} />
+  )
 }
