@@ -56,6 +56,9 @@ export async function abrirTurno(
 
 // ─── Registrar movimiento mid-turno ───────────────────────────────────────────
 
+// Vía registrar_fondo_caja() (SECURITY DEFINER, migración 20260801000031)
+// en vez de insert directo a movimientos_caja — mismas validaciones,
+// re-verificadas también server-side dentro de la función.
 export async function registrarMovimiento(data: {
   turnoId: number
   tipo: 'fondo' | 'retiro'
@@ -65,18 +68,18 @@ export async function registrarMovimiento(data: {
   if (data.monto <= 0) return { error: 'El monto debe ser mayor a cero.' }
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Sin sesión.' }
 
-  const { error } = await supabase.from('movimientos_caja').insert({
-    turno_id: data.turnoId,
-    tipo: data.tipo,
-    monto: data.monto,
-    notas: data.notas,
-    usuario_id: user.id,
+  const { error } = await supabase.rpc('registrar_fondo_caja', {
+    p_turno_id: data.turnoId,
+    p_tipo: data.tipo,
+    p_monto: data.monto,
+    p_notas: data.notas,
   })
 
-  if (error) return { error: 'Error al registrar el movimiento.' }
+  if (error) {
+    console.error('[registrarMovimiento] error RPC registrar_fondo_caja:', error)
+    return { error: error.message || 'Error al registrar el movimiento.' }
+  }
 }
 
 // ─── Cerrar turno ─────────────────────────────────────────────────────────────

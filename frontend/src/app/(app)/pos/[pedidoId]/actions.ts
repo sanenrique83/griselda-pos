@@ -1091,6 +1091,11 @@ export async function eliminarProductoPendiente(
 }
 
 // ─── Cancelar ítem enviado ────────────────────────────────────────────────────
+// El cancelar+revertir-inventario+registrar-cancelación+movimiento-de-caja
+// vive ahora atómico en cancelar_item_seguro() (SECURITY DEFINER, migración
+// 20260801000031). Las lecturas de aquí abajo se quedan tal cual — son solo
+// para armar el ticket de cocina, montoAfectado ya no hace falta calcularlo
+// en TS (se calcula adentro de la función).
 export async function cancelarItem(
   pedidoProductoId: number,
   motivo: string,
@@ -1100,25 +1105,22 @@ export async function cancelarItem(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Sin sesión.' }
 
-  // 1. Datos del item
+  // 1. Datos del item (para el ticket)
   const { data: pp } = await supabase
     .from('pedido_productos')
-    .select('precio_unit, cantidad, subpedido_id, productos(nombre)')
+    .select('cantidad, subpedido_id, productos(nombre)')
     .eq('id', pedidoProductoId)
     .single()
 
   if (!pp) return { error: 'Producto no encontrado.' }
 
-  // 2. Extras
+  // 2. Modificadores (para el ticket)
   const { data: opciones } = await supabase
     .from('pedido_producto_opciones')
-    .select('precio_extra, opciones_modificador(nombre)')
+    .select('opciones_modificador(nombre)')
     .eq('pedido_producto_id', pedidoProductoId)
 
-  const extrasTotal = (opciones ?? []).reduce((s: number, o: any) => s + o.precio_extra, 0)
-  const montoAfectado = (pp.precio_unit + extrasTotal) * pp.cantidad
-
-  // 3. Navegar subpedido → pedido → turno_id
+  // 3. Navegar subpedido → pedido (para mesa/tipo del ticket)
   const { data: sub } = await supabase
     .from('subpedidos')
     .select('pedido_id')
@@ -1129,49 +1131,25 @@ export async function cancelarItem(
 
   const { data: pedido } = await supabase
     .from('pedidos')
-    .select('turno_id, mesa_id, tipo, mesas(numero, nombre)')
+    .select('mesa_id, tipo, mesas(numero, nombre)')
     .eq('id', sub.pedido_id)
     .single()
 
   if (!pedido) return { error: 'Pedido no encontrado.' }
 
-  // 4. Marcar cancelado y revertir inventario en la misma transacción,
-  // vía cancelar_item_enviado() (20260726000006_receta_modo_preparacion_consumo.sql).
-  const { error: updErr } = await supabase.rpc('cancelar_item_enviado', {
+  // 4. Cancelar + revertir inventario + registrar cancelación + movimiento
+  // de caja negativo — todo dentro de cancelar_item_seguro().
+  const { error: cancelErr } = await supabase.rpc('cancelar_item_seguro', {
     p_pedido_producto_id: pedidoProductoId,
+    p_motivo: motivo,
   })
 
-  if (updErr) return { error: updErr.message || 'Error al cancelar el ítem.' }
-
-  // 5. Registrar cancelación
-  await supabase.from('cancelaciones').insert({
-    pedido_producto_id: pedidoProductoId,
-    usuario_id: user.id,
-    motivo,
-    monto_afectado: montoAfectado,
-  })
-
-  // 6. Movimiento de caja negativo — el ítem ya quedó cancelado por el RPC
-  // de arriba (paso 4), así que un fallo aquí no debe reportarse como
-  // "cancelación fallida" (sería engañoso, ya se canceló). Se loguea para
-  // que el descuadre de caja se pueda rastrear en vez de perderse en silencio.
-  const { error: movErr } = await supabase.from('movimientos_caja').insert({
-    turno_id: pedido.turno_id,
-    tipo: 'cancelacion',
-    monto: -montoAfectado,
-    notas: motivo,
-    usuario_id: user.id,
-  })
-  if (movErr) {
-    console.error('[cancelarItem] error registrando el movimiento de caja de la cancelación:', {
-      pedidoProductoId,
-      turnoId: pedido.turno_id,
-      montoAfectado,
-      error: movErr.message,
-    })
+  if (cancelErr) {
+    console.error('[cancelarItem] error RPC cancelar_item_seguro:', cancelErr)
+    return { error: cancelErr.message || 'Error al cancelar el ítem.' }
   }
 
-  // 7. Ticket de cancelación en cocina (fallo silencioso — no bloquea)
+  // 5. Ticket de cancelación en cocina (fallo silencioso — no bloquea)
   const [{ data: cfg }, { data: perfil }] = await Promise.all([
     supabase.from('config_sistema').select('impresion_activa').eq('id', 1).single(),
     supabase.from('perfiles').select('nombre').eq('id', user.id).single(),
