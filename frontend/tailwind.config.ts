@@ -44,9 +44,19 @@ const config: Config = {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
         },
+        bump: {
+          '0%': { transform: 'scale(1)' },
+          '35%': { transform: 'scale(1.08)' },
+          '65%': { transform: 'scale(0.97)' },
+          '100%': { transform: 'scale(1)' },
+        },
       },
       animation: {
         fadeIn: 'fadeIn .25s ease-out',
+        // Rebote corto al agregar un producto al pedido (VistaMenu.tsx) —
+        // distinto del active:scale-[.98] de la tarjeta, que es feedback de
+        // "estoy presionando", no de "esto se agregó".
+        bump: 'bump .35s ease-out',
       },
     },
   },

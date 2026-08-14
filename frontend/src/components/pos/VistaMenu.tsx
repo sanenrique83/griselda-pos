@@ -34,6 +34,14 @@ export function VistaMenu({
   const [categoriaActiva, setCategoriaActiva] = useState<number | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const chipsRef = useRef<HTMLDivElement>(null)
+  // Rebote corto al agregar (id del producto que está animando ahora mismo,
+  // o null) — se limpia solo vía onAnimationEnd, no con un timeout aparte.
+  const [bumpId, setBumpId] = useState<number | null>(null)
+
+  function handleAgregar(producto: ProductoCatalogo) {
+    setBumpId(producto.id)
+    onAgregarProducto(producto)
+  }
 
   // Recorre en orden los comensales YA CREADOS (comensal_numero), nunca
   // salta a sillas físicas sin comensal. Da la vuelta sola del último al

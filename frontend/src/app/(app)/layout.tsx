@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { InactivityGuard } from '@/components/layout/InactivityGuard'
 import { FeedbackPrefsSync } from '@/components/layout/FeedbackPrefsSync'
+import { SplashScreen } from '@/components/layout/SplashScreen'
 import type { ConfigSistema, Perfil } from '@/lib/types/database.types'
 
 // Layout protegido: verifica sesión y carga el perfil del usuario.
@@ -21,9 +22,11 @@ export default async function AppLayout({
     supabase.from('perfiles').select('*').eq('id', user.id).single<Perfil>(),
     supabase
       .from('config_sistema')
-      .select('timeout_inactividad_minutos')
+      .select('timeout_inactividad_minutos, negocio_nombre, ticket_subtitulo, ticket_pie')
       .eq('id', 1)
-      .single<Pick<ConfigSistema, 'timeout_inactividad_minutos'>>(),
+      .single<
+        Pick<ConfigSistema, 'timeout_inactividad_minutos' | 'negocio_nombre' | 'ticket_subtitulo' | 'ticket_pie'>
+      >(),
     // Contar pedidos activos para el badge del BottomNav
     supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('estado', 'abierto'),
   ])
@@ -46,6 +49,13 @@ export default async function AppLayout({
       <FeedbackPrefsSync
         sonidoActivado={perfil.sonido_activado}
         vibracionActivada={perfil.vibracion_activada}
+      />
+      {/* Eslogan: reutiliza ticket_subtitulo/ticket_pie (ya capturados en
+          /mas/configuracion para el ticket impreso) en vez de un campo
+          nuevo — ver SplashScreen.tsx. */}
+      <SplashScreen
+        nombre={config?.negocio_nombre ?? 'Griselda POS'}
+        eslogan={config?.ticket_subtitulo || config?.ticket_pie || ''}
       />
 
       {/* Contenido de la pantalla — padding inferior para el BottomNav */}
