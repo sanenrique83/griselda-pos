@@ -88,10 +88,11 @@ export function VistaMenu({
     return (
       <div
         key={producto.id}
-        onClick={() => !agotado && onAgregarProducto(producto)}
+        onClick={() => !agotado && handleAgregar(producto)}
+        onAnimationEnd={() => setBumpId((id) => (id === producto.id ? null : id))}
         className={`mx-3 mb-2 flex cursor-pointer items-center gap-3 rounded-xl border border-[#E5E5EA] bg-white p-3.5 shadow-card transition-transform active:scale-[.98] ${
-          agotado ? 'opacity-60' : ''
-        }`}
+          bumpId === producto.id ? 'animate-bump' : ''
+        } ${agotado ? 'opacity-60' : ''}`}
       >
         {/* Imagen real si existe (foto_url, Catálogo → bucket "productos"),
             emoji como respaldo — mismo patrón que SeccionProductos.tsx */}
@@ -140,7 +141,7 @@ export function VistaMenu({
         <button
           onClick={(e) => {
             e.stopPropagation()
-            if (!agotado) onAgregarProducto(producto)
+            if (!agotado) handleAgregar(producto)
           }}
           disabled={agotado}
           aria-label={agotado ? 'Producto agotado' : `Agregar ${producto.nombre}`}
