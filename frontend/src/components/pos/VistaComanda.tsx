@@ -11,6 +11,7 @@ import {
   ChevronUp,
   Plus,
   UserPlus2,
+  Clock3,
 } from 'lucide-react'
 import { ItemComandaRow } from './ItemComanda'
 import { enviarACocina, agregarComensal, eliminarComensal, cancelarItem, eliminarProductoPendiente, moverProducto, dividirProducto, anularPedidoCompleto, asignarSilla } from '@/app/(app)/pos/[pedidoId]/actions'
@@ -42,6 +43,17 @@ function contarRondas(items: ItemComanda[]): number {
       .map((i) => i.enviadoEn),
   )
   return enviados.size
+}
+
+// Ventana de la sección "Enviado hace poco" — más allá de esto ya no aporta
+// (el mesero ya lo dio por hecho hace rato), así que la línea simplemente
+// deja de listarse en vez de mostrar "hace 40 min".
+const VENTANA_ENVIADOS_RECIENTES_MS = 15 * 60 * 1000
+
+function formatearHaceTiempo(fechaISO: string, ahoraMs: number): string {
+  const minutos = Math.floor((ahoraMs - new Date(fechaISO).getTime()) / 60000)
+  if (minutos < 1) return 'Recién enviado'
+  return `hace ${minutos} min`
 }
 
 interface VistaComandaProps {
@@ -118,6 +130,25 @@ export function VistaComanda({
       return () => clearTimeout(t)
     }
   }, [printError])
+
+  // Recalcula "hace N min" cada 30s mientras la pantalla sigue abierta, sin
+  // necesidad de refrescar datos del servidor — es puramente Date.now().
+  const [, forzarTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => forzarTick((t) => t + 1), 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  // "Enviado hace poco" (últimos 10-15 min): para que el mesero no reenvíe
+  // por duda sin tener que abrir cada tarjeta de comensal a revisar estados.
+  const itemsEnviadosRecientes = subpedidos
+    .flatMap((sp) =>
+      sp.items
+        .filter((i) => i.estado === 'enviado' && i.enviadoEn)
+        .map((i) => ({ item: i, comensalLabel: sp.nombre ?? `Comensal ${sp.comensal_numero}` })),
+    )
+    .filter(({ item }) => Date.now() - new Date(item.enviadoEn as string).getTime() <= VENTANA_ENVIADOS_RECIENTES_MS)
+    .sort((a, b) => new Date(b.item.enviadoEn as string).getTime() - new Date(a.item.enviadoEn as string).getTime())
 
   const totalPedido = subpedidos.reduce((s, sp) => s + sp.total, 0)
   const hayPendientes = subpedidos.some((s) =>
@@ -403,6 +434,30 @@ export function VistaComanda({
       {printError && (
         <div className="flex-shrink-0 bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white">
           ⚠️ Sin conexión a impresora
+        </div>
+      )}
+
+      {itemsEnviadosRecientes.length > 0 && (
+        <div className="mx-3 mt-3 flex-shrink-0 rounded-2xl bg-white shadow-card overflow-hidden">
+          <div className="flex items-center gap-1.5 border-b border-[#F2F2F7] px-3.5 py-2.5">
+            <Clock3 size={13} strokeWidth={2.4} className="text-text-3" />
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+              Enviado hace poco — no hace falta reenviar
+            </p>
+          </div>
+          <div className="max-h-32 space-y-1 overflow-y-auto px-3.5 py-2">
+            {itemsEnviadosRecientes.map(({ item, comensalLabel }) => (
+              <div key={item.id} className="flex items-center justify-between gap-2 text-[12px]">
+                <span className="min-w-0 truncate text-text-2">
+                  {item.cantidad}x {item.nombre}
+                  <span className="ml-1 text-text-4">· {comensalLabel}</span>
+                </span>
+                <span className="flex-shrink-0 font-medium text-text-3">
+                  {formatearHaceTiempo(item.enviadoEn as string, Date.now())}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

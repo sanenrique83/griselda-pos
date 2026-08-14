@@ -1,5 +1,7 @@
-# Griselda POS — Estado Consolidado del Proyecto (v6)
-**Última actualización:** 2 de agosto de 2026. Reemplaza la v5 — se cerró la "Cola Maestra v2" completa desde H-01 hasta el #10 (10 de 12 ítems), incluyendo el rediseño de Comanda en cascada (el más grande de uso diario de esta ronda), PIN rápido, administración de usuarios, y un segundo bug real de embed ambiguo (mismo patrón que `combo_productos`, esta vez en `grupos_modificadores`).
+# Griselda POS — Estado Consolidado del Proyecto (v7)
+**Última actualización:** 14 de agosto de 2026. Reemplaza la v6 — se cerró el hueco de seguridad en tablas de caja (4 funciones `SECURITY DEFINER` nuevas, ver sección propia) y se completó el Bloque E (experiencia visual e interacción, 6/6 piezas). Ninguna de las migraciones de esta ronda está aplicada todavía — quedan para que Rober corra `supabase db push` en el orden documentado en cada sección.
+
+**Actualización anterior (v6, 2 de agosto de 2026):** se cerró la "Cola Maestra v2" completa desde H-01 hasta el #10 (10 de 12 ítems), incluyendo el rediseño de Comanda en cascada (el más grande de uso diario de esa ronda), PIN rápido, administración de usuarios, y un segundo bug real de embed ambiguo (mismo patrón que `combo_productos`, esta vez en `grupos_modificadores`).
 
 **Verificación independiente de esta actualización (Rober + Claude, no solo el autoreporte de Claude Code):** se confirmó directamente en código, línea por línea, que el fix de seguridad de `perfiles.activo` (`(app)/layout.tsx`, cierra sesión server-side en cada navegación si la cuenta fue desactivada) y el fix del embed ambiguo de `grupos_modificadores` (hint de FK explícito en los 3 sitios reales) están correctamente implementados — no solo documentados. Se confirmó con Rober directamente que "Manual de usuario" y "Rediseño de roles + permisos" (más abajo) son decisiones reales suyas, contempladas desde hace tiempo pero no activadas — no algo que Claude Code haya asumido por su cuenta. Se confirmó que `SUPABASE_SERVICE_ROLE_KEY` ya está configurada en Vercel (necesaria para #7 y #8).
 
@@ -192,7 +194,7 @@ Con Fase 9 cerrada, se hizo un repaso deliberado de qué quedó pendiente de fas
 |---|---|
 | **Backup automático de Supabase (F2-11)** | ⚪ **El pendiente más urgente de todo el documento**, sin cambios desde la v1 — cada semana que pasa hay más inventario/recetas/costeo en juego. |
 | **Operación sin internet / resiliencia offline** | ⚪ El sistema depende 100% de conexión. Señalado desde el análisis original de todo el proyecto; nunca se ha atacado con ningún spec. |
-| **RLS de tablas de caja legible por cualquier autenticado** | ❓ Señalado desde el primerísimo análisis. La auditoría de código cerró el caso de `ingredientes`, pero **no se confirmó explícitamente si este otro caso (tablas de caja/`movimientos_caja` y similares) sigue abierto o ya se resolvió de paso** — vale la pena una verificación puntual antes de asumir cualquier cosa. |
+| **RLS de tablas de caja legible por cualquier autenticado** | 🟡 **Confirmado y cerrado a nivel de código — falta que Rober aplique la migración.** Se verificó que sí era un hueco real (insert directo desde el cliente a `movimientos_caja`/`pagos`/`cobro_subpedidos` en 4 rutas: `cobrarPedido()`, `registrarMovimiento()`, `anularPedido()`, `cancelarItem()`). Se migró la escritura de las 4 a funciones `SECURITY DEFINER` nuevas y se dejó lista (sin aplicar) la migración que cierra las 3 tablas a solo-lectura. Ver sección propia abajo, "Cierre del hueco de seguridad en tablas de caja". |
 | **Contraseña del admin** | ❓ Nunca se confirmó si de verdad se cambió del default original. |
 
 ### Huecos genuinos sin fase asignada
@@ -219,6 +221,41 @@ Con Fase 9 cerrada, se hizo un repaso deliberado de qué quedó pendiente de fas
 
 - ✅ Auditoría de queries contra el esquema real (2 rondas completas).
 - ✅ Código muerto identificado en la auditoría (todo eliminado).
+
+---
+
+## Cierre del hueco de seguridad en tablas de caja
+
+Antes de tocar código se investigaron 2 hallazgos puntuales: (1) si un mesero con `descuentos_mesero` activo lograba cobrar con descuento pese a la política `descuentos_insert_perm` (sí lograba, la política solo exige que exista sesión, no que sea admin — política más permisiva de lo que su nombre en el archivo de migración sugiere), y (2) qué escribía directo a tablas de caja fuera de `cobrarPedido()`. El segundo punto reveló un error propio en un reporte anterior (`cancelarItem()` había sido mal etiquetada como `anularPedido()`) — corregido antes de escribir nada, ampliando el alcance de 3 a 4 funciones.
+
+**4 funciones nuevas `SECURITY DEFINER`** (`supabase/migrations/20260801000031_funciones_caja_seguras.sql`), una por cada camino de escritura directa encontrado — migran la lógica completa de su Server Action equivalente, re-implementando adentro cualquier permiso que antes vivía en una política RLS de otra tabla (SECURITY DEFINER salta RLS por completo, así que ese chequeo se vuelve responsabilidad de la función):
+- `cobrar_pedido_seguro()` — permiso `cobro_solo_admin`, permiso `descuentos_mesero`, movimiento+pagos+cobro_subpedidos, cierre de subpedidos/pedido, liberación de mesa/satélite.
+- `registrar_fondo_caja()` — depósitos/retiros de `/mas/turno`.
+- `anular_pedido_seguro()` — migra la validación de "solo si el total es $0", que antes solo vivía en el cliente (`CobroShell.tsx`), ahora también server-side.
+- `cancelar_item_seguro()` — permiso `cancelaciones_mesero`, inserta `cancelaciones` + `movimientos_caja` (fallo en el insert de caja no revierte la cancelación del ítem, mismo comportamiento que tenía el código original).
+
+**Migración de solo-lectura** (`20260801000032_caja_rls_solo_lectura.sql`, **creada pero deliberadamente sin aplicar ni en pruebas**) cierra `movimientos_caja`/`pagos`/`cobro_subpedidos` a `SELECT` únicamente — todo insert/update pasa solo por las 4 funciones. **Orden de aplicación obligatorio, documentado en el propio archivo:** (1) `supabase db push` de las funciones → (2) desplegar a Vercel el TypeScript que ya llama a las 4 funciones vía `.rpc()` en vez de insertar directo → (3) recién ahí aplicar el candado de RLS. Aplicar el candado antes del paso 2 rompería el cobro en producción.
+
+**Nota de documentación, sin efecto funcional** (`20260801000033_nota_nombre_real_descuentos_policy.sql`, sí aplicada vía `COMMENT ON POLICY`): deja registrado que la política real en producción se llama `descuentos_insert_perm`, no `descuentos_insert_admin` como dice el archivo de migración original — para que no sea sorpresa si algún día alguien escribe un `DROP POLICY` con el nombre del archivo.
+
+**3 archivos TypeScript actualizados** para llamar `.rpc()` en vez de insertar directo: `cobro/[pedidoId]/actions.ts` (`cobrarPedido`, `anularPedido`), `mas/turno/actions.ts` (`registrarMovimiento`), `pos/[pedidoId]/actions.ts` (`cancelarItem`).
+
+**Probado contra la base real** (no solo simulado) con fixtures aisladas `TEST-QA-*` e impersonación de usuarios reales vía `set_config('request.jwt.claim.sub', ...)`, limpiadas después — 6 escenarios, todos correctos: cobro normal, cobro con descuento por mesero, `cobro_solo_admin` bloqueando a mesero y permitiendo a admin, depósito/retiro (+ rechazo de monto ≤0), anular con total $0 (+ rechazo de anular con consumo >0), y cancelar ítem. `npx tsc --noEmit` limpio.
+
+**Nada de esto está aplicado en producción todavía** — las funciones se corrieron una sola vez, directo, solo para poder probarlas (`supabase db query --linked`, no marca la migración como aplicada en el CLI); el candado de RLS no se tocó ni siquiera así. Las 3 migraciones (031, 032, 033 — 033 ya aplicada por ser inofensiva) esperan que Rober corra `supabase db push` en el orden indicado arriba.
+
+---
+
+## Bloque E — experiencia visual e interacción (6/6 completo, sin aplicar migraciones)
+
+Trabajado en 6 piezas, cada una mostrada y verificada (`npx tsc --noEmit` limpio) antes de seguir con la siguiente, sin aplicar ninguna migración.
+
+- **Sonido/vibración** — `perfiles.sonido_activado`/`vibracion_activada` (default `true`, migración `20260801000034`). Tonos sintetizados con Web Audio API (sin archivos de audio), `navigator.vibrate()` documentado como inefectivo en iOS (Safari/WebKit nunca lo implementó). Dispara en agregar producto, confirmar/enviar a cocina, cobrar, cancelar ítem — deliberadamente **no** en anular pedido completo, porque esos Server Actions terminan en `redirect()`, que interrumpe cualquier código posterior a la llamada. La pantalla `/cambiar-password` se renombró a `/preferencias` (con `git mv`) y ahora agrupa sonido/vibración + cambio de contraseña, en vez de crear una pantalla nueva aparte.
+- **Productos favoritos** — `productos.favorito` + `config_sistema.mostrar_favoritos` (ambos default distinto: `false`/`true`, migración `20260801000035`). Toggle "⭐ Favorito" en el sheet de Catálogo, control en `/mas/permisos` (sección nueva "Menú"), sección "⭐ Favoritos" al inicio del menú del POS (solo en la vista general sin filtrar, sin duplicar tarjetas con la lista de abajo).
+- **Mensaje de despedida** — `config_sistema.mensaje_despedida` (migración `20260801000036`). **Colisión de nombre evitada a propósito:** `/mas/configuracion` ya tenía un campo llamado "Mensaje de despedida" que en realidad es `ticket_pie` (pie del ticket *impreso*, algo distinto) — el campo nuevo quedó en tarjeta separada ("Al cerrar sesión") con guardado independiente. El botón de cerrar sesión se extrajo a `LogoutButton.tsx` (client) para poder mostrar el mensaje en un overlay de pantalla completa 1.6s *antes* de llamar al `signOut()` real (que redirige y corta cualquier código posterior).
+- **Splash screen** — sin migración. Logo circular + nombre (`negocio_nombre`) + eslogan, montado en `(app)/layout.tsx`, una sola vez por pestaña (`sessionStorage`, no `localStorage`). El eslogan se reutiliza de `ticket_subtitulo`/`ticket_pie` (ya capturados para el ticket impreso) en vez de un campo nuevo, tal como se pidió.
+- **Animación de rebote** — sin migración. Keyframe `bump` nuevo en `tailwind.config.ts`, en la tarjeta de producto de `VistaMenu.tsx` al tocarla o tocar el botón +, distinto del `active:scale-[.98]` que ya existía (ese es "estoy presionando"; este es "esto se agregó").
+- **Historial temporal de comandas enviadas** — **sin migración**: `pedido_productos.enviado_en` ya existía en la base de una ronda anterior (Cola Maestra v2, #9) y ya se poblaba vía `enviar_pedido_a_cocina()`. Se agregó una sección nueva en `VistaComanda.tsx` ("Enviado hace poco"), independiente de la que ya existía en `/pedidos` — lista todas las líneas enviadas en los últimos 15 minutos con "hace X min" (recalculado cada 30s en el cliente), para que el mesero no reenvíe por duda sin tener que abrir cada tarjeta de comensal.
 
 ---
 
@@ -258,7 +295,7 @@ Durante las pruebas del #9, la Comanda de una mesa con pedido real dejó de most
 
 ## Lo que falta de la Cola Maestra v2
 
-- **#11 — Bloque E (experiencia visual e interacción)** — sonido/vibración, favoritos curados, mensaje de despedida, splash screen, animación de rebote. Spec listo, sin implementar.
+- **#11 — Bloque E (experiencia visual e interacción)** — ✅ **6/6 implementado** (sonido/vibración, favoritos, mensaje de despedida, splash screen, animación de rebote, historial temporal de comandas enviadas en Comanda). Ver sección propia abajo, "Bloque E — experiencia visual e interacción". Migraciones creadas, sin aplicar.
 - **#12 — Bloque A (motor de recetas, rediseño de UX)** — el más grande, dejado a propósito al final: buscar-o-crear inline de insumos/utensilios, instrucciones por insumo derivado, rendimiento aprendido de producciones históricas. Spec listo (A1-A5), sin implementar.
 - **Recordatorio proactivo de fin de turno** — spec ya escrito (`turnos_horario` como catálogo de patrones fijos, emparejado automático al abrir turno vía `dentroDeHorario()` ya existente, aviso configurable "faltan X min para tu turno programado"). **Se había perdido de vista, nunca quedó anotado en ninguna cola anterior** — recuperado y agregado aquí. Distinto de C1 (que es validación de diferencia de efectivo al cerrar) — este es puramente proactivo, antes de llegar a la hora de fin programada, no bloquea nada. Confirmado: la administración de `turnos_horario` vive en `/mas/permisos`, no en `/mas/turno` (mismo criterio de siempre: operativo vs. configuración de una sola vez).
 - **Manual de usuario dentro de la app** — **decisión de diseño tomada, construcción pospuesta a propósito hasta que Rober lo pida.** `/mas/ayuda`, contenido **editable por el admin desde la app** (no hardcodeado, para que no se desactualice como pasaría con un PDF — se descartó el formato de documento por esta misma razón), secciones con visibilidad `'todos'`/`'admin'`. Diseño: tabla `manual_secciones` (titulo, contenido, orden, visible_para). Falta confirmar si arranca con contenido mínimo de ejemplo (2-3 secciones) o más completo desde el inicio, antes de escribir el prompt final.
