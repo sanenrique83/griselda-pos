@@ -1,5 +1,7 @@
-# Griselda POS — Estado Consolidado del Proyecto (v7)
-**Última actualización:** 14 de agosto de 2026. Reemplaza la v6 — se cerró el hueco de seguridad en tablas de caja (4 funciones `SECURITY DEFINER` nuevas, ver sección propia) y se completó el Bloque E (experiencia visual e interacción, 6/6 piezas). Ninguna de las migraciones de esta ronda está aplicada todavía — quedan para que Rober corra `supabase db push` en el orden documentado en cada sección.
+# Griselda POS — Estado Consolidado del Proyecto (v8)
+**Última actualización:** 14 de agosto de 2026. Reemplaza la v7 — se completó la Fase 8 (Analítica Avanzada, 3/3: heatmap de horas pico, dispersión margen vs. volumen, predicción de demanda). Migraciones `20260801000037`-`39` creadas, sin aplicar — se juntan con las de la v7 (caja segura + Bloque E) para un solo `supabase db push`.
+
+**Actualización anterior (v7, 14 de agosto de 2026):** se cerró el hueco de seguridad en tablas de caja (4 funciones `SECURITY DEFINER` nuevas, ver sección propia) y se completó el Bloque E (experiencia visual e interacción, 6/6 piezas). Ninguna de las migraciones de esa ronda está aplicada todavía tampoco.
 
 **Actualización anterior (v6, 2 de agosto de 2026):** se cerró la "Cola Maestra v2" completa desde H-01 hasta el #10 (10 de 12 ítems), incluyendo el rediseño de Comanda en cascada (el más grande de uso diario de esa ronda), PIN rápido, administración de usuarios, y un segundo bug real de embed ambiguo (mismo patrón que `combo_productos`, esta vez en `grupos_modificadores`).
 
@@ -43,9 +45,15 @@ Sin cambios desde v1: F5-01 a F5-09 todos ✅ confirmados (incluyendo los 4 que 
 | F7-08 Cierre de sesión por inactividad | ✅ Incluye campo de configuración en `/mas/permisos` |
 | F7-09 Unir mesas persistente *(no numerada originalmente, salió de una idea durante el mapa de mesas)* | ✅ Confirmado con prueba de conflicto real |
 
-## Fase 8 — Analítica Avanzada Pendiente
+## Fase 8 — Analítica Avanzada — ✅ **3/3 implementado, sin aplicar migraciones**
 
-Sin cambios desde que se especificó — F8-01, F8-02, F8-03 siguen ⚪ sin implementar.
+Las 3 piezas se trabajaron en orden (F8-01 → F8-02 → F8-03), cada una mostrada y con `npx tsc --noEmit` limpio antes de seguir con la siguiente, sin aplicar ninguna migración — quedan juntas para un solo `supabase db push`.
+
+- **F8-01 — Heatmap de horas pico** (`dashboard_heatmap_horas_pico()`, migración `20260801000037`). No se pudo reusar `dashboard_ventas_promedio_dia_semana()` tal cual porque esa agrupa a nivel turno (`t.abierto_en`) y el heatmap necesita la hora real de cada cobro (`movimientos_caja.created_at`) — sí se reutilizó su **patrón** completo (CTE de totales por turno, `ROW_NUMBER()` por recencia, tope de 8 comparables, luego `AVG`), extendido con la dimensión hora. En el Dashboard: cuadrícula con filas = rango continuo de horas reales de operación (min–max hora con algún cobro histórico, nunca 0-23 fijo) × 7 columnas de día, intensidad de verde bosque proporcional al promedio (nunca rojo — no es alerta). Sin tooltip de Recharts (es un grid de divs, no una gráfica); tocar una celda muestra el detalle en una línea fija abajo.
+- **F8-02 — Dispersión margen vs. volumen** (`dashboard_margen_vs_volumen()`, migración `20260801000038`). Reutiliza `margen_productos()` literalmente vía `FROM margen_productos() m` (la misma función de la tarjeta "Margen de productos"), cruzada con volumen histórico vendido (`SUM(pedido_productos.cantidad)`, sin cancelados). Excluye productos sin costo completo (`margen IS NULL`) — nada que graficar en ese eje, mismo criterio que ya usa esa tarjeta al mostrar "—". En el Dashboard: `ScatterChart` de Recharts (misma librería del resto), volumen en X, margen $ en Y, tooltip con nombre al tocar/pasar el cursor.
+- **F8-03 — Predicción de demanda** (`dashboard_prediccion_demanda()`, migración `20260801000039`). Mismo patrón de "día de la semana histórico" que `dashboard_alerta_ventas_bajas()` (CTE `parametros` con `EXTRACT(DOW)` sobre `NOW()`, aquí +1 día para apuntar a mañana), pero comparando el total COMPLETO de cada turno histórico (no acotado a una hora de corte, porque se proyecta el día entero, no "hasta ahora"). Tarjeta simple: "Mañana ({día}): ventas esperadas ~$X" + una línea aclarando explícitamente que es una tendencia histórica, no una garantía.
+
+Las 3 tarjetas nuevas (F8-02 y F8-03) viven junto a "Margen de productos" en `dashboard/page.tsx`, no dentro de `<DashboardCharts>` — igual que esa tarjeta, son datos "independientes del turno" (costeo/histórico de catálogo), presentes en las dos ramas de la página (con y sin turno activo).
 
 ---
 
@@ -202,7 +210,7 @@ Con Fase 9 cerrada, se hizo un repaso deliberado de qué quedó pendiente de fas
 | Tema | Estado |
 |---|---|
 | **F4-03 — Cambiar el mesero asignado a una mesa activa** | ⚪ Identificado desde el spec original de marzo, nunca asignado a ninguna fase posterior. Sigue sin construirse. |
-| **Fase 8 completa** (F8-01 heatmap de horas pico, F8-02 scatter margen vs. volumen, F8-03 predicción de demanda) | ⚪ Especificada hace tiempo, nunca implementada — el proyecto se desvió hacia el rediseño de recetas y luego Fase 9. **Dato a favor:** F9-04 (alerta de ventas bajas) ya construyó el mismo patrón de comparación "mismo día de la semana a la misma hora" que necesita F8-03 — implementarla ahora sería más barato que antes de que existiera ese precedente. |
+| **Fase 8 completa** (F8-01 heatmap de horas pico, F8-02 scatter margen vs. volumen, F8-03 predicción de demanda) | ✅ **3/3 implementado** — ver sección propia "Fase 8 — Analítica Avanzada" arriba. Migraciones creadas (`20260801000037`-`39`), sin aplicar. |
 | **F5-00 — Verificar nombres de perfiles** | ✅ Auditado y corregido: los ~15 sitios que resuelven `usuario_id`/`mesero_id` → nombre ahora usan `primerNombreValido()` (`lib/nombreUsuario.ts`), fallback único `'Sin registrar'` que también captura string vacío (no solo `null`/`undefined`). Historial ahora también muestra el nombre del mesero. |
 
 ### Deuda técnica que sigue creciendo
@@ -301,7 +309,7 @@ Durante las pruebas del #9, la Comanda de una mesa con pedido real dejó de most
 - **Manual de usuario dentro de la app** — **decisión de diseño tomada, construcción pospuesta a propósito hasta que Rober lo pida.** `/mas/ayuda`, contenido **editable por el admin desde la app** (no hardcodeado, para que no se desactualice como pasaría con un PDF — se descartó el formato de documento por esta misma razón), secciones con visibilidad `'todos'`/`'admin'`. Diseño: tabla `manual_secciones` (titulo, contenido, orden, visible_para). Falta confirmar si arranca con contenido mínimo de ejemplo (2-3 secciones) o más completo desde el inicio, antes de escribir el prompt final.
 - **Rediseño de roles + permisos (fusionados en un solo trabajo)** — **decisión tomada, construcción pospuesta a propósito hasta que Rober lo pida.** Se confirmaron 5 roles: `mesero`, `cajero`, `gerente`, `admin` (control total, sin cambios), `contador` (nuevo, solo lectura de Dashboard/Reportes). Diseño: `permisos` (catálogo de capacidades) + `rol_permisos` (matriz rol↔permiso) + función `tiene_permiso(clave)`, con matriz editable en `/mas/permisos`. Reemplaza la deuda técnica de columnas booleanas sueltas en `config_sistema` (`descuentos_mesero`, `cancelaciones_mesero`, `cancelar_pedido_mesero` se migran a filas de `permisos`, sin borrar las columnas viejas todavía). **Aclaración importante:** solo los permisos por rol se mueven a tabla — la configuración de negocio (umbrales, formatos) se queda en `config_sistema`, no depende de quién eres.
 
-**Todavía sin spec, esperando alguna decisión tuya**: C6 (botón SOS, falta que confirmes qué debe hacer), Fase 8 completa (F8-01/02/03), 3 hallazgos de las conversaciones ChatGPT (límite de descuentos, modo de prueba, alertas por WhatsApp/Telegram), y la conversación de multi-tenant/SaaS vendible — **guardada explícitamente para el final de todo**, como pediste. (Bloque F ya no está en esta lista — decisión tomada y en construcción activa, ver sección propia abajo.)
+**Todavía sin spec, esperando alguna decisión tuya**: C6 (botón SOS, falta que confirmes qué debe hacer), 3 hallazgos de las conversaciones ChatGPT (límite de descuentos, modo de prueba, alertas por WhatsApp/Telegram), y la conversación de multi-tenant/SaaS vendible — **guardada explícitamente para el final de todo**, como pediste. (Bloque F y Fase 8 ya no están en esta lista — ambos completos, ver sus secciones propias.)
 
 ## Bloque F — Identidad Visual (rediseño de pantallas, en curso)
 

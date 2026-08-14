@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Perfil } from '@/lib/types/database.types'
 import { Wallet, ShoppingBag, DollarSign, Armchair } from 'lucide-react'
-import { DashboardCharts } from '@/components/dashboard/DashboardCharts'
+import { DashboardCharts, MargenVolumenScatterCard } from '@/components/dashboard/DashboardCharts'
 import { primerNombreValido } from '@/lib/nombreUsuario'
 import type {
   VentaHora,
@@ -18,6 +18,8 @@ import type {
   RendimientoPunto,
   RendimientoRecetaData,
   PersonaMonto,
+  HeatmapPunto,
+  MargenVolumenPunto,
 } from '@/components/dashboard/DashboardCharts'
 
 // ─── Fechas de temporada alta (puentes / fines de semana largo) ──────────────
@@ -144,6 +146,31 @@ export default async function DashboardPage() {
     margenVariable: r.margen_variable ?? false,
   }))
 
+  // ── F8-03: predicción de demanda para mañana (independiente del turno) ────
+  const { data: prediccionRaw } = await supabase.rpc('dashboard_prediccion_demanda')
+  const filaPrediccion = (prediccionRaw as
+    | { dia_semana: number; promedio: number | null; turnos_comparados: number }[]
+    | null)?.[0]
+  const prediccionDemanda: PrediccionDemanda | null =
+    filaPrediccion && filaPrediccion.turnos_comparados > 0
+      ? {
+          diaLabel: DIAS_SEMANA_LABEL[filaPrediccion.dia_semana],
+          promedio: filaPrediccion.promedio ?? 0,
+          turnosComparados: filaPrediccion.turnos_comparados,
+        }
+      : null
+
+  // ── F8-02: dispersión margen vs. volumen (costeo de catálogo, independiente del turno) ──
+  const { data: margenVolumenRaw } = await supabase.rpc('dashboard_margen_vs_volumen')
+  const margenVsVolumen: MargenVolumenPunto[] = (margenVolumenRaw ?? []).map((r: any) => ({
+    productoId: r.producto_id,
+    nombre: r.nombre,
+    volumen: r.volumen,
+    margen: r.margen,
+    margenPct: r.margen_pct,
+    margenVariable: r.margen_variable ?? false,
+  }))
+
   // ── Insumos bajo stock mínimo (independiente del turno) ───────────────────
   const { data: insumosRaw } = await supabase
     .from('insumos')
@@ -199,6 +226,8 @@ export default async function DashboardPage() {
           <InsumosBajoStockCard insumos={insumosBajoStock} />
           <PorcionesBajasCard porciones={porcionesBajas} />
           <MargenProductosCard margenes={margenes} />
+          <MargenVolumenScatterCard puntos={margenVsVolumen} />
+          <PrediccionDemandaCard prediccion={prediccionDemanda} />
         </div>
       </div>
     )
@@ -292,6 +321,7 @@ export default async function DashboardPage() {
     temporadaAltaRes,
     pedidoProductosCanceladosRes,
     descuentosRes,
+    heatmapHorasPicoRes,
   ] = await Promise.all([
     cobroIds.length > 0
       ? supabase.from('pagos').select('movimiento_id, metodo_pago, monto').in('movimiento_id', cobroIds)
@@ -305,6 +335,7 @@ export default async function DashboardPage() {
     supabase.rpc('dashboard_turno_por_fecha', { p_fecha: fechaHace7 }),
     supabase.rpc('dashboard_ventas_promedio_dia_semana'),
     supabase.rpc('dashboard_temporada_alta', { p_fechas: FECHAS_TEMPORADA_ALTA }),
+    supabase.rpc('dashboard_heatmap_horas_pico'),
     subIds.length > 0
       ? supabase
           .from('pedido_productos')
@@ -569,6 +600,17 @@ export default async function DashboardPage() {
     ? diasConDato.reduce((a, b) => (b.promedio < a.promedio ? b : a)).dia
     : null
 
+  // ── (2.2) F8-01: heatmap de horas pico, día×hora, últimos 8 turnos c/u (RPC) ──
+  const heatmapHorasPico: HeatmapPunto[] = ((heatmapHorasPicoRes.data as
+    | { dia_semana: number; hora: number; promedio: number; turnos_contados: number }[]
+    | null) ?? []).map((row) => ({
+    diaSemana: row.dia_semana,
+    diaLabel: DIAS_SEMANA_LABEL[row.dia_semana],
+    hora: row.hora,
+    promedio: row.promedio,
+    turnosContados: row.turnos_contados,
+  }))
+
   // ── (3) Ticket promedio: mesa vs. llevar vs. mostrador (cerrados del turno) ──
   let sumMesa = 0, countMesaCerrados = 0
   let sumLlevar = 0, countLlevarCerrados = 0
@@ -821,6 +863,7 @@ export default async function DashboardPage() {
             ventasPorDiaSemana={ventasPorDiaSemana}
             diaMayor={diaMayor}
             diaMenor={diaMenor}
+            heatmapHorasPico={heatmapHorasPico}
             ticketPorTipo={ticketPorTipo}
             tiempoServicio={tiempoServicio}
             cancelaciones={cancelaciones}
@@ -851,6 +894,12 @@ export default async function DashboardPage() {
 
         {/* ── Margen por producto ────────────────────────────────────────────── */}
         <MargenProductosCard margenes={margenes} />
+
+        {/* ── F8-02: dispersión margen vs. volumen ───────────────────────────── */}
+        <MargenVolumenScatterCard puntos={margenVsVolumen} />
+
+        {/* ── F8-03: predicción de demanda ────────────────────────────────────── */}
+        <PrediccionDemandaCard prediccion={prediccionDemanda} />
 
         <div className="h-2" />
       </div>
@@ -1100,6 +1149,42 @@ function PorcionesBajasCard({ porciones }: { porciones: PorcionesBajas[] }) {
             </p>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── F8-03: Predicción de demanda para mañana ──────────────────────────────────
+// Proyección basada en el promedio de los últimos turnos cerrados con el
+// mismo día de la semana que mañana (dashboard_prediccion_demanda(), mismo
+// patrón de "día de la semana histórico" que dashboard_alerta_ventas_bajas())
+// — nunca se presenta como garantía, el texto lo deja explícito.
+
+interface PrediccionDemanda {
+  diaLabel: string
+  promedio: number
+  turnosComparados: number
+}
+
+function PrediccionDemandaCard({ prediccion }: { prediccion: PrediccionDemanda | null }) {
+  if (!prediccion) return null
+
+  return (
+    <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+      <div className="border-b border-[#E5E5EA] px-4 pt-3.5 pb-2.5">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+          Predicción de demanda
+        </p>
+      </div>
+      <div className="px-4 py-4">
+        <p className="text-[14px] text-text-2">
+          Mañana (<span className="font-semibold">{prediccion.diaLabel}</span>): ventas esperadas{' '}
+          <span className="font-mono font-bold text-[#173F2E]">~${fmtMoney(prediccion.promedio)}</span>
+        </p>
+        <p className="mt-1.5 text-[11px] text-text-3">
+          Proyección basada en el promedio de los últimos {prediccion.turnosComparados}{' '}
+          {prediccion.diaLabel}s similares — es una tendencia histórica, no una garantía de venta.
+        </p>
       </div>
     </div>
   )

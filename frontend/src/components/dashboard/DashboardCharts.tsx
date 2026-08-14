@@ -15,6 +15,8 @@ import {
   PieChart,
   Pie,
   Cell,
+  ScatterChart,
+  Scatter,
 } from 'recharts'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -50,6 +52,25 @@ export interface VentaPorDiaSemana {
   promedio: number
   /** Cuántos turnos cerrados entraron en el promedio (0-8) */
   turnos: number
+}
+
+export interface HeatmapPunto {
+  /** 0=domingo…6=sábado (EXTRACT(DOW) de Postgres) */
+  diaSemana: number
+  diaLabel: string
+  hora: number
+  promedio: number
+  turnosContados: number
+}
+
+export interface MargenVolumenPunto {
+  productoId: number
+  nombre: string
+  /** Unidades vendidas históricamente (no acotado al turno, igual que margen_productos()) */
+  volumen: number
+  margen: number
+  margenPct: number
+  margenVariable: boolean
 }
 
 export interface TicketTipoStat {
@@ -130,6 +151,8 @@ interface DashboardChartsProps {
   /** Día con mayor/menor promedio entre los que sí tienen turnos contados — null si no hay ninguno. */
   diaMayor: string | null
   diaMenor: string | null
+  /** F8-01: una fila por combinación día×hora con datos — no incluye horas sin ningún cobro histórico. */
+  heatmapHorasPico: HeatmapPunto[]
   ticketPorTipo: TicketPorTipoData
   tiempoServicio: TiempoServicioData
   cancelaciones: CancelacionesData
@@ -237,6 +260,7 @@ export function DashboardCharts({
   ventasPorDiaSemana,
   diaMayor,
   diaMenor,
+  heatmapHorasPico,
   ticketPorTipo,
   tiempoServicio,
   cancelaciones,
@@ -255,6 +279,7 @@ export function DashboardCharts({
   const hayMetodos = metodosPago.some((m) => m.monto > 0)
   const hayTipos = tiposPedido.some((t) => t.count > 0)
   const hayDiaSemana = ventasPorDiaSemana.some((v) => v.turnos > 0)
+  const hayHeatmap = heatmapHorasPico.length > 0
   const hayTiempoServicio = tiempoServicio.pedidosContados > 0
   const hayCancelaciones = cancelaciones.count > 0
   const hayDescuentos = descuentos.count > 0
@@ -338,6 +363,9 @@ export function DashboardCharts({
           )}
         </div>
       )}
+
+      {/* ── (a.3) F8-01: Heatmap de horas pico ───────────────────────────────── */}
+      {hayHeatmap && <HeatmapHorasPicoCard puntos={heatmapHorasPico} />}
 
       {/* ── (b) Top productos ────────────────────────────────────────────── */}
       {hayProd && (
@@ -757,6 +785,183 @@ function MiniStatHex({ label, value, color }: { label: string; value: string; co
     <div className="rounded-xl bg-s2 px-3 py-2.5">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-text-3">{label}</p>
       <p className="mt-1 font-mono text-[16px] font-bold" style={{ color }}>{value}</p>
+    </div>
+  )
+}
+
+// ─── F8-01: Heatmap de horas pico ─────────────────────────────────────────────
+// Cuadrícula día×hora — filas = horas de operación reales (rango continuo
+// entre la hora más temprana y más tardía con algún cobro histórico, nunca
+// 0-23), columnas = días de la semana. Intensidad de verde bosque según el
+// promedio (nunca rojo — no es una alerta, es un patrón). Tocar una celda
+// muestra el detalle abajo, ya que no hay tooltip nativo en un grid de divs
+// (esto no es una gráfica de Recharts).
+
+function HeatmapHorasPicoCard({ puntos }: { puntos: HeatmapPunto[] }) {
+  const [celda, setCelda] = useState<HeatmapPunto | null>(null)
+
+  const horas = [...new Set(puntos.map((p) => p.hora))].sort((a, b) => a - b)
+  const horaMin = horas[0]
+  const horaMax = horas[horas.length - 1]
+  const rangoHoras = Array.from({ length: horaMax - horaMin + 1 }, (_, i) => horaMin + i)
+
+  const porCelda = new Map<string, HeatmapPunto>()
+  for (const p of puntos) porCelda.set(`${p.diaSemana}-${p.hora}`, p)
+
+  const maxPromedio = Math.max(...puntos.map((p) => p.promedio))
+
+  function colorCelda(p: HeatmapPunto | undefined): string {
+    if (!p || maxPromedio <= 0) return '#F2F2F7'
+    const intensidad = 0.12 + 0.88 * (p.promedio / maxPromedio)
+    return `rgba(23, 63, 46, ${intensidad.toFixed(2)})`
+  }
+
+  return (
+    <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+      <SectionHeader title="Horas pico (últimos 8 turnos por combinación)" />
+      <div className="overflow-x-auto px-3 pt-3 pb-2">
+        <div className="inline-grid min-w-full gap-[3px]" style={{ gridTemplateColumns: `32px repeat(7, 1fr)` }}>
+          {/* Encabezado de días */}
+          <div />
+          {DIAS_SEMANA_LABEL_HEATMAP.map((label) => (
+            <div key={label} className="pb-1 text-center text-[10px] font-semibold text-text-3">
+              {label}
+            </div>
+          ))}
+
+          {/* Una fila por hora */}
+          {rangoHoras.map((hora) => (
+            <FragmentoFilaHeatmap
+              key={hora}
+              hora={hora}
+              porCelda={porCelda}
+              colorCelda={colorCelda}
+              celdaSeleccionada={celda}
+              onSeleccionar={setCelda}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="border-t border-[#F2F2F7] px-4 py-2.5 text-[12px]">
+        {celda ? (
+          celda.turnosContados > 0 ? (
+            <p className="text-text-2">
+              <span className="font-semibold">
+                {celda.diaLabel} {String(celda.hora).padStart(2, '0')}:00
+              </span>{' '}
+              — ${fmtMoney(celda.promedio)} promedio, de {celda.turnosContados} turno
+              {celda.turnosContados !== 1 ? 's' : ''}
+            </p>
+          ) : (
+            <p className="text-text-3">Sin cobros históricos en ese horario.</p>
+          )
+        ) : (
+          <p className="text-text-3">Toca una celda para ver el detalle.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Índice = EXTRACT(DOW): 0=domingo…6=sábado — mismo orden que DIAS_SEMANA_LABEL
+// en dashboard/page.tsx, pero declarado aparte porque ese vive en el server
+// component y este archivo es 'use client'.
+const DIAS_SEMANA_LABEL_HEATMAP = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+
+function FragmentoFilaHeatmap({
+  hora,
+  porCelda,
+  colorCelda,
+  celdaSeleccionada,
+  onSeleccionar,
+}: {
+  hora: number
+  porCelda: Map<string, HeatmapPunto>
+  colorCelda: (p: HeatmapPunto | undefined) => string
+  celdaSeleccionada: HeatmapPunto | null
+  onSeleccionar: (p: HeatmapPunto) => void
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-end pr-1 text-[10px] font-medium text-text-3">
+        {String(hora).padStart(2, '0')}h
+      </div>
+      {DIAS_SEMANA_LABEL_HEATMAP.map((_, dow) => {
+        const p = porCelda.get(`${dow}-${hora}`)
+        const seleccionada = celdaSeleccionada?.diaSemana === dow && celdaSeleccionada?.hora === hora
+        return (
+          <button
+            key={dow}
+            onClick={() => p && onSeleccionar(p)}
+            disabled={!p}
+            className={`aspect-square rounded-[4px] transition-transform ${
+              seleccionada ? 'ring-2 ring-[#173F2E] ring-offset-1' : ''
+            }`}
+            style={{ backgroundColor: colorCelda(p) }}
+            aria-label={p ? `${DIAS_SEMANA_LABEL_HEATMAP[dow]} ${hora}:00 — $${fmtMoney(p.promedio)}` : undefined}
+          />
+        )
+      })}
+    </>
+  )
+}
+
+// ─── F8-02: Dispersión margen vs. volumen ─────────────────────────────────────
+// Exportado aparte (no forma parte de las props de <DashboardCharts>) porque
+// vive junto a <MargenProductosCard> en dashboard/page.tsx — sección de
+// costeo de catálogo, independiente del turno, con su propio punto de
+// inserción en las dos ramas de esa página (con/sin turno activo).
+
+function TooltipMargenVolumen({ active, payload }: any) {
+  if (!active || !payload?.length) return null
+  const p: MargenVolumenPunto = payload[0].payload
+  return (
+    <div className="rounded-xl bg-white border border-[#E5E5EA] shadow-lg px-3 py-2">
+      <p className="text-xs font-semibold text-text-2">{p.nombre}</p>
+      <p className="text-[11px] text-text-3">{p.volumen} vendidos</p>
+      <p className="text-sm font-bold text-[#173F2E]">
+        {p.margenVariable ? '~' : ''}${fmtMoney(p.margen)} ({p.margenPct.toFixed(1)}%)
+      </p>
+    </div>
+  )
+}
+
+export function MargenVolumenScatterCard({ puntos }: { puntos: MargenVolumenPunto[] }) {
+  if (puntos.length === 0) return null
+
+  return (
+    <div className="rounded-2xl bg-white shadow-card overflow-hidden">
+      <SectionHeader title="Margen vs. volumen" />
+      <div className="px-2 pt-3 pb-4">
+        <ResponsiveContainer width="100%" height={220}>
+          <ScatterChart margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+            <XAxis
+              type="number"
+              dataKey="volumen"
+              name="Volumen"
+              tick={{ fontSize: 10, fill: '#8E8E93' }}
+              axisLine={false}
+              tickLine={false}
+              label={{ value: 'Unidades vendidas', position: 'insideBottom', offset: -2, fontSize: 10, fill: '#8E8E93' }}
+            />
+            <YAxis
+              type="number"
+              dataKey="margen"
+              name="Margen"
+              tick={{ fontSize: 10, fill: '#8E8E93' }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v) => `$${fmtMoney(v)}`}
+            />
+            <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<TooltipMargenVolumen />} />
+            <Scatter data={puntos} fill="#173F2E" fillOpacity={0.75} />
+          </ScatterChart>
+        </ResponsiveContainer>
+        <p className="mt-1 px-2 text-[10px] text-text-3">
+          Cada punto es un producto — toca o pasa el cursor para ver su nombre.
+        </p>
+      </div>
     </div>
   )
 }
