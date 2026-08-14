@@ -6,7 +6,7 @@ import type { ComponentType } from 'react'
 import {
   ArrowLeftRight, Clock, BarChart3, Package, Printer, Users, ReceiptText,
   FileText, BookOpen, Armchair, Scissors, XCircle, Shield, Headphones,
-  NotebookText, LogOut, Monitor, ChevronRight, Lock,
+  NotebookText, LogOut, Monitor, ChevronRight, SlidersHorizontal,
 } from 'lucide-react'
 import { primerNombreValido } from '@/lib/nombreUsuario'
 import { HeaderA } from '@/components/ui/HeaderA'
@@ -103,11 +103,11 @@ export default async function MasPage() {
             </div>
           </div>
           <Link
-            href="/cambiar-password"
+            href="/preferencias"
             className="flex items-center gap-2 border-t border-[#F2F2F7] px-4 py-2.5 text-[12px] font-medium text-text-3 active:bg-s2"
           >
-            <Lock size={13} strokeWidth={2.2} />
-            Cambiar mi contraseña
+            <SlidersHorizontal size={13} strokeWidth={2.2} />
+            Preferencias
           </Link>
         </div>
 

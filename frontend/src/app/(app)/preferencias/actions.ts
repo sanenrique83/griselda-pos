@@ -35,3 +35,26 @@ export async function cambiarMiPassword(
   const { error: updateError } = await supabase.auth.updateUser({ password: passwordNueva })
   if (updateError) return { error: updateError.message ?? 'Error al actualizar la contraseña.' }
 }
+
+// ─── Sonido / vibración ─────────────────────────────────────────────────────
+// Cliente normal de sesión — perfil_propio_update (RLS) ya permite que
+// cualquier usuario actualice su propia fila de perfiles, sin necesitar el
+// cliente admin.
+export async function actualizarPreferenciasFeedback(
+  sonidoActivado: boolean,
+  vibracionActivada: boolean,
+): Promise<Err | undefined> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Sin sesión.' }
+
+  const { error } = await supabase
+    .from('perfiles')
+    .update({ sonido_activado: sonidoActivado, vibracion_activada: vibracionActivada })
+    .eq('id', user.id)
+
+  if (error) return { error: 'Error al guardar tus preferencias.' }
+}

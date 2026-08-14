@@ -18,6 +18,7 @@ import type { SubpedidoPOS, ItemComanda, MesaSillas, MesaCadenaItem } from '@/ap
 import { imprimirTicket, type TicketConfig } from '@/lib/print'
 import { agruparPorGrupo, construirDescripcionNatural, type OpcionConGrupo } from '@/lib/descripcionNatural'
 import { formatCurrency } from '@/components/ui/tokens'
+import { dispararFeedback } from '@/lib/feedback'
 import { SheetAsientos } from './SheetAsientos'
 import { siguienteSillaLibre } from '@/lib/asientos'
 
@@ -181,6 +182,7 @@ export function VistaComanda({
         return
       }
 
+      dispararFeedback('confirmar')
       router.refresh()
 
       if (comensales.length > 0) {
@@ -255,6 +257,7 @@ export function VistaComanda({
       if (result?.error) {
         setError(result.error)
       } else {
+        dispararFeedback('cancelar')
         setItemACancelar(null)
         setMotivoIdx(0)
         router.refresh()

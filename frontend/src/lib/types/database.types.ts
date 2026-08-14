@@ -38,6 +38,10 @@ export interface Perfil {
   pin_hash: string | null
   pin_intentos_fallidos: number
   pin_bloqueado_hasta: string | null
+  // Preferencias personales (pantalla /preferencias) — feedback táctil al
+  // agregar/confirmar/cobrar/cancelar, ver lib/feedback.ts.
+  sonido_activado: boolean
+  vibracion_activada: boolean
 }
 
 export interface ConfigSistema {

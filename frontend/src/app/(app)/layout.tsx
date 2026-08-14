@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { InactivityGuard } from '@/components/layout/InactivityGuard'
+import { FeedbackPrefsSync } from '@/components/layout/FeedbackPrefsSync'
 import type { ConfigSistema, Perfil } from '@/lib/types/database.types'
 
 // Layout protegido: verifica sesión y carga el perfil del usuario.
@@ -42,6 +43,10 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-dvh flex-col">
       <InactivityGuard timeoutMinutos={config?.timeout_inactividad_minutos ?? 15} />
+      <FeedbackPrefsSync
+        sonidoActivado={perfil.sonido_activado}
+        vibracionActivada={perfil.vibracion_activada}
+      />
 
       {/* Contenido de la pantalla — padding inferior para el BottomNav */}
       <main className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))]">

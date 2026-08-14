@@ -17,6 +17,7 @@ import { imprimirTicket, consolidarItemsCliente, type TicketConfig } from '@/lib
 import { HeaderB } from '@/components/ui/HeaderB'
 import { Boton } from '@/components/ui/Boton'
 import { formatCurrency } from '@/components/ui/tokens'
+import { dispararFeedback } from '@/lib/feedback'
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────
 
@@ -357,6 +358,8 @@ export function CobroShell({
         setError(result.error)
         return
       }
+
+      dispararFeedback('cobrar')
 
       // Cobro exitoso — imprimir ticket de pago de cliente (si el usuario lo pidió)
       if (imprimirTicketPago) {

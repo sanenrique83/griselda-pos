@@ -28,6 +28,7 @@ import {
   type ComboSlot,
 } from '@/app/(app)/pos/[pedidoId]/actions'
 import { siguienteSillaLibre } from '@/lib/asientos'
+import { dispararFeedback } from '@/lib/feedback'
 import type { TicketConfig } from '@/lib/print'
 import type {
   SubpedidoPOS,
@@ -139,6 +140,7 @@ export function PosShell({
   }
 
   function handleSheetSuccess() {
+    dispararFeedback('agregar')
     router.refresh()
   }
 
